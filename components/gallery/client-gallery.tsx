@@ -199,7 +199,7 @@ export function ClientGallery(props: Props) {
       </main>
 
       <footer className="pb-12 text-center">
-        <Wordmark className="text-muted" />
+        <Wordmark height={44} className="opacity-80" />
       </footer>
 
       {open !== null && (
@@ -280,7 +280,7 @@ function Cover({
     return (
       <section className="min-h-svh flex flex-col-reverse md:flex-row protect">
         <div className="md:w-[42%] flex flex-col items-center justify-center text-center px-8 py-14 md:py-0">
-          <Wordmark className="mb-12 text-muted" />
+          <Wordmark height={48} className="mb-12" />
           {heading("text-[clamp(2.2rem,5vw,4.5rem)]")}
           {enter(false)}
         </div>
@@ -292,7 +292,7 @@ function Cover({
   if (design.cover_layout === "framed") {
     return (
       <section className="min-h-svh flex flex-col items-center px-5 sm:px-12 pt-[max(env(safe-area-inset-top),1.5rem)] pb-10 protect">
-        <Wordmark className="text-muted mb-6" />
+        <Wordmark height={40} className="mb-6" />
         <div className="relative w-full flex-1 min-h-[55svh] overflow-hidden bg-bg-soft">{img("absolute inset-0 w-full h-full")}</div>
         <div className="text-center pt-10">
           {heading("text-[clamp(2.2rem,6vw,5rem)]")}
@@ -308,7 +308,7 @@ function Cover({
       {img("absolute inset-0 w-full h-full")}
       <div className={`absolute inset-0 ${bottom ? "bg-gradient-to-b from-black/20 via-transparent to-black/70" : "bg-black/30"}`} />
       <div className="absolute top-0 inset-x-0 flex justify-center pt-[max(env(safe-area-inset-top),1.75rem)] text-white/90">
-        <Wordmark />
+        <Wordmark height={44} tone="white" />
       </div>
       <div
         className={`absolute text-white px-6 sm:px-14 ${bottom ? "inset-x-0 bottom-0 pb-[max(env(safe-area-inset-bottom),3rem)] sm:pb-20 text-left" : "inset-0 flex flex-col items-center justify-center text-center"}`}

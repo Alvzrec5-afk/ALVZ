@@ -9,7 +9,7 @@ import type { ColorTheme, FontStyle } from "@/lib/design";
 function Shell({ theme, children }: { theme: ColorTheme; children: React.ReactNode }) {
   return (
     <div data-theme={theme} className="min-h-svh bg-bg text-ink flex flex-col items-center justify-center px-6 text-center">
-      <Wordmark className="absolute top-8" />
+      <Wordmark height={48} className="absolute top-8" />
       {children}
     </div>
   );

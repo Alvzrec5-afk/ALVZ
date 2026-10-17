@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Wordmark } from "@/components/wordmark";
 import { requireAdminPage } from "@/lib/auth";
 import { SessionKeeper } from "@/components/admin/session-keeper";
 import { signOut } from "../actions";
@@ -12,7 +13,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <SessionKeeper />
       <header className="border-b border-line">
         <div className="mx-auto max-w-6xl px-5 sm:px-8 h-16 flex items-center justify-between">
-          <Link href="/admin" className="eyebrow tracking-[0.42em]">ALVZ.REC <span className="text-muted ml-2 tracking-[0.2em]">studio</span></Link>
+          <Link href="/admin" className="flex items-center gap-3">
+            <Wordmark height={30} />
+            <span className="eyebrow text-muted tracking-[0.2em]">studio</span>
+          </Link>
           <form action={signOut}>
             <button className="eyebrow text-muted hover:text-ink transition-colors">Déconnexion</button>
           </form>

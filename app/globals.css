@@ -210,3 +210,10 @@ body {
 .fs-minimal { --g-font: var(--font-montserrat), sans-serif; --g-weight: 200; --g-transform: none; --g-tracking: 0.04em; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideIn { from { transform: translateX(100%); } to { transform: none; } }
+
+/* Logo : version blanche sur fonds sombres, version foncée sur Blanc et Sable */
+.logo-on-light { display: none; }
+[data-theme="blanc"] .logo-on-dark,
+[data-theme="sable"] .logo-on-dark { display: none; }
+[data-theme="blanc"] .logo-on-light,
+[data-theme="sable"] .logo-on-light { display: block; }
