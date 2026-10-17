@@ -85,7 +85,7 @@ export function presignGet(key: string, opts: { downloadName?: string } = {}) {
       Bucket: bucket(),
       Key: key,
       ResponseContentDisposition: opts.downloadName
-        ? `attachment; filename*=UTF-8''${encodeURIComponent(opts.downloadName)}`
+        ? `attachment; filename="${opts.downloadName.normalize("NFD").replace(/[^\x20-\x7e]/g, "").replace(/["\\]/g, "_")}"`
         : undefined,
     }),
     { expiresIn: 3 * 60 * 60, signingDate },

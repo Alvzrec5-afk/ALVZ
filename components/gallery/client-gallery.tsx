@@ -44,7 +44,7 @@ export function ClientGallery(props: Props) {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     return () => {
-      delete document.documentElement.dataset.theme;
+      document.documentElement.dataset.theme = "dark";
     };
   }, [theme]);
 

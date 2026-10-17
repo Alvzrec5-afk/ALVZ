@@ -5,6 +5,7 @@ import { presignGet, variantKey } from "@/lib/storage";
 import { StorageCheck } from "@/components/admin/storage-check";
 
 export const metadata = { title: "Galeries" };
+export const dynamic = "force-dynamic";
 
 type Row = {
   id: string;
@@ -19,11 +20,11 @@ type Row = {
 
 export default async function AdminHome() {
   const { supabase } = await requireAdminPage();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("galleries")
     .select("id, title, event_date, cover_photo_id, password_hash, expires_at, created_at, photos(count)")
-    .eq("photos.status", "ready")
     .order("created_at", { ascending: false });
+  if (error) throw new Error(`Impossible de charger les galeries : ${error.message}`);
   const galleries = (data ?? []) as Row[];
   const covers = await Promise.all(
     galleries.map((g) => (g.cover_photo_id ? presignGet(variantKey(g.id, g.cover_photo_id, "thumb")) : null)),

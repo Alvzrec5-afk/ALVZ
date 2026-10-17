@@ -22,8 +22,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
     .maybeSingle();
   if (!photo) return Response.json({ error: "Photo introuvable" }, { status: 404 });
 
-  const url = await presignGet(originalKey(photo.gallery_id, photo.id, photo.original_ext), {
-    downloadName: downloadName(photo),
-  });
-  return Response.redirect(url, 302);
+  const name = downloadName(photo);
+  const key = originalKey(photo.gallery_id, photo.id, photo.original_ext);
+  // ?json=1 : le navigateur récupère lui-même le fichier (enregistrement via le menu de partage sur mobile).
+  if (new URL(req.url).searchParams.get("json")) {
+    return Response.json({ url: await presignGet(key), name });
+  }
+  return Response.redirect(await presignGet(key, { downloadName: name }), 302);
 }

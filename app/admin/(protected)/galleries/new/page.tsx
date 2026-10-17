@@ -12,7 +12,7 @@ export default function NewGallery() {
       <GalleryForm
         action={createGallery}
         submitLabel="Créer la galerie"
-        values={{ title: "", event_date: "", expires_at: "", watermark: false, downloads_enabled: true, theme: "light", hasPassword: false }}
+        values={{ title: "", event_date: "", expires_at: "", watermark: false, downloads_enabled: true, theme: "dark", hasPassword: false }}
       />
     </div>
   );

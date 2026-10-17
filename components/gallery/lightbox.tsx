@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PhotoView } from "@/lib/types";
 import { ChevronLeft, ChevronRight, CloseIcon, DownloadIcon, HeartIcon } from "@/components/icons";
+import { fetchPhotoFile, prefersShareSheet } from "./save-photo";
 
 export function Lightbox({
   photos,
@@ -26,6 +27,37 @@ export function Lightbox({
   const [chrome, setChrome] = useState(true);
   const touch = useRef<{ x: number; y: number; t: number } | null>(null);
   const [dragX, setDragX] = useState(0);
+  const [saving, setSaving] = useState<null | "loading" | File>(null);
+
+  async function download(id: string) {
+    if (!downloadHref) return;
+    const href = downloadHref(id);
+    if (!prefersShareSheet()) {
+      window.location.href = href;
+      return;
+    }
+    setSaving("loading");
+    try {
+      const file = await fetchPhotoFile(href);
+      if (navigator.canShare({ files: [file] })) setSaving(file);
+      else {
+        setSaving(null);
+        window.location.href = href;
+      }
+    } catch (e) {
+      setSaving(null);
+      alert(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function share(file: File) {
+    try {
+      await navigator.share({ files: [file] });
+    } catch {
+      // partage annulé par le client
+    }
+    setSaving(null);
+  }
 
   const prev = useCallback(() => index > 0 && onIndex(index - 1), [index, onIndex]);
   const next = useCallback(() => index < photos.length - 1 && onIndex(index + 1), [index, onIndex, photos.length]);
@@ -95,9 +127,9 @@ export function Lightbox({
             <HeartIcon className={`w-5 h-5 ${fav ? "text-heart" : ""}`} filled={fav} />
           </button>
           {downloadHref && (
-            <a className="icon-btn" href={downloadHref(photo.id)} aria-label="Télécharger en HD">
+            <button className="icon-btn" onClick={() => download(photo.id)} aria-label="Télécharger en HD" disabled={saving !== null}>
               <DownloadIcon />
-            </a>
+            </button>
           )}
           <button className="icon-btn" onClick={onClose} aria-label="Fermer">
             <CloseIcon />
@@ -117,6 +149,19 @@ export function Lightbox({
           style={{ transform: dragX ? `translateX(${dragX}px)` : undefined, transition: dragX ? "none" : undefined, aspectRatio: `${photo.width} / ${photo.height}` }}
         />
       </div>
+
+      {saving !== null && (
+        <div className="absolute inset-x-0 bottom-0 z-20 px-5 pt-5 pb-[max(env(safe-area-inset-bottom),1.25rem)] bg-bg border-t border-line text-center" onTouchStart={(e) => e.stopPropagation()} onTouchEnd={(e) => e.stopPropagation()}>
+          {saving === "loading" ? (
+            <p className="eyebrow text-muted py-3">Préparation de la photo HD…</p>
+          ) : (
+            <div className="flex gap-3">
+              <button className="btn btn-ghost flex-1" onClick={() => setSaving(null)}>Annuler</button>
+              <button className="btn flex-1" onClick={() => share(saving)}>Enregistrer la photo</button>
+            </div>
+          )}
+        </div>
+      )}
 
       {index > 0 && (
         <button className={`hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 icon-btn w-12 h-12 transition-opacity ${chrome ? "" : "opacity-0"}`} onClick={prev} aria-label="Précédente">
