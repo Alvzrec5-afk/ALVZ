@@ -4,3 +4,7 @@
 
 [build.environment]
   NODE_VERSION = "22"
+
+# Active explicitement le moteur Next.js de Netlify (pages serveur, routes API).
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
