@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { regenerateLink, setGalleryExpiry, setGalleryPassword } from "@/app/admin/actions";
+import { regenerateLink, setGalleryExpiry, setGalleryPassword, setGallerySlug } from "@/app/admin/actions";
 import { DownloadIcon, HeartIcon, LockIcon, WrenchIcon } from "@/components/icons";
 import type { ManagedGallery } from "./gallery-manager";
 import { ListRow, SubHeader, Toggle } from "./ui";
@@ -161,8 +161,9 @@ function GeneralSettings({
       </form>
 
       <section className="border-t border-line mt-14 pt-8 max-w-xl space-y-3">
-        <h3 className="label">Lien secret</h3>
-        <p className="text-sm text-muted">Générer un nouveau lien rend l&apos;ancien inutilisable (utile si le lien a circulé par erreur).</p>
+        <h3 className="label">Lien de la galerie</h3>
+        <SlugSetting gallery={gallery} onDone={() => router.refresh()} />
+        <p className="text-sm text-muted pt-4">Ou générer un nouveau lien aléatoire, impossible à deviner. L&apos;ancien lien cessera de fonctionner.</p>
         <button
           className="btn btn-ghost"
           onClick={async () => {
@@ -171,7 +172,7 @@ function GeneralSettings({
             router.refresh();
           }}
         >
-          Nouveau lien
+          Nouveau lien aléatoire
         </button>
       </section>
       <section className="border-t border-line mt-10 pt-8 max-w-xl space-y-3">
@@ -220,5 +221,53 @@ function PasswordSetting({ gallery, onDone }: { gallery: ManagedGallery; onDone:
       )}
       {msg && <p className="text-xs text-emerald-400 mt-3">{msg}</p>}
     </div>
+  );
+}
+
+function SlugSetting({ gallery, onDone }: { gallery: ManagedGallery; onDone: () => void }) {
+  const [value, setValue] = useState(gallery.slug);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [origin, setOrigin] = useState("");
+  useEffect(() => setOrigin(window.location.host), []);
+  useEffect(() => setValue(gallery.slug), [gallery.slug]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (value === gallery.slug) return;
+    if (!confirm("Changer le lien ? L'ancien lien ne fonctionnera plus pour vos clients.")) return;
+    setBusy(true);
+    const r = await setGallerySlug(gallery.id, value);
+    setBusy(false);
+    if (r.error) return setMsg({ ok: false, text: r.error });
+    setValue(r.slug!);
+    setMsg({ ok: true, text: "Lien enregistré ✓" });
+    onDone();
+  }
+
+  return (
+    <form onSubmit={submit}>
+      <div className="flex items-end gap-1 border-b border-line focus-within:border-ink">
+        <span className="text-sm text-muted pb-3 shrink-0">{origin}/g/</span>
+        <input
+          className="flex-1 min-w-0 bg-transparent outline-none py-3 text-base"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
+          placeholder="camille-hugo"
+        />
+      </div>
+      <div className="mt-4 flex items-center gap-4">
+        <button className="btn" disabled={busy || value === gallery.slug}>{busy ? "…" : "Enregistrer le lien"}</button>
+        {msg && <span className={`text-xs ${msg.ok ? "text-emerald-400" : "text-danger"}`}>{msg.text}</span>}
+      </div>
+      {!gallery.hasPassword && (
+        <p className="text-xs text-amber-400 mt-3">
+          Conseil : un lien lisible est facile à deviner. Ajoutez un mot de passe (Confidentialité) pour une galerie privée.
+        </p>
+      )}
+    </form>
   );
 }

@@ -21,7 +21,7 @@ export type PublicGallery = {
 export const GALLERY_FIELDS = `id, slug, title, event_date, cover_photo_id, password_hash, expires_at, watermark, downloads_enabled, favorites_enabled, download_web_enabled, ${DESIGN_FIELDS}`;
 
 export async function findGalleryBySlug(slug: string) {
-  if (!/^[A-Za-z0-9_-]{10,64}$/.test(slug)) return null;
+  if (!/^[A-Za-z0-9_-]{3,64}$/.test(slug)) return null;
   const db = createServiceClient();
   const { data } = await db.from("galleries").select(GALLERY_FIELDS).eq("slug", slug).maybeSingle();
   return (data as PublicGallery | null) ?? null;

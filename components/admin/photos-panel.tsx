@@ -4,11 +4,12 @@ import { DndContext, PointerSensor, TouchSensor, closestCenter, useSensor, useSe
 import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { addCollection, renameCollection, reorderCollections, setCover } from "@/app/admin/actions";
 import type { Collection, PhotoView } from "@/lib/types";
 import { CloseIcon, DotsIcon, HeartIcon, PlusCircleIcon } from "@/components/icons";
 import { UploadPanel } from "./upload-panel";
+import { AdminViewer } from "./admin-viewer";
 import { purge } from "./purge";
 
 type Props = {
@@ -36,6 +37,10 @@ export function PhotosPanel(props: Props) {
   const [busy, setBusy] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [actions, setActions] = useState(false);
+  const [viewer, setViewer] = useState<number | null>(null);
+  const dragging = useRef(false); // évite d'ouvrir la visionneuse à la fin d'un glisser-déposer
+  const [coverId, setCoverId] = useState(props.coverPhotoId);
+  useEffect(() => setCoverId(props.coverPhotoId), [props.coverPhotoId]);
 
   useEffect(() => setPositions(props.positions), [props.positions]);
   useEffect(() => {
@@ -53,7 +58,10 @@ export function PhotosPanel(props: Props) {
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 6 } }),
   );
 
+  const endDrag = () => setTimeout(() => (dragging.current = false), 80);
+
   async function onDragEnd(e: DragEndEvent) {
+    endDrag();
     if (!e.over || e.active.id === e.over.id) return;
     const from = order.findIndex((p) => p.id === e.active.id);
     const to = order.findIndex((p) => p.id === e.over!.id);
@@ -203,14 +211,15 @@ export function PhotosPanel(props: Props) {
           <span className="text-emerald-400">Touchez ici pour ajouter des photos</span>
         </button>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={() => (dragging.current = true)} onDragCancel={endDrag} onDragEnd={onDragEnd}>
           <SortableContext items={order.map((p) => p.id)} strategy={rectSortingStrategy}>
             <ul className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
               {order.map((p) => (
                 <SortablePhoto
                   key={p.id}
                   photo={p}
-                  isCover={p.id === props.coverPhotoId}
+                  isCover={p.id === coverId}
+                  onOpen={() => !dragging.current && setViewer(order.findIndex((o) => o.id === p.id))}
                   favorites={props.favoriteCounts[p.id] ?? 0}
                   onCover={() => run(() => setCover(props.galleryId, p.id))}
                   onDelete={() => {
@@ -222,6 +231,35 @@ export function PhotosPanel(props: Props) {
           </SortableContext>
         </DndContext>
       )}
+
+      {viewer !== null && order[viewer] && (
+        <AdminViewer
+          photos={order}
+          index={viewer}
+          onIndex={setViewer}
+          onClose={() => setViewer(null)}
+          coverId={coverId}
+          favoriteCounts={props.favoriteCounts}
+          onCover={async (p) => {
+            await setCover(props.galleryId, p.id);
+            setCoverId(p.id);
+            router.refresh();
+          }}
+          onDelete={async (p) => {
+            try {
+              await post("/api/admin/photos/delete", { photoIds: [p.id] });
+            } catch (e) {
+              alert(e instanceof Error ? e.message : String(e));
+              return;
+            }
+            const remaining = order.filter((o) => o.id !== p.id);
+            setOrder(remaining);
+            if (remaining.length === 0) setViewer(null);
+            else setViewer(Math.min(viewer, remaining.length - 1));
+            router.refresh();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -229,12 +267,14 @@ export function PhotosPanel(props: Props) {
 function SortablePhoto({
   photo,
   isCover,
+  onOpen,
   favorites,
   onCover,
   onDelete,
 }: {
   photo: PhotoView;
   isCover: boolean;
+  onOpen: () => void;
   favorites: number;
   onCover: () => void;
   onDelete: () => void;
@@ -244,9 +284,10 @@ function SortablePhoto({
     <li
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 10 : undefined }}
-      className={`group relative aspect-square bg-bg-soft touch-manipulation ${isDragging ? "opacity-70" : ""}`}
+      className={`group relative aspect-square bg-bg-soft touch-manipulation cursor-pointer ${isDragging ? "opacity-70" : ""}`}
       {...attributes}
       {...listeners}
+      onClick={onOpen}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={photo.thumb} alt={photo.filename} loading="lazy" draggable={false} className="w-full h-full object-cover" />
@@ -258,11 +299,11 @@ function SortablePhoto({
       )}
       <div className="absolute inset-x-0 top-0 flex justify-end gap-1 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
         {!isCover && (
-          <button onPointerDown={(e) => e.stopPropagation()} onClick={onCover} className="bg-black/60 text-white text-[10px] px-1.5 py-1 uppercase tracking-wider" title="Utiliser comme couverture">
+          <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onCover(); }} className="bg-black/60 text-white text-[10px] px-1.5 py-1 uppercase tracking-wider" title="Utiliser comme couverture">
             Couv.
           </button>
         )}
-        <button onPointerDown={(e) => e.stopPropagation()} onClick={onDelete} className="bg-black/60 text-white text-[10px] px-1.5 py-1" title="Supprimer">
+        <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onDelete(); }} className="bg-black/60 text-white text-[10px] px-1.5 py-1" title="Supprimer">
           ✕
         </button>
       </div>

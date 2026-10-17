@@ -85,6 +85,26 @@ export async function regenerateLink(galleryId: string) {
   revalidatePath(`/admin/galleries/${galleryId}`);
 }
 
+/** Lien personnalisé, ex. « camille-hugo » → /g/camille-hugo */
+export async function setGallerySlug(galleryId: string, raw: string) {
+  const { supabase } = await requireAdminApi();
+  const slug = raw
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  if (!/^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/.test(slug)) {
+    return { error: "Le lien doit contenir entre 3 et 64 caractères (lettres, chiffres et tirets)." };
+  }
+  const { error } = await supabase.from("galleries").update({ slug }).eq("id", galleryId);
+  if (error) return { error: error.code === "23505" ? "Ce lien est déjà utilisé par une autre galerie." : error.message };
+  revalidatePath(`/admin/galleries/${galleryId}`);
+  revalidatePath("/admin");
+  return { slug };
+}
+
 export async function setCover(galleryId: string, photoId: string) {
   const { supabase } = await requireAdminApi();
   await supabase.from("galleries").update({ cover_photo_id: photoId }).eq("id", galleryId);
