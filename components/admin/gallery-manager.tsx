@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { GalleryDesign } from "@/lib/design";
 import type { Collection, PhotoView } from "@/lib/types";
-import { ArrowLeft, BrushIcon, DotsIcon, GearIcon, HeartIcon, ImageIcon } from "@/components/icons";
+import { ArrowLeft, BrushIcon, CloseIcon, DotsIcon, GearIcon, HeartIcon, ImageIcon, MenuIcon, PencilIcon } from "@/components/icons";
 import { PhotosPanel } from "./photos-panel";
 import { DesignPanel } from "./design-panel";
 import { SettingsPanel } from "./settings-panel";
@@ -48,6 +48,7 @@ export function GalleryManager(props: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("photos");
   const [menu, setMenu] = useState(false);
+  const [drawer, setDrawer] = useState(false);
   const [copied, setCopied] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -83,9 +84,6 @@ export function GalleryManager(props: Props) {
         </Link>
         <span className={`w-2 h-2 rounded-full shrink-0 ${status}`} />
         <h1 className="flex-1 min-w-0 text-lg truncate ml-1">{gallery.title}</h1>
-        <span className="hidden sm:block">
-          <button onClick={copy} className="btn btn-ghost">{copied ? "Lien copié ✓" : "Copier le lien"}</button>
-        </span>
         <div className="relative">
           <button className="icon-btn" onClick={() => setMenu((m) => !m)} aria-label="Options">
             <DotsIcon />
@@ -101,31 +99,56 @@ export function GalleryManager(props: Props) {
             </>
           )}
         </div>
+        <button className="icon-btn" onClick={() => setTab("design")} aria-label="Design">
+          <PencilIcon />
+        </button>
+        <button className="icon-btn" onClick={() => setDrawer(true)} aria-label="Menu de la galerie">
+          <MenuIcon />
+        </button>
       </div>
-      {copied && <p className="sm:hidden text-xs text-emerald-400 mt-1">Lien copié ✓</p>}
+      {copied && <p className="text-xs text-emerald-400 mt-1">Lien copié ✓</p>}
 
       <p className="text-xs text-muted mt-2">
         {props.photos.length} photos · {props.collections.length} collection{props.collections.length > 1 ? "s" : ""}
       </p>
 
-      {/* Onglets à icônes */}
-      <nav className="mt-6 grid grid-cols-4 border-b border-line -mx-5 sm:mx-0">
-        {TABS.map(({ id, label, Icon }) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            className={`flex flex-col items-center gap-1.5 pt-3 pb-3 border-b-2 -mb-px transition-colors ${tab === id ? "border-emerald-500 text-ink" : "border-transparent text-muted hover:text-ink"}`}
-          >
-            <Icon className="w-5 h-5" />
-            <span className="text-[10px] tracking-[0.18em] uppercase">
-              {label}
-              {id === "activity" && props.favoriteLists.length > 0 ? ` ${props.favoriteLists.length}` : ""}
-            </span>
-          </button>
-        ))}
-      </nav>
+      {/* Menu latéral : sections de la galerie */}
+      {drawer && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/50 animate-[fadeIn_0.2s_ease-out_both]" onClick={() => setDrawer(false)} />
+          <aside className="absolute right-0 top-0 h-full w-[78%] max-w-xs bg-bg border-l border-line px-6 pt-[max(env(safe-area-inset-top),1rem)] animate-[slideIn_0.25s_ease-out_both]">
+            <div className="flex items-center justify-between h-12">
+              <span className="eyebrow text-muted">Galerie</span>
+              <button className="icon-btn -mr-2" onClick={() => setDrawer(false)} aria-label="Fermer">
+                <CloseIcon />
+              </button>
+            </div>
+            <nav className="mt-6">
+              {TABS.map(({ id, label, Icon }) => (
+                <button
+                  key={id}
+                  onClick={() => {
+                    setTab(id);
+                    setDrawer(false);
+                  }}
+                  className={`w-full flex items-center gap-4 py-4 border-b border-line text-left ${tab === id ? "text-ink" : "text-muted hover:text-ink"}`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span className="flex-1 text-[15px]">{label}</span>
+                  {id === "activity" && props.favoriteLists.length > 0 && <span className="text-xs">{props.favoriteLists.length}</span>}
+                  {tab === id && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+                </button>
+              ))}
+            </nav>
+          </aside>
+        </div>
+      )}
 
-      <div className="pt-8">
+      {tab !== "photos" && (
+        <button onClick={() => setTab("photos")} className="mt-6 eyebrow text-muted hover:text-ink">← Photos</button>
+      )}
+
+      <div className="pt-6">
         {tab === "photos" && (
           <PhotosPanel
             galleryId={gallery.id}

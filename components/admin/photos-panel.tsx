@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { addCollection, renameCollection, reorderCollections, setCover } from "@/app/admin/actions";
 import type { Collection, PhotoView } from "@/lib/types";
-import { HeartIcon } from "@/components/icons";
+import { HeartIcon, PlusCircleIcon } from "@/components/icons";
 import { UploadPanel } from "./upload-panel";
 import { purge } from "./purge";
 
@@ -34,6 +34,7 @@ export function PhotosPanel(props: Props) {
   const [order, setOrder] = useState<PhotoView[]>([]);
   const [positions, setPositions] = useState(props.positions);
   const [busy, setBusy] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(props.photos.length === 0);
 
   useEffect(() => setPositions(props.positions), [props.positions]);
   useEffect(() => {
@@ -88,7 +89,16 @@ export function PhotosPanel(props: Props) {
 
   return (
     <div>
-      <UploadPanel galleryId={props.galleryId} defaultCollection={active?.name ?? "Galerie"} />
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <h2 className="display text-2xl sm:text-3xl min-w-0 truncate">{active?.name ?? "Photos"}</h2>
+        <button onClick={() => setUploadOpen((o) => !o)} className="shrink-0 flex items-center gap-1.5 text-[13px] sm:text-sm text-emerald-400 hover:text-emerald-300">
+          <PlusCircleIcon /> {uploadOpen ? "Fermer" : "Ajouter des médias"}
+        </button>
+      </div>
+      {/* Reste monté quand il est fermé, pour ne pas interrompre un envoi en cours */}
+      <div className={uploadOpen ? "" : "hidden"}>
+        <UploadPanel galleryId={props.galleryId} defaultCollection={active?.name ?? "Galerie"} />
+      </div>
 
       <div className="flex items-center gap-6 overflow-x-auto no-scrollbar border-b border-line">
         {props.collections.map((c) => (

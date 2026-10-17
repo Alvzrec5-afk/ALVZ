@@ -105,3 +105,20 @@ export const DotsIcon = ({ className = "w-5 h-5" }: P) => (
     <circle cx="19" cy="12" r="1.6" />
   </svg>
 );
+export const PencilIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <path d="M16.5 4.5l3 3L8 19l-4 1 1-4L16.5 4.5Z" />
+    <path d="M14.5 6.5l3 3" />
+  </svg>
+);
+export const MenuIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <path d="M4 7h16M4 12h16M4 17h16" />
+  </svg>
+);
+export const PlusCircleIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 8v8M8 12h8" />
+  </svg>
+);

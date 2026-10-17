@@ -208,3 +208,5 @@ body {
 .fs-modern { --g-font: var(--font-inter), sans-serif; --g-weight: 300; --g-transform: uppercase; --g-tracking: 0.3em; }
 .fs-editorial { --g-font: var(--font-playfair), serif; --g-weight: 400; --g-transform: none; --g-tracking: 0.01em; --g-style: italic; }
 .fs-minimal { --g-font: var(--font-montserrat), sans-serif; --g-weight: 200; --g-transform: none; --g-tracking: 0.04em; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideIn { from { transform: translateX(100%); } to { transform: none; } }
