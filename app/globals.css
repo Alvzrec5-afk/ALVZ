@@ -1,7 +1,8 @@
 @import "tailwindcss";
 
 /* ALVZ.REC — palette éditoriale : blanc chaud, encre profonde, très peu de couleur. */
-:root {
+:root,
+[data-theme="blanc"] {
   --bg: #fbfaf8;
   --bg-soft: #f3f1ed;
   --ink: #161514;
@@ -12,7 +13,30 @@
   color-scheme: light;
 }
 
-[data-theme="dark"] {
+[data-theme="sable"] {
+  --bg: #efe8de;
+  --bg-soft: #e5ddd1;
+  --ink: #2b2620;
+  --muted: #8a7f72;
+  --line: #d9cfc1;
+  --danger: #9a3b2a;
+  --heart: #a8473b;
+  color-scheme: light;
+}
+
+[data-theme="anthracite"] {
+  --bg: #23262a;
+  --bg-soft: #2c3035;
+  --ink: #e9e6e0;
+  --muted: #959189;
+  --line: #3a3e44;
+  --danger: #e07a68;
+  --heart: #e2766b;
+  color-scheme: dark;
+}
+
+[data-theme="dark"],
+[data-theme="noir"] {
   --bg: #0e0e0d;
   --bg-soft: #181816;
   --ink: #ece8e2;
@@ -170,3 +194,17 @@ body {
   from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: none; }
 }
+
+/* Styles typographiques des galeries */
+.gallery-title {
+  font-family: var(--g-font);
+  font-weight: var(--g-weight);
+  text-transform: var(--g-transform);
+  letter-spacing: var(--g-tracking);
+  font-style: var(--g-style, normal);
+  line-height: 1.05;
+}
+.fs-classic { --g-font: var(--font-cormorant), serif; --g-weight: 300; --g-transform: uppercase; --g-tracking: 0.08em; }
+.fs-modern { --g-font: var(--font-inter), sans-serif; --g-weight: 300; --g-transform: uppercase; --g-tracking: 0.3em; }
+.fs-editorial { --g-font: var(--font-playfair), serif; --g-weight: 400; --g-transform: none; --g-tracking: 0.01em; --g-style: italic; }
+.fs-minimal { --g-font: var(--font-montserrat), sans-serif; --g-weight: 200; --g-transform: none; --g-tracking: 0.04em; }

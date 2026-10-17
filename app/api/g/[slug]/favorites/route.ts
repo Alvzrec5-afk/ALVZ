@@ -9,6 +9,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   const access = await loadAccessibleGallery(slug);
   if ("error" in access) return access.error;
   const { gallery } = access;
+  if (!gallery.favorites_enabled) return Response.json({ error: "Favoris désactivés" }, { status: 403 });
 
   const { email } = (await req.json().catch(() => ({}))) as { email?: string };
   const clean = String(email ?? "").trim().toLowerCase();
@@ -33,6 +34,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ slug: st
   const access = await loadAccessibleGallery(slug);
   if ("error" in access) return access.error;
   const { gallery } = access;
+  if (!gallery.favorites_enabled) return Response.json({ error: "Favoris désactivés" }, { status: 403 });
 
   const listId = await getFavoriteListId(gallery);
   if (!listId) return Response.json({ error: "E-mail requis" }, { status: 401 });

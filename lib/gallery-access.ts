@@ -1,5 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { DESIGN_FIELDS, type GalleryDesign } from "@/lib/design";
 import { createServiceClient } from "@/lib/supabase/server";
 import { sign, unsign } from "@/lib/tokens";
 
@@ -13,11 +14,11 @@ export type PublicGallery = {
   expires_at: string | null;
   watermark: boolean;
   downloads_enabled: boolean;
-  theme: "light" | "dark";
-};
+  favorites_enabled: boolean;
+  download_web_enabled: boolean;
+} & GalleryDesign;
 
-export const GALLERY_FIELDS =
-  "id, slug, title, event_date, cover_photo_id, password_hash, expires_at, watermark, downloads_enabled, theme";
+export const GALLERY_FIELDS = `id, slug, title, event_date, cover_photo_id, password_hash, expires_at, watermark, downloads_enabled, favorites_enabled, download_web_enabled, ${DESIGN_FIELDS}`;
 
 export async function findGalleryBySlug(slug: string) {
   if (!/^[A-Za-z0-9_-]{10,64}$/.test(slug)) return null;

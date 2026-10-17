@@ -3,15 +3,33 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { regenerateLink, updateGallery } from "@/app/admin/actions";
+import type { GalleryDesign } from "@/lib/design";
 import type { Collection, PhotoView } from "@/lib/types";
-import { GalleryForm, type GalleryFormValues } from "./gallery-form";
+import { ArrowLeft, BrushIcon, DotsIcon, GearIcon, HeartIcon, ImageIcon } from "@/components/icons";
 import { PhotosPanel } from "./photos-panel";
+import { DesignPanel } from "./design-panel";
+import { SettingsPanel } from "./settings-panel";
 import { FavoritesPanel } from "./favorites-panel";
 import { purge } from "./purge";
 
+export type ManagedGallery = {
+  id: string;
+  slug: string;
+  title: string;
+  eventDate: string;
+  expiresAt: string;
+  expired: boolean;
+  coverPhotoId: string | null;
+  hasPassword: boolean;
+  watermark: boolean;
+  downloadsEnabled: boolean;
+  downloadWebEnabled: boolean;
+  favoritesEnabled: boolean;
+  design: GalleryDesign;
+};
+
 type Props = {
-  gallery: { id: string; slug: string; title: string; coverPhotoId: string | null; form: GalleryFormValues };
+  gallery: ManagedGallery;
   collections: Collection[];
   photos: PhotoView[];
   positions: Record<string, number>;
@@ -19,27 +37,29 @@ type Props = {
 };
 
 const TABS = [
-  { id: "photos", label: "Photos" },
-  { id: "settings", label: "Paramètres" },
-  { id: "favorites", label: "Favoris" },
+  { id: "photos", label: "Photos", Icon: ImageIcon },
+  { id: "design", label: "Design", Icon: BrushIcon },
+  { id: "settings", label: "Paramètres", Icon: GearIcon },
+  { id: "activity", label: "Activité", Icon: HeartIcon },
 ] as const;
 
 export function GalleryManager(props: Props) {
   const { gallery } = props;
   const router = useRouter();
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("photos");
+  const [menu, setMenu] = useState(false);
   const [copied, setCopied] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const link = () => `${window.location.origin}/g/${gallery.slug}`;
-
   async function copy() {
-    await navigator.clipboard.writeText(link());
+    await navigator.clipboard.writeText(`${window.location.origin}/g/${gallery.slug}`);
+    setMenu(false);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
   async function remove() {
+    setMenu(false);
     if (!confirm(`Supprimer définitivement la galerie « ${gallery.title} » et toutes ses photos ?`)) return;
     setDeleting(true);
     try {
@@ -52,34 +72,60 @@ export function GalleryManager(props: Props) {
     }
   }
 
+  const status = gallery.expired ? "bg-danger" : props.photos.length > 0 ? "bg-emerald-500" : "bg-muted";
+
   return (
-    <div>
-      <Link href="/admin" className="eyebrow text-muted hover:text-ink">← Galeries</Link>
-      <div className="mt-6 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
-        <div className="min-w-0">
-          <h1 className="display text-5xl break-words">{gallery.title}</h1>
-          <p className="text-xs text-muted mt-3">{props.photos.length} photos · {props.collections.length} collection{props.collections.length > 1 ? "s" : ""}</p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <button onClick={copy} className="btn">{copied ? "Lien copié ✓" : "Copier le lien"}</button>
-          <a href={`/g/${gallery.slug}`} target="_blank" rel="noreferrer" className="btn btn-ghost">Voir la galerie</a>
+    <div className={deleting ? "opacity-40 pointer-events-none" : ""}>
+      {/* En-tête */}
+      <div className="flex items-center gap-2 -mx-2">
+        <Link href="/admin" className="icon-btn" aria-label="Retour aux galeries">
+          <ArrowLeft />
+        </Link>
+        <span className={`w-2 h-2 rounded-full shrink-0 ${status}`} />
+        <h1 className="flex-1 min-w-0 text-lg truncate ml-1">{gallery.title}</h1>
+        <span className="hidden sm:block">
+          <button onClick={copy} className="btn btn-ghost">{copied ? "Lien copié ✓" : "Copier le lien"}</button>
+        </span>
+        <div className="relative">
+          <button className="icon-btn" onClick={() => setMenu((m) => !m)} aria-label="Options">
+            <DotsIcon />
+          </button>
+          {menu && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setMenu(false)} />
+              <div className="absolute right-0 mt-1 z-20 w-56 bg-bg-soft border border-line py-1 shadow-xl text-sm">
+                <button className="block w-full text-left px-4 py-3 hover:bg-bg" onClick={copy}>Copier le lien client</button>
+                <a className="block px-4 py-3 hover:bg-bg" href={`/g/${gallery.slug}`} target="_blank" rel="noreferrer" onClick={() => setMenu(false)}>Voir la galerie</a>
+                <button className="block w-full text-left px-4 py-3 text-danger hover:bg-bg" onClick={remove}>Supprimer la galerie</button>
+              </div>
+            </>
+          )}
         </div>
       </div>
+      {copied && <p className="sm:hidden text-xs text-emerald-400 mt-1">Lien copié ✓</p>}
 
-      <nav className="mt-12 border-b border-line flex gap-8">
-        {TABS.map((t) => (
+      <p className="text-xs text-muted mt-2">
+        {props.photos.length} photos · {props.collections.length} collection{props.collections.length > 1 ? "s" : ""}
+      </p>
+
+      {/* Onglets à icônes */}
+      <nav className="mt-6 grid grid-cols-4 border-b border-line -mx-5 sm:mx-0">
+        {TABS.map(({ id, label, Icon }) => (
           <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`eyebrow pb-4 -mb-px border-b transition-colors ${tab === t.id ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"}`}
+            key={id}
+            onClick={() => setTab(id)}
+            className={`flex flex-col items-center gap-1.5 pt-3 pb-3 border-b-2 -mb-px transition-colors ${tab === id ? "border-emerald-500 text-ink" : "border-transparent text-muted hover:text-ink"}`}
           >
-            {t.label}
-            {t.id === "favorites" && props.favoriteLists.length > 0 && <span className="ml-2 text-muted">{props.favoriteLists.length}</span>}
+            <Icon className="w-5 h-5" />
+            <span className="text-[10px] tracking-[0.18em] uppercase">
+              {label}
+              {id === "activity" && props.favoriteLists.length > 0 ? ` ${props.favoriteLists.length}` : ""}
+            </span>
           </button>
         ))}
       </nav>
 
-      <div className="pt-10">
+      <div className="pt-8">
         {tab === "photos" && (
           <PhotosPanel
             galleryId={gallery.id}
@@ -93,34 +139,9 @@ export function GalleryManager(props: Props) {
             }, {})}
           />
         )}
-        {tab === "settings" && (
-          <div className="space-y-20">
-            <GalleryForm action={updateGallery.bind(null, gallery.id)} values={gallery.form} submitLabel="Enregistrer" />
-            <section className="border-t border-line pt-10 max-w-xl space-y-4">
-              <h2 className="label">Lien secret</h2>
-              <p className="text-sm text-muted">
-                Générer un nouveau lien rend l&apos;ancien inutilisable (utile si le lien a circulé par erreur).
-              </p>
-              <button
-                className="btn btn-ghost"
-                onClick={async () => {
-                  if (!confirm("Générer un nouveau lien ? L'ancien ne fonctionnera plus.")) return;
-                  await regenerateLink(gallery.id);
-                  router.refresh();
-                }}
-              >
-                Nouveau lien
-              </button>
-            </section>
-            <section className="border-t border-line pt-10 max-w-xl space-y-4">
-              <h2 className="label text-danger">Zone sensible</h2>
-              <button className="btn btn-danger" onClick={remove} disabled={deleting}>
-                {deleting ? "Suppression…" : "Supprimer la galerie"}
-              </button>
-            </section>
-          </div>
-        )}
-        {tab === "favorites" && <FavoritesPanel lists={props.favoriteLists} photos={props.photos} collections={props.collections} />}
+        {tab === "design" && <DesignPanel gallery={gallery} photos={props.photos} />}
+        {tab === "settings" && <SettingsPanel gallery={gallery} onDelete={remove} />}
+        {tab === "activity" && <FavoritesPanel lists={props.favoriteLists} photos={props.photos} collections={props.collections} />}
       </div>
     </div>
   );

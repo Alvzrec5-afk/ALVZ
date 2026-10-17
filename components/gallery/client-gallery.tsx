@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { GalleryDesign } from "@/lib/design";
 import type { Collection, PhotoView } from "@/lib/types";
-import { ChevronDown, DownloadIcon, HeartIcon, MoonIcon, SunIcon } from "@/components/icons";
+import { ChevronDown, DownloadIcon, HeartIcon } from "@/components/icons";
 import { Wordmark } from "@/components/wordmark";
-import { JustifiedGrid } from "./justified-grid";
+import { PhotoGrid } from "./justified-grid";
 import { Lightbox } from "./lightbox";
 import { downloadArchive } from "./zip";
 
@@ -12,9 +13,11 @@ type Props = {
   slug: string;
   title: string;
   date: string;
-  theme: "light" | "dark";
+  design: GalleryDesign;
   watermark: boolean;
   downloadsEnabled: boolean;
+  downloadWebEnabled: boolean;
+  favoritesEnabled: boolean;
   cover: { src: string; width: number; height: number } | null;
   collections: Collection[];
   photos: PhotoView[];
@@ -24,7 +27,7 @@ type Props = {
 const FAVORITES_TAB = "__favorites";
 
 export function ClientGallery(props: Props) {
-  const [theme, setTheme] = useState(props.theme);
+  const { design } = props;
   const [tab, setTab] = useState(props.collections[0]?.id ?? "");
   const [favorites, setFavorites] = useState(() => new Set(props.favorites.photoIds));
   const [email, setEmail] = useState(props.favorites.email);
@@ -34,27 +37,13 @@ export function ClientGallery(props: Props) {
   const [zip, setZip] = useState<{ done: number; total: number } | null>(null);
   const gridTop = useRef<HTMLDivElement>(null);
 
-  // Préférence d'ambiance propre à chaque visiteur
+  // Couleur de fond de la page (zones de rebond iPhone comprises)
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(`theme:${props.slug}`);
-      if (saved === "light" || saved === "dark") setTheme(saved);
-    } catch {}
-  }, [props.slug]);
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
+    document.documentElement.dataset.theme = design.color_theme;
     return () => {
       document.documentElement.dataset.theme = "dark";
     };
-  }, [theme]);
-
-  const toggleTheme = () => {
-    const next = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    try {
-      localStorage.setItem(`theme:${props.slug}`, next);
-    } catch {}
-  };
+  }, [design.color_theme]);
 
   const visible = useMemo(
     () =>
@@ -119,41 +108,23 @@ export function ClientGallery(props: Props) {
   }
 
   const activeCollection = props.collections.find((c) => c.id === tab);
+  const scrollToGrid = () => gridTop.current?.scrollIntoView({ behavior: "smooth" });
 
   return (
-    <div data-theme={theme} className="min-h-svh bg-bg text-ink" onContextMenu={props.watermark ? (e) => (e.target as HTMLElement).tagName === "IMG" && e.preventDefault() : undefined}>
-      {/* Couverture plein écran */}
-      <section className="relative h-svh w-full overflow-hidden bg-black protect">
-        {props.cover && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={props.cover.src} alt="" className="absolute inset-0 w-full h-full object-cover animate-[coverIn_2.4s_ease-out_both]" />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/10 to-black/55" />
-        <div className="absolute top-0 inset-x-0 flex justify-center pt-[max(env(safe-area-inset-top),1.75rem)] text-white/90">
-          <Wordmark />
-        </div>
-        <div className="absolute inset-x-0 bottom-0 px-6 pb-[max(env(safe-area-inset-bottom),3.5rem)] sm:pb-24 text-center text-white">
-          <h1 className="display text-[clamp(2.75rem,9vw,7.5rem)] uppercase tracking-[0.08em] break-words animate-[fadeUp_1.6s_0.3s_ease-out_both]">
-            {props.title}
-          </h1>
-          {props.date && <p className="eyebrow mt-5 text-white/80 animate-[fadeUp_1.6s_0.6s_ease-out_both]">{props.date}</p>}
-          <button
-            onClick={() => gridTop.current?.scrollIntoView({ behavior: "smooth" })}
-            className="mt-10 inline-flex flex-col items-center gap-2 eyebrow text-white/80 hover:text-white transition-colors animate-[fadeUp_1.6s_0.9s_ease-out_both]"
-          >
-            Voir la galerie
-            <ChevronDown className="w-4 h-4 animate-bounce [animation-duration:2.4s]" />
-          </button>
-        </div>
-      </section>
+    <div
+      data-theme={design.color_theme}
+      className={`fs-${design.font_style} min-h-svh bg-bg text-ink`}
+      onContextMenu={props.watermark ? (e) => (e.target as HTMLElement).tagName === "IMG" && e.preventDefault() : undefined}
+    >
+      <Cover design={design} cover={props.cover} title={props.title} date={props.date} onEnter={scrollToGrid} />
 
-      <div ref={gridTop} className="scroll-mt-0" />
+      <div ref={gridTop} />
 
       {/* Barre de navigation discrète */}
       <header className="sticky top-0 z-30 bg-bg/90 backdrop-blur-md border-b border-line">
         <div className="mx-auto max-w-[1800px] px-3 sm:px-8 h-14 sm:h-16 flex items-center gap-3">
           <div className="hidden md:block w-56 shrink-0 min-w-0">
-            <p className="display text-lg truncate">{props.title}</p>
+            <p className="gallery-title text-base truncate">{props.title}</p>
           </div>
           <nav className="flex-1 min-w-0 flex md:justify-center gap-6 overflow-x-auto no-scrollbar px-2">
             {props.collections.length > 1 &&
@@ -166,8 +137,8 @@ export function ClientGallery(props: Props) {
                   {c.name}
                 </button>
               ))}
-            {props.collections.length <= 1 && <span className="md:hidden display text-lg truncate">{props.title}</span>}
-            {favorites.size > 0 && (
+            {props.collections.length <= 1 && <span className="md:hidden gallery-title text-base truncate">{props.title}</span>}
+            {props.favoritesEnabled && favorites.size > 0 && (
               <button
                 onClick={() => selectTab(FAVORITES_TAB)}
                 className={`eyebrow whitespace-nowrap py-2 border-b transition-colors flex items-center gap-1.5 ${tab === FAVORITES_TAB ? "border-ink" : "border-transparent text-muted hover:text-ink"}`}
@@ -176,7 +147,7 @@ export function ClientGallery(props: Props) {
               </button>
             )}
           </nav>
-          <div className="flex items-center justify-end gap-0 md:w-56 shrink-0">
+          <div className="flex items-center justify-end md:w-56 shrink-0">
             {props.downloadsEnabled && (
               <div className="relative">
                 <button className="icon-btn" onClick={() => setMenu((m) => !m)} aria-label="Télécharger" disabled={zip !== null}>
@@ -200,9 +171,6 @@ export function ClientGallery(props: Props) {
                 )}
               </div>
             )}
-            <button className="icon-btn" onClick={toggleTheme} aria-label="Changer d'ambiance">
-              {theme === "dark" ? <SunIcon /> : <MoonIcon />}
-            </button>
           </div>
         </div>
       </header>
@@ -214,12 +182,16 @@ export function ClientGallery(props: Props) {
           </p>
         )}
         {visible.length === 0 ? (
-          <p className="py-32 text-center display text-2xl text-muted">Aucune photo ici pour l&apos;instant.</p>
+          <p className="py-32 text-center gallery-title text-2xl text-muted">Aucune photo ici pour l&apos;instant.</p>
         ) : (
-          <JustifiedGrid
+          <PhotoGrid
             key={tab}
             photos={visible}
+            style={design.grid_style}
+            size={design.grid_size}
+            spacing={design.grid_spacing}
             favorites={favorites}
+            favoritesEnabled={props.favoritesEnabled}
             onOpen={(id) => setOpen(visible.findIndex((p) => p.id === id))}
             onToggleFavorite={toggleFavorite}
           />
@@ -237,8 +209,10 @@ export function ClientGallery(props: Props) {
           onIndex={setOpen}
           onClose={() => setOpen(null)}
           favorites={favorites}
+          favoritesEnabled={props.favoritesEnabled}
           onToggleFavorite={toggleFavorite}
-          downloadHref={props.downloadsEnabled ? (id) => `/api/g/${props.slug}/download?photo=${id}` : null}
+          downloadHref={props.downloadsEnabled ? (id, size) => `/api/g/${props.slug}/download?photo=${id}${size === "web" ? "&size=web" : ""}` : null}
+          webDownload={props.downloadWebEnabled}
         />
       )}
 
@@ -263,6 +237,86 @@ export function ClientGallery(props: Props) {
         </div>
       )}
     </div>
+  );
+}
+
+/** Couverture selon la mise en page choisie dans le studio. */
+function Cover({
+  design,
+  cover,
+  title,
+  date,
+  onEnter,
+}: {
+  design: GalleryDesign;
+  cover: Props["cover"];
+  title: string;
+  date: string;
+  onEnter: () => void;
+}) {
+  const focus = { objectPosition: `${design.cover_focus_x}% ${design.cover_focus_y}%` };
+  const img = (cls: string) =>
+    cover ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={cover.src} alt="" className={`${cls} object-cover animate-[coverIn_2.4s_ease-out_both]`} style={focus} />
+    ) : null;
+  const enter = (light: boolean) => (
+    <button
+      onClick={onEnter}
+      className={`mt-10 inline-flex flex-col items-center gap-2 eyebrow transition-colors animate-[fadeUp_1.6s_0.9s_ease-out_both] ${light ? "text-white/80 hover:text-white" : "text-muted hover:text-ink"}`}
+    >
+      Voir la galerie
+      <ChevronDown className="w-4 h-4 animate-bounce [animation-duration:2.4s]" />
+    </button>
+  );
+  const heading = (cls: string) => (
+    <>
+      <h1 className={`gallery-title break-words animate-[fadeUp_1.6s_0.3s_ease-out_both] ${cls}`}>{title}</h1>
+      {date && <p className="eyebrow mt-5 opacity-80 animate-[fadeUp_1.6s_0.6s_ease-out_both]">{date}</p>}
+    </>
+  );
+
+  if (design.cover_layout === "split") {
+    return (
+      <section className="min-h-svh flex flex-col-reverse md:flex-row protect">
+        <div className="md:w-[42%] flex flex-col items-center justify-center text-center px-8 py-14 md:py-0">
+          <Wordmark className="mb-12 text-muted" />
+          {heading("text-[clamp(2.2rem,5vw,4.5rem)]")}
+          {enter(false)}
+        </div>
+        <div className="relative h-[62svh] md:h-auto md:flex-1 overflow-hidden bg-bg-soft">{img("absolute inset-0 w-full h-full")}</div>
+      </section>
+    );
+  }
+
+  if (design.cover_layout === "framed") {
+    return (
+      <section className="min-h-svh flex flex-col items-center px-5 sm:px-12 pt-[max(env(safe-area-inset-top),1.5rem)] pb-10 protect">
+        <Wordmark className="text-muted mb-6" />
+        <div className="relative w-full flex-1 min-h-[55svh] overflow-hidden bg-bg-soft">{img("absolute inset-0 w-full h-full")}</div>
+        <div className="text-center pt-10">
+          {heading("text-[clamp(2.2rem,6vw,5rem)]")}
+          {enter(false)}
+        </div>
+      </section>
+    );
+  }
+
+  const bottom = design.cover_layout === "bottom";
+  return (
+    <section className="relative h-svh w-full overflow-hidden bg-black protect">
+      {img("absolute inset-0 w-full h-full")}
+      <div className={`absolute inset-0 ${bottom ? "bg-gradient-to-b from-black/20 via-transparent to-black/70" : "bg-black/30"}`} />
+      <div className="absolute top-0 inset-x-0 flex justify-center pt-[max(env(safe-area-inset-top),1.75rem)] text-white/90">
+        <Wordmark />
+      </div>
+      <div
+        className={`absolute text-white px-6 sm:px-14 ${bottom ? "inset-x-0 bottom-0 pb-[max(env(safe-area-inset-bottom),3rem)] sm:pb-20 text-left" : "inset-0 flex flex-col items-center justify-center text-center"}`}
+      >
+        {heading("text-[clamp(2.6rem,9vw,7.5rem)]")}
+        <div className={bottom ? "" : ""}>{enter(true)}</div>
+      </div>
+    </section>
   );
 }
 

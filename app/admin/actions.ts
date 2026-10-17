@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdminApi } from "@/lib/auth";
 import { parisEndOfDay } from "@/lib/dates";
+import { sanitizeSettingsPatch } from "@/lib/design";
 import { createSessionClient } from "@/lib/supabase/server";
 import { newSlug } from "@/lib/tokens";
 
@@ -16,29 +17,17 @@ export async function signOut() {
   redirect("/admin/login");
 }
 
-function readSettings(form: FormData) {
-  const title = String(form.get("title") ?? "").trim();
-  const eventDate = String(form.get("event_date") ?? "").trim();
-  const expires = String(form.get("expires_at") ?? "").trim();
-  return {
-    title,
-    event_date: eventDate || null,
-    expires_at: expires ? parisEndOfDay(expires) : null,
-    watermark: form.get("watermark") === "on",
-    downloads_enabled: form.get("downloads_enabled") === "on",
-    theme: form.get("theme") === "dark" ? "dark" : "light",
-  };
-}
-
 export async function createGallery(_: FormState, form: FormData): Promise<FormState> {
   const { supabase } = await requireAdminApi();
-  const settings = readSettings(form);
-  if (!settings.title) return { error: "Le nom du client est obligatoire." };
+  const title = String(form.get("title") ?? "").trim();
+  if (!title) return { error: "Le nom du client est obligatoire." };
+  const eventDate = String(form.get("event_date") ?? "").trim();
   const password = String(form.get("password") ?? "");
   const { data, error } = await supabase
     .from("galleries")
     .insert({
-      ...settings,
+      title,
+      event_date: eventDate || null,
       slug: newSlug(),
       password_hash: password ? await bcrypt.hash(password, 10) : null,
     })
@@ -50,19 +39,44 @@ export async function createGallery(_: FormState, form: FormData): Promise<FormS
   redirect(`/admin/galleries/${data.id}`);
 }
 
-export async function updateGallery(galleryId: string, _: FormState, form: FormData): Promise<FormState> {
+/** Modifie un ou plusieurs réglages (design, options, nom, date…). Les valeurs sont validées côté serveur. */
+export async function updateGallerySettings(galleryId: string, patch: Record<string, unknown>) {
   const { supabase } = await requireAdminApi();
-  const settings = readSettings(form);
-  if (!settings.title) return { error: "Le nom du client est obligatoire." };
-  const update: Record<string, unknown> = { ...settings, updated_at: new Date().toISOString() };
-  const password = String(form.get("password") ?? "");
-  if (form.get("remove_password") === "on") update.password_hash = null;
-  else if (password) update.password_hash = await bcrypt.hash(password, 10);
-  const { error } = await supabase.from("galleries").update(update).eq("id", galleryId);
+  const clean = sanitizeSettingsPatch(patch);
+  if (Object.keys(clean).length === 0) return { error: "Aucune modification valide" };
+  const { error } = await supabase
+    .from("galleries")
+    .update({ ...clean, updated_at: new Date().toISOString() })
+    .eq("id", galleryId);
   if (error) return { error: error.message };
   revalidatePath(`/admin/galleries/${galleryId}`);
   revalidatePath("/admin");
-  return { ok: "Modifications enregistrées." };
+  return {};
+}
+
+export async function setGalleryPassword(galleryId: string, password: string | null) {
+  const { supabase } = await requireAdminApi();
+  const { error } = await supabase
+    .from("galleries")
+    .update({ password_hash: password ? await bcrypt.hash(password, 10) : null, updated_at: new Date().toISOString() })
+    .eq("id", galleryId);
+  if (error) return { error: error.message };
+  revalidatePath(`/admin/galleries/${galleryId}`);
+  revalidatePath("/admin");
+  return {};
+}
+
+export async function setGalleryExpiry(galleryId: string, date: string | null) {
+  const { supabase } = await requireAdminApi();
+  if (date !== null && !/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "Date invalide" };
+  const { error } = await supabase
+    .from("galleries")
+    .update({ expires_at: date ? parisEndOfDay(date) : null, updated_at: new Date().toISOString() })
+    .eq("id", galleryId);
+  if (error) return { error: error.message };
+  revalidatePath(`/admin/galleries/${galleryId}`);
+  revalidatePath("/admin");
+  return {};
 }
 
 export async function regenerateLink(galleryId: string) {

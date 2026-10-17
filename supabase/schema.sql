@@ -25,7 +25,17 @@ create table public.galleries (
   expires_at timestamptz,
   watermark boolean not null default false,
   downloads_enabled boolean not null default true,
-  theme text not null default 'light' check (theme in ('light','dark')),
+  theme text not null default 'light' check (theme in ('light','dark')), -- ancien réglage, remplacé par color_theme
+  cover_layout text not null default 'center' check (cover_layout in ('center','bottom','split','framed')),
+  cover_focus_x real not null default 50 check (cover_focus_x between 0 and 100),
+  cover_focus_y real not null default 50 check (cover_focus_y between 0 and 100),
+  font_style text not null default 'classic' check (font_style in ('classic','modern','editorial','minimal')),
+  color_theme text not null default 'noir' check (color_theme in ('noir','blanc','sable','anthracite')),
+  grid_style text not null default 'justified' check (grid_style in ('justified','square','columns')),
+  grid_size text not null default 'large' check (grid_size in ('small','large')),
+  grid_spacing text not null default 'fine' check (grid_spacing in ('fine','wide')),
+  favorites_enabled boolean not null default true,
+  download_web_enabled boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { GridSize, GridSpacing, GridStyle } from "@/lib/design";
 import type { PhotoView } from "@/lib/types";
 import { HeartIcon } from "@/components/icons";
 
@@ -24,19 +25,32 @@ function computeRows(photos: PhotoView[], width: number, target: number, gap: nu
   return rows;
 }
 
+/** Colonnes : chaque photo va dans la colonne la plus courte (proportions respectées). */
+function computeColumns(photos: PhotoView[], count: number) {
+  const cols: PhotoView[][] = Array.from({ length: count }, () => []);
+  const heights = new Array(count).fill(0);
+  for (const p of photos) {
+    const i = heights.indexOf(Math.min(...heights));
+    cols[i].push(p);
+    heights[i] += p.height / p.width;
+  }
+  return cols;
+}
+
 const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
-export function JustifiedGrid({
-  photos,
-  favorites,
-  onOpen,
-  onToggleFavorite,
-}: {
+type Props = {
   photos: PhotoView[];
+  style: GridStyle;
+  size: GridSize;
+  spacing: GridSpacing;
   favorites: Set<string>;
+  favoritesEnabled: boolean;
   onOpen: (id: string) => void;
   onToggleFavorite: (id: string) => void;
-}) {
+};
+
+export function PhotoGrid({ photos, style, size, spacing, favorites, favoritesEnabled, onOpen, onToggleFavorite }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
 
@@ -49,10 +63,14 @@ export function JustifiedGrid({
     return () => ro.disconnect();
   }, []);
 
-  const mobile = width > 0 && width < 640;
-  const gap = mobile ? 4 : 8;
-  const target = mobile ? 170 : width < 1100 ? 260 : 320;
-  const rows = useMemo(() => (width ? computeRows(photos, width, target, gap) : []), [photos, width, target, gap]);
+  const bp = width < 640 ? 0 : width < 1100 ? 1 : 2; // téléphone, tablette, ordinateur
+  const gap = spacing === "fine" ? [3, 6, 8][bp] : [10, 18, 26][bp];
+  const small = size === "small";
+  const target = small ? [110, 180, 220][bp] : [170, 260, 320][bp];
+  const columnCount = style === "square" ? (small ? [3, 4, 6] : [2, 3, 4])[bp] : (small ? [3, 4, 5] : [2, 3, 3])[bp];
+
+  const rows = useMemo(() => (width && style === "justified" ? computeRows(photos, width, target, gap) : []), [photos, width, target, gap, style]);
+  const cols = useMemo(() => (style === "columns" ? computeColumns(photos, columnCount) : []), [photos, columnCount, style]);
 
   // Apparition en fondu au défilement
   useEffect(() => {
@@ -70,42 +88,65 @@ export function JustifiedGrid({
     );
     el.querySelectorAll(".reveal:not(.is-visible)").forEach((n) => io.observe(n));
     return () => io.disconnect();
-  }, [rows]);
+  }, [rows, cols, width, style]);
+
+  const tile = (p: PhotoView, box: React.CSSProperties, displayWidth: number, cover: boolean) => {
+    const fav = favorites.has(p.id);
+    return (
+      <div key={p.id} className="reveal group relative bg-bg-soft overflow-hidden" style={box}>
+        <button className="block w-full h-full cursor-zoom-in" onClick={() => onOpen(p.id)} aria-label={`Ouvrir ${p.filename}`}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={p.thumb}
+            srcSet={`${p.thumb} 640w, ${p.web} 2000w`}
+            sizes={`${Math.round(displayWidth)}px`}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            draggable={false}
+            className={`w-full h-full ${cover ? "object-cover" : "object-contain"} transition-transform duration-[1.2s] ease-out group-hover:scale-[1.015]`}
+          />
+        </button>
+        {favoritesEnabled && (
+          <button
+            onClick={() => onToggleFavorite(p.id)}
+            className={`absolute bottom-1 right-1 w-9 h-9 flex items-center justify-center text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-opacity ${fav ? "opacity-100" : "opacity-0 group-hover:opacity-90 [@media(hover:none)]:opacity-70"}`}
+            aria-label={fav ? "Retirer des favoris" : "Ajouter aux favoris"}
+          >
+            <HeartIcon className="w-5 h-5" filled={fav} />
+          </button>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div ref={ref} className="w-full">
-      {rows.map((row, r) => (
-        <div key={r} className="flex" style={{ gap, marginBottom: gap }}>
-          {row.items.map((p) => {
-            const w = (p.width / p.height) * row.height;
-            const fav = favorites.has(p.id);
-            return (
-              <div key={p.id} className="reveal group relative bg-bg-soft shrink-0 overflow-hidden" style={{ width: w, height: row.height }}>
-                <button className="block w-full h-full cursor-zoom-in" onClick={() => onOpen(p.id)} aria-label={`Ouvrir ${p.filename}`}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={p.thumb}
-                    srcSet={`${p.thumb} 640w, ${p.web} 2000w`}
-                    sizes={`${Math.round(w)}px`}
-                    alt=""
-                    loading="lazy"
-                    decoding="async"
-                    draggable={false}
-                    className="w-full h-full object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-[1.015]"
-                  />
-                </button>
-                <button
-                  onClick={() => onToggleFavorite(p.id)}
-                  className={`absolute bottom-1.5 right-1.5 w-9 h-9 flex items-center justify-center text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-opacity ${fav ? "opacity-100" : "opacity-0 group-hover:opacity-90 [@media(hover:none)]:opacity-70"}`}
-                  aria-label={fav ? "Retirer des favoris" : "Ajouter aux favoris"}
-                >
-                  <HeartIcon className="w-5 h-5" filled={fav} />
-                </button>
-              </div>
-            );
-          })}
+      {width > 0 && style === "justified" &&
+        rows.map((row, r) => (
+          <div key={r} className="flex" style={{ gap, marginBottom: gap }}>
+            {row.items.map((p) => {
+              const w = (p.width / p.height) * row.height;
+              return tile(p, { width: w, height: row.height, flexShrink: 0 }, w, true);
+            })}
+          </div>
+        ))}
+
+      {width > 0 && style === "square" && (
+        <div className="grid" style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`, gap }}>
+          {photos.map((p) => tile(p, { aspectRatio: "1 / 1" }, width / columnCount, true))}
         </div>
-      ))}
+      )}
+
+      {width > 0 && style === "columns" && (
+        <div className="flex items-start" style={{ gap }}>
+          {cols.map((col, i) => (
+            <div key={i} className="flex-1 min-w-0 flex flex-col" style={{ gap }}>
+              {col.map((p) => tile(p, { aspectRatio: `${p.width} / ${p.height}` }, width / columnCount, true))}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

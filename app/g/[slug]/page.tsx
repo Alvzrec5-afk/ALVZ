@@ -19,8 +19,8 @@ export default async function GalleryPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   const gallery = await findGalleryBySlug(slug);
   if (!gallery) notFound();
-  if (isExpired(gallery)) return <ExpiredScreen theme={gallery.theme} />;
-  if (!(await hasAccess(gallery))) return <LockScreen slug={slug} title={gallery.title} theme={gallery.theme} />;
+  if (isExpired(gallery)) return <ExpiredScreen theme={gallery.color_theme} />;
+  if (!(await hasAccess(gallery))) return <LockScreen slug={slug} title={gallery.title} theme={gallery.color_theme} fontStyle={gallery.font_style} />;
 
   const db = createServiceClient();
   const listId = await getFavoriteListId(gallery);
@@ -42,9 +42,20 @@ export default async function GalleryPage({ params }: { params: Promise<{ slug: 
       slug={slug}
       title={gallery.title}
       date={formatLongDate(gallery.event_date)}
-      theme={gallery.theme}
+      design={{
+        cover_layout: gallery.cover_layout,
+        cover_focus_x: gallery.cover_focus_x,
+        cover_focus_y: gallery.cover_focus_y,
+        font_style: gallery.font_style,
+        color_theme: gallery.color_theme,
+        grid_style: gallery.grid_style,
+        grid_size: gallery.grid_size,
+        grid_spacing: gallery.grid_spacing,
+      }}
       watermark={gallery.watermark}
       downloadsEnabled={gallery.downloads_enabled}
+      downloadWebEnabled={gallery.download_web_enabled}
+      favoritesEnabled={gallery.favorites_enabled}
       cover={cover ? { src: cover.web, width: cover.width, height: cover.height } : null}
       collections={visibleCollections}
       photos={views}

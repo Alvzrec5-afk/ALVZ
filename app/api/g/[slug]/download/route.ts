@@ -1,6 +1,6 @@
 import { loadAccessibleGallery } from "@/lib/gallery-access";
 import { downloadName } from "@/lib/photos";
-import { originalKey, presignGet } from "@/lib/storage";
+import { originalKey, presignGet, variantKey } from "@/lib/storage";
 import { createServiceClient } from "@/lib/supabase/server";
 
 /** Téléchargement d'une photo en HD : redirige vers une URL Oracle temporaire. */
@@ -22,6 +22,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
     .maybeSingle();
   if (!photo) return Response.json({ error: "Photo introuvable" }, { status: 404 });
 
+  // Taille web (si autorisée) : version 2000 px, filigranée si la galerie l'est.
+  if (new URL(req.url).searchParams.get("size") === "web" && gallery.download_web_enabled) {
+    const webName = `${photo.filename.replace(/\.[^.]+$/, "")}-web.jpg`;
+    const webKey = variantKey(photo.gallery_id, photo.id, gallery.watermark ? "web_wm" : "web");
+    return Response.redirect(await presignGet(webKey, { downloadName: webName }), 302);
+  }
   const name = downloadName(photo);
   const key = originalKey(photo.gallery_id, photo.id, photo.original_ext);
   return Response.redirect(await presignGet(key, { downloadName: name }), 302);

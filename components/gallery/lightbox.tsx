@@ -10,22 +10,27 @@ export function Lightbox({
   onIndex,
   onClose,
   favorites,
+  favoritesEnabled,
   onToggleFavorite,
   downloadHref,
+  webDownload,
 }: {
   photos: PhotoView[];
   index: number;
   onIndex: (i: number) => void;
   onClose: () => void;
   favorites: Set<string>;
+  favoritesEnabled: boolean;
   onToggleFavorite: (id: string) => void;
-  downloadHref: ((id: string) => string) | null;
+  downloadHref: ((id: string, size?: "hd" | "web") => string) | null;
+  webDownload: boolean;
 }) {
   const photo = photos[index];
   const [loaded, setLoaded] = useState(false);
   const [chrome, setChrome] = useState(true);
   const touch = useRef<{ x: number; y: number; t: number } | null>(null);
   const [dragX, setDragX] = useState(0);
+  const [sizeMenu, setSizeMenu] = useState(false);
   const prev = useCallback(() => index > 0 && onIndex(index - 1), [index, onIndex]);
   const next = useCallback(() => index < photos.length - 1 && onIndex(index + 1), [index, onIndex, photos.length]);
 
@@ -95,13 +100,32 @@ export function Lightbox({
       >
         <span className="eyebrow text-muted pl-2">{index + 1} / {photos.length}</span>
         <div className="flex items-center gap-1">
-          <button className="icon-btn" onClick={() => onToggleFavorite(photo.id)} aria-label="Favori">
-            <HeartIcon className={`w-5 h-5 ${fav ? "text-heart" : ""}`} filled={fav} />
-          </button>
-          {downloadHref && (
+          {favoritesEnabled && (
+            <button className="icon-btn" onClick={() => onToggleFavorite(photo.id)} aria-label="Favori">
+              <HeartIcon className={`w-5 h-5 ${fav ? "text-heart" : ""}`} filled={fav} />
+            </button>
+          )}
+          {downloadHref && !webDownload && (
             <a className="icon-btn" href={downloadHref(photo.id)} download aria-label="Télécharger en HD">
               <DownloadIcon />
             </a>
+          )}
+          {downloadHref && webDownload && (
+            <div className="relative">
+              <button className="icon-btn" onClick={() => setSizeMenu((m) => !m)} aria-label="Télécharger">
+                <DownloadIcon />
+              </button>
+              {sizeMenu && (
+                <div className="absolute right-0 mt-1 w-52 bg-bg-soft border border-line py-1 shadow-xl text-sm z-30">
+                  <a className="block px-4 py-3 hover:bg-bg" href={downloadHref(photo.id, "hd")} download onClick={() => setSizeMenu(false)}>
+                    Haute définition
+                  </a>
+                  <a className="block px-4 py-3 hover:bg-bg" href={downloadHref(photo.id, "web")} download onClick={() => setSizeMenu(false)}>
+                    Taille web <span className="text-muted text-xs">(réseaux sociaux)</span>
+                  </a>
+                </div>
+              )}
+            </div>
           )}
           <button className="icon-btn" onClick={onClose} aria-label="Fermer">
             <CloseIcon />

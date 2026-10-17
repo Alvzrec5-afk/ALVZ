@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Cormorant_Garamond, Inter } from "next/font/google";
+import { Cormorant_Garamond, Inter, Montserrat, Playfair_Display } from "next/font/google";
 import "./globals.css";
 
 const cormorant = Cormorant_Garamond({
@@ -17,6 +17,21 @@ const inter = Inter({
   display: "swap",
 });
 
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  style: ["normal", "italic"],
+  variable: "--font-playfair",
+  display: "swap",
+});
+
+const montserrat = Montserrat({
+  subsets: ["latin"],
+  weight: ["200", "300"],
+  variable: "--font-montserrat",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: { default: "ALVZ.REC", template: "%s — ALVZ.REC" },
   description: "Galeries privées ALVZ.REC — photo & vidéo.",
@@ -31,7 +46,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" data-theme="dark" className={`${cormorant.variable} ${inter.variable}`} suppressHydrationWarning>
+    <html lang="fr" data-theme="dark" className={`${cormorant.variable} ${inter.variable} ${playfair.variable} ${montserrat.variable}`} suppressHydrationWarning>
       <body>{children}</body>
     </html>
   );
