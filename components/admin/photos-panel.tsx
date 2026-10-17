@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { addCollection, renameCollection, reorderCollections, setCover } from "@/app/admin/actions";
 import type { Collection, PhotoView } from "@/lib/types";
-import { HeartIcon, PlusCircleIcon } from "@/components/icons";
+import { CloseIcon, DotsIcon, HeartIcon, PlusCircleIcon } from "@/components/icons";
 import { UploadPanel } from "./upload-panel";
 import { purge } from "./purge";
 
@@ -34,7 +34,8 @@ export function PhotosPanel(props: Props) {
   const [order, setOrder] = useState<PhotoView[]>([]);
   const [positions, setPositions] = useState(props.positions);
   const [busy, setBusy] = useState(false);
-  const [uploadOpen, setUploadOpen] = useState(props.photos.length === 0);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [actions, setActions] = useState(false);
 
   useEffect(() => setPositions(props.positions), [props.positions]);
   useEffect(() => {
@@ -92,26 +93,37 @@ export function PhotosPanel(props: Props) {
       <div className="flex items-center justify-between gap-4 mb-6">
         <h2 className="display text-2xl sm:text-3xl min-w-0 truncate">{active?.name ?? "Photos"}</h2>
         <button onClick={() => setUploadOpen((o) => !o)} className="shrink-0 flex items-center gap-1.5 text-[13px] sm:text-sm text-emerald-400 hover:text-emerald-300">
-          <PlusCircleIcon /> {uploadOpen ? "Fermer" : "Ajouter des médias"}
+          <PlusCircleIcon /> Ajouter des médias
         </button>
       </div>
-      {/* Reste monté quand il est fermé, pour ne pas interrompre un envoi en cours */}
-      <div className={uploadOpen ? "" : "hidden"}>
-        <UploadPanel galleryId={props.galleryId} defaultCollection={active?.name ?? "Galerie"} />
+      {/* Fenêtre d'envoi : reste montée quand elle est fermée, pour ne pas interrompre un envoi en cours */}
+      <div className={uploadOpen ? "fixed inset-0 z-50 flex items-end sm:items-center justify-center" : "hidden"}>
+        <div className="absolute inset-0 bg-black/60" onClick={() => setUploadOpen(false)} />
+        <div className="relative w-full sm:max-w-2xl max-h-[90svh] overflow-y-auto bg-bg border-t sm:border border-line px-5 pt-4 pb-[max(env(safe-area-inset-bottom),1.25rem)] animate-[fadeUp_0.3s_ease-out_both]">
+          <div className="flex items-center justify-between mb-4">
+            <p className="eyebrow text-muted">Ajouter des médias</p>
+            <button className="icon-btn -mr-2" onClick={() => setUploadOpen(false)} aria-label="Fermer">
+              <CloseIcon />
+            </button>
+          </div>
+          <UploadPanel galleryId={props.galleryId} defaultCollection={active?.name ?? "Galerie"} />
+          <p className="text-xs text-muted -mt-6">Vous pouvez fermer cette fenêtre : l&apos;envoi continue en arrière-plan.</p>
+        </div>
       </div>
 
-      <div className="flex items-center gap-6 overflow-x-auto no-scrollbar border-b border-line">
+      <div className="flex items-center border-b border-line mb-5">
+      <div className="flex-1 min-w-0 flex items-center gap-6 overflow-x-auto no-scrollbar">
         {props.collections.map((c) => (
           <button
             key={c.id}
             onClick={() => setActiveId(c.id)}
-            className={`eyebrow pb-3 -mb-px border-b whitespace-nowrap transition-colors ${c.id === active?.id ? "border-ink" : "border-transparent text-muted hover:text-ink"}`}
+            className={`eyebrow py-3 -mb-px border-b whitespace-nowrap transition-colors ${c.id === active?.id ? "border-ink" : "border-transparent text-muted hover:text-ink"}`}
           >
             {c.name} <span className="text-muted ml-1">{counts[c.id] ?? 0}</span>
           </button>
         ))}
         <button
-          className="eyebrow pb-3 text-muted hover:text-ink whitespace-nowrap"
+          className="eyebrow py-3 text-muted hover:text-ink whitespace-nowrap"
           onClick={() => {
             const name = prompt("Nom de la nouvelle collection (ex : Cérémonie)");
             if (name) run(async () => {
@@ -123,48 +135,73 @@ export function PhotosPanel(props: Props) {
           + Collection
         </button>
       </div>
-
       {active && (
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 py-5 text-xs text-muted">
-          <button
-            className="hover:text-ink"
-            disabled={busy}
-            onClick={() => run(() => post("/api/admin/photos/sort-by-date", { collectionId: active.id }))}
-          >
-            Trier par date de prise de vue
-          </button>
-          <button
-            className="hover:text-ink"
-            disabled={busy}
-            onClick={() => {
-              const name = prompt("Nouveau nom", active.name);
-              if (name && name !== active.name) run(async () => {
-                const r = await renameCollection(props.galleryId, active.id, name);
-                if (r.error) throw new Error(r.error);
-              });
-            }}
-          >
-            Renommer
-          </button>
-          <button className="hover:text-ink" disabled={busy} onClick={() => moveCollection(-1)}>← Déplacer</button>
-          <button className="hover:text-ink" disabled={busy} onClick={() => moveCollection(1)}>Déplacer →</button>
-          <button
-            className="hover:text-danger"
-            disabled={busy}
-            onClick={() => {
-              if (confirm(`Supprimer la collection « ${active.name} » et ses ${counts[active.id] ?? 0} photos ?`)) {
-                run(() => purge("collection", active.id));
-              }
-            }}
-          >
-            Supprimer la collection
-          </button>
-          <span className="ml-auto hidden sm:inline">Glissez les photos pour les réorganiser</span>
+        <div className="shrink-0 pl-2">
+          <div className="relative">
+            <button className="icon-btn -mr-2" onClick={() => setActions((a) => !a)} aria-label="Actions de la collection" disabled={busy}>
+              <DotsIcon />
+            </button>
+            {actions && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setActions(false)} />
+                <div className="absolute right-0 mt-1 z-20 w-64 bg-bg-soft border border-line py-1 shadow-xl text-sm" onClick={() => setActions(false)}>
+                  <button
+                    className="block w-full text-left px-4 py-3 hover:bg-bg"
+                    onClick={() => {
+                      const name = prompt("Nom de la nouvelle collection (ex : Cérémonie)");
+                      if (name) run(async () => {
+                        const r = await addCollection(props.galleryId, name);
+                        if (r.error) throw new Error(r.error);
+                      });
+                    }}
+                  >
+                    Nouvelle collection
+                  </button>
+                  <button className="block w-full text-left px-4 py-3 hover:bg-bg" onClick={() => run(() => post("/api/admin/photos/sort-by-date", { collectionId: active.id }))}>
+                    Trier par date de prise de vue
+                  </button>
+                  <button
+                    className="block w-full text-left px-4 py-3 hover:bg-bg"
+                    onClick={() => {
+                      const name = prompt("Nouveau nom", active.name);
+                      if (name && name !== active.name) run(async () => {
+                        const r = await renameCollection(props.galleryId, active.id, name);
+                        if (r.error) throw new Error(r.error);
+                      });
+                    }}
+                  >
+                    Renommer la collection
+                  </button>
+                  {props.collections.length > 1 && (
+                    <>
+                      <button className="block w-full text-left px-4 py-3 hover:bg-bg" onClick={() => moveCollection(-1)}>Déplacer vers la gauche</button>
+                      <button className="block w-full text-left px-4 py-3 hover:bg-bg" onClick={() => moveCollection(1)}>Déplacer vers la droite</button>
+                    </>
+                  )}
+                  <button
+                    className="block w-full text-left px-4 py-3 text-danger hover:bg-bg"
+                    onClick={() => {
+                      if (confirm(`Supprimer la collection « ${active.name} » et ses ${counts[active.id] ?? 0} photos ?`)) {
+                        run(() => purge("collection", active.id));
+                      }
+                    }}
+                  >
+                    Supprimer la collection
+                  </button>
+                  <p className="px-4 pt-2 pb-2 text-[11px] text-muted border-t border-line mt-1">Astuce : maintenez une photo puis glissez-la pour la déplacer.</p>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
+      </div>
 
       {order.length === 0 ? (
-        <p className="py-16 text-center text-sm text-muted">Aucune photo dans cette collection.</p>
+        <button onClick={() => setUploadOpen(true)} className="w-full py-16 text-center text-sm text-muted border border-dashed border-line hover:border-muted">
+          Aucune photo dans cette collection.<br />
+          <span className="text-emerald-400">Touchez ici pour ajouter des photos</span>
+        </button>
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <SortableContext items={order.map((p) => p.id)} strategy={rectSortingStrategy}>
