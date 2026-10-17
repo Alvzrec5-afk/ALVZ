@@ -22,7 +22,7 @@ export default async function AdminHome() {
   const { supabase } = await requireAdminPage();
   const { data, error } = await supabase
     .from("galleries")
-    .select("id, title, event_date, cover_photo_id, password_hash, expires_at, created_at, photos(count)")
+    .select("id, title, event_date, cover_photo_id, password_hash, expires_at, created_at, photos!photos_gallery_id_fkey(count)")
     .order("created_at", { ascending: false });
   if (error) throw new Error(`Impossible de charger les galeries : ${error.message}`);
   const galleries = (data ?? []) as Row[];
