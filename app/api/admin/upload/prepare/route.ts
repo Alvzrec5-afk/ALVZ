@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { apiError, requireAdminApi } from "@/lib/auth";
+import { formatBytes } from "@/lib/format";
+import { storageUsage } from "@/lib/usage";
 import {
   MULTIPART_THRESHOLD,
   PART_SIZE,
@@ -75,6 +77,16 @@ export async function POST(req: Request) {
       .eq("content_hash", body.hash)
       .maybeSingle();
     if (existing?.status === "ready") return Response.json({ duplicate: true });
+
+    // Limite de stockage : on refuse l'envoi plutôt que de dépasser l'offre Oracle.
+    const usage = await storageUsage(supabase);
+    const estimate = body.size + 1_200_000; // original + déclinaisons
+    if (usage.total + estimate > usage.limit) {
+      return Response.json(
+        { error: `Stockage plein (${formatBytes(usage.total)} sur ${formatBytes(usage.limit)}). Supprimez d'anciennes galeries pour libérer de la place.` },
+        { status: 413 },
+      );
+    }
 
     const collectionId = await findOrCreateCollection(supabase, body.galleryId, collectionName);
     const ext = extensionOf(body.filename);

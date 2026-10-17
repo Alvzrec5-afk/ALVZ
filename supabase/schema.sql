@@ -65,6 +65,7 @@ create table public.photos (
   position double precision not null default 0,
   status text not null default 'uploading' check (status in ('uploading', 'ready')),
   multipart_upload_id text,
+  variants_bytes bigint not null default 0,
   created_at timestamptz not null default now(),
   unique (gallery_id, content_hash)
 );
@@ -111,3 +112,15 @@ create policy "admin full access" on public.favorite_lists
   for all to authenticated using ((select private.is_admin())) with check ((select private.is_admin()));
 create policy "admin full access" on public.favorites
   for all to authenticated using ((select private.is_admin())) with check ((select private.is_admin()));
+
+-- Espace utilisé par galerie (soumis aux règles RLS : seul l'admin obtient un résultat).
+create or replace function public.storage_usage()
+returns table (gallery_id uuid, bytes bigint)
+language sql stable security invoker set search_path = '' as $$
+  select p.gallery_id,
+         sum(p.size_bytes + case when p.variants_bytes > 0 then p.variants_bytes else 1000000 end)::bigint
+  from public.photos p
+  group by p.gallery_id;
+$$;
+revoke execute on function public.storage_usage() from public, anon;
+grant execute on function public.storage_usage() to authenticated;

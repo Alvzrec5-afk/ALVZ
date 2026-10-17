@@ -44,6 +44,7 @@ Cochez **Contains secret values** pour les lignes marquées 🔒.
 | `ORACLE_ACCESS_KEY_ID` | Access Key de la Customer Secret Key | 🔒 |
 | `ORACLE_SECRET_ACCESS_KEY` | Secret Key de la Customer Secret Key | 🔒 |
 | `GALLERY_SECRET` | Une longue phrase aléatoire (40 caractères ou plus) | 🔒 |
+| `STORAGE_LIMIT_GB` | *Optionnel.* Limite de stockage en Go (20 par défaut, l'offre gratuite d'Oracle) | |
 
 Après tout changement de variable : **Deploys** → **Trigger deploy** → **Deploy site** (les variables ne sont prises en compte qu'au déploiement suivant).
 

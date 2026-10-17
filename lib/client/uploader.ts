@@ -249,7 +249,12 @@ export class Uploader {
 
     this.update(item, { step: "Finalisation" });
     await withRetry(() =>
-      api("/api/admin/upload/complete", { photoId: prepared.photoId, width: variants.width, height: variants.height }),
+      api("/api/admin/upload/complete", {
+        photoId: prepared.photoId,
+        width: variants.width,
+        height: variants.height,
+        variantsBytes: smallTotal,
+      }),
     );
     return false;
   }

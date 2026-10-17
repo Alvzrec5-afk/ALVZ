@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { LockIcon } from "@/components/icons";
+import { formatBytes } from "@/lib/format";
 import { purge } from "./purge";
 
 export type GalleryCard = {
@@ -13,6 +14,7 @@ export type GalleryCard = {
   date: string;
   createdAt: string;
   photoCount: number;
+  bytes: number;
   locked: boolean;
   expired: boolean;
   cover: string | null;
@@ -22,6 +24,7 @@ const SORTS = {
   recent: { label: "Plus récentes", fn: (a: GalleryCard, b: GalleryCard) => b.createdAt.localeCompare(a.createdAt) },
   oldest: { label: "Plus anciennes", fn: (a: GalleryCard, b: GalleryCard) => a.createdAt.localeCompare(b.createdAt) },
   name: { label: "Nom (A → Z)", fn: (a: GalleryCard, b: GalleryCard) => a.title.localeCompare(b.title, "fr") },
+  size: { label: "Plus lourdes", fn: (a: GalleryCard, b: GalleryCard) => b.bytes - a.bytes },
 } as const;
 
 const SearchIcon = () => (
@@ -190,6 +193,7 @@ export function GalleryGrid({ galleries }: { galleries: GalleryCard[] }) {
                     title={g.expired ? "Expirée" : g.photoCount > 0 ? "En ligne" : "Vide"}
                   />
                   {g.photoCount} photo{g.photoCount > 1 ? "s" : ""}
+                  {g.bytes > 0 && <span>· {formatBytes(g.bytes)}</span>}
                   {g.locked && <LockIcon className="w-3 h-3" />}
                 </p>
                 {g.date && <p className="text-[11px] text-muted mt-0.5">{g.date}</p>}
