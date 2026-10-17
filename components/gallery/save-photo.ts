@@ -9,7 +9,7 @@ export function prefersShareSheet() {
 
 export async function fetchPhotoFile(downloadHref: string): Promise<File> {
   const res = await fetch(`${downloadHref}&json=1`);
-  const info = (await res.json()) as { url?: string; name?: string; error?: string };
+  const info = (await res.json().catch(() => ({}))) as { url?: string; name?: string; error?: string };
   if (!res.ok || !info.url) throw new Error(info.error || "Téléchargement impossible");
   const photo = await fetch(info.url);
   if (!photo.ok) throw new Error("Téléchargement impossible");

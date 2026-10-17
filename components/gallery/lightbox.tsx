@@ -96,6 +96,11 @@ export function Lightbox({
       aria-modal="true"
       onContextMenu={(e) => e.preventDefault()}
       onTouchStart={(e) => {
+        // Un appui sur un bouton (cœur, téléchargement, fermer) n'est pas un geste sur la photo.
+        if ((e.target as HTMLElement).closest("button, a")) {
+          touch.current = null;
+          return;
+        }
         const t = e.touches[0];
         touch.current = { x: t.clientX, y: t.clientY, t: Date.now() };
       }}
