@@ -1,5 +1,6 @@
+/** Taille toujours exprimée en Go (ex. « 0,43 Go »), pour suivre facilement la limite de stockage. */
 export function formatBytes(n: number) {
-  if (n < 1024 ** 2) return `${Math.max(0, Math.round(n / 1024))} Ko`;
-  if (n < 1024 ** 3) return `${(n / 1024 ** 2).toFixed(n < 10 * 1024 ** 2 ? 1 : 0)} Mo`;
-  return `${(n / 1024 ** 3).toFixed(n < 10 * 1024 ** 3 ? 2 : 1).replace(".", ",")} Go`;
+  const gb = Math.max(0, n) / 1024 ** 3;
+  if (gb > 0 && gb < 0.01) return "< 0,01 Go";
+  return `${gb.toFixed(gb >= 100 ? 0 : 2).replace(".", ",")} Go`;
 }
