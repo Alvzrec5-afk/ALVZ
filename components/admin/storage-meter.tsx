@@ -16,7 +16,7 @@ export function StorageMeter({ used, limit }: { used: number; limit: number }) {
       <div className="mt-3 h-1.5 bg-bg-soft rounded-full overflow-hidden">
         <div className={`h-full ${bar} rounded-full transition-[width] duration-700`} style={{ width: `${Math.max(pct, used > 0 ? 1 : 0)}%` }} />
       </div>
-      <p className={`mt-2 text-xs ${level === "ok" ? "text-muted" : level === "warn" ? "text-amber-400" : "text-danger"}`}>
+      <p className={`mt-2 text-xs ${level === "ok" ? "text-muted" : level === "warn" ? "text-warn" : "text-danger"}`}>
         {level === "ok" && `${Math.round(pct)} % utilisé · ${formatBytes(Math.max(0, limit - used))} disponibles`}
         {level === "warn" && `${Math.round(pct)} % utilisé : pensez à supprimer d'anciennes galeries.`}
         {level === "danger" && `${Math.round(pct)} % utilisé : stockage presque plein, les nouveaux envois seront bientôt bloqués.`}

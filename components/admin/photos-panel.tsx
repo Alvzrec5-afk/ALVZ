@@ -100,7 +100,7 @@ export function PhotosPanel(props: Props) {
     <div>
       <div className="flex items-center justify-between gap-4 mb-6">
         <h2 className="display text-2xl sm:text-3xl min-w-0 truncate">{active?.name ?? "Photos"}</h2>
-        <button onClick={() => setUploadOpen((o) => !o)} className="shrink-0 flex items-center gap-1.5 text-[13px] sm:text-sm text-emerald-400 hover:text-emerald-300">
+        <button onClick={() => setUploadOpen((o) => !o)} className="shrink-0 flex items-center gap-1.5 text-[13px] sm:text-sm text-accent hover:opacity-80">
           <PlusCircleIcon /> Ajouter des médias
         </button>
       </div>
@@ -208,7 +208,7 @@ export function PhotosPanel(props: Props) {
       {order.length === 0 ? (
         <button onClick={() => setUploadOpen(true)} className="w-full py-16 text-center text-sm text-muted border border-dashed border-line hover:border-muted">
           Aucune photo dans cette collection.<br />
-          <span className="text-emerald-400">Touchez ici pour ajouter des photos</span>
+          <span className="text-accent">Touchez ici pour ajouter des photos</span>
         </button>
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={() => (dragging.current = true)} onDragCancel={endDrag} onDragEnd={onDragEnd}>

@@ -21,7 +21,7 @@ export function ListRow({
       <span className="text-muted">{icon}</span>
       <span className="flex-1 text-[15px]">{label}</span>
       {badge !== undefined && (
-        <span className={`eyebrow text-[10px] px-3 py-1.5 rounded-full ${badge ? "bg-emerald-500/15 text-emerald-400" : "bg-bg-soft text-muted"}`}>
+        <span className={`eyebrow text-[10px] px-3 py-1.5 rounded-full ${badge ? "bg-accent/15 text-accent" : "bg-bg-soft text-muted"}`}>
           {badge ? "Activé" : "Désactivé"}
         </span>
       )}

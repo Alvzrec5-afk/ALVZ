@@ -31,6 +31,7 @@ create table public.galleries (
   cover_focus_y real not null default 50 check (cover_focus_y between 0 and 100),
   font_style text not null default 'classic' check (font_style in ('classic','modern','editorial','minimal')),
   color_theme text not null default 'noir' check (color_theme in ('noir','blanc','sable','anthracite')),
+  color_follow_device boolean not null default true, -- suit le mode clair/sombre de l'appareil
   grid_style text not null default 'justified' check (grid_style in ('justified','square','columns')),
   grid_size text not null default 'large' check (grid_size in ('small','large')),
   grid_spacing text not null default 'fine' check (grid_spacing in ('fine','wide')),

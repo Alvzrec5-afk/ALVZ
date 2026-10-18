@@ -42,11 +42,15 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fbfaf8" },
+    { media: "(prefers-color-scheme: dark)", color: "#0e0e0d" },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" data-theme="dark" className={`${cormorant.variable} ${inter.variable} ${playfair.variable} ${montserrat.variable}`} suppressHydrationWarning>
+    <html lang="fr" data-theme="auto" className={`${cormorant.variable} ${inter.variable} ${playfair.variable} ${montserrat.variable}`} suppressHydrationWarning>
       <body>{children}</body>
     </html>
   );

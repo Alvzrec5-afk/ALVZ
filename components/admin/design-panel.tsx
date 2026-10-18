@@ -13,6 +13,7 @@ import {
   type FontStyle,
   type GalleryDesign,
   type GridStyle,
+  themeAttr,
 } from "@/lib/design";
 import type { PhotoView } from "@/lib/types";
 import { GridIcon, ImageIcon, PaletteIcon, TypeIcon } from "@/components/icons";
@@ -50,7 +51,7 @@ export function DesignPanel({ gallery, photos }: { gallery: ManagedGallery; phot
         </div>
         <ListRow icon={<ImageIcon />} label="Couverture" value={COVER_LAYOUTS[design.cover_layout]} onClick={() => setView("cover")} />
         <ListRow icon={<TypeIcon />} label="Typographie" value={FONT_STYLES[design.font_style]} onClick={() => setView("type")} />
-        <ListRow icon={<PaletteIcon />} label="Couleur" value={COLOR_THEMES[design.color_theme].label} onClick={() => setView("color")} />
+        <ListRow icon={<PaletteIcon />} label="Couleur" value={design.color_follow_device ? "Automatique" : COLOR_THEMES[design.color_theme].label} onClick={() => setView("color")} />
         <ListRow icon={<GridIcon />} label="Grille" value={GRID_STYLES[design.grid_style]} onClick={() => setView("grid")} />
       </div>
     );
@@ -150,7 +151,7 @@ export function DesignPanel({ gallery, photos }: { gallery: ManagedGallery; phot
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {(Object.keys(FONT_STYLES) as FontStyle[]).map((k) => (
             <OptionCard key={k} selected={design.font_style === k} onClick={() => update({ font_style: k })} label={FONT_STYLES[k]}>
-              <div data-theme={design.color_theme} className={`fs-${k} bg-bg text-ink px-5 py-8 text-center`}>
+              <div data-theme={themeAttr(design)} className={`fs-${k} bg-bg text-ink px-5 py-8 text-center`}>
                 <p className="gallery-title text-2xl truncate">{gallery.title}</p>
                 <p className="eyebrow text-muted mt-3 text-[9px]">14 juin 2026</p>
               </div>
@@ -166,9 +167,26 @@ export function DesignPanel({ gallery, photos }: { gallery: ManagedGallery; phot
     return (
       <div>
         <SubHeader title="Couleur" onBack={back} />
+        <div className="mb-6">
+          <OptionCard
+            selected={design.color_follow_device}
+            onClick={() => update({ color_follow_device: true })}
+            label="Automatique : suit le mode clair / sombre du téléphone du client"
+          >
+            <div className="flex">
+              {(["blanc", "noir"] as const).map((t) => (
+                <div key={t} data-theme={t} className={`fs-${design.font_style} flex-1 bg-bg text-ink px-4 py-6`}>
+                  <p className="gallery-title text-lg truncate">{gallery.title}</p>
+                  <p className="eyebrow text-muted mt-2 text-[9px]">{t === "blanc" ? "Mode clair" : "Mode sombre"}</p>
+                </div>
+              ))}
+            </div>
+          </OptionCard>
+        </div>
+        <p className="label mb-4">Ou une ambiance fixe</p>
         <div className="grid grid-cols-2 gap-4">
           {(Object.keys(COLOR_THEMES) as ColorTheme[]).map((k) => (
-            <OptionCard key={k} selected={design.color_theme === k} onClick={() => update({ color_theme: k })} label={COLOR_THEMES[k].label}>
+            <OptionCard key={k} selected={!design.color_follow_device && design.color_theme === k} onClick={() => update({ color_theme: k, color_follow_device: false })} label={COLOR_THEMES[k].label}>
               <div data-theme={k} className={`fs-${design.font_style} bg-bg text-ink px-4 py-6`}>
                 <p className="gallery-title text-lg truncate">{gallery.title}</p>
                 <div className="mt-4 grid grid-cols-3 gap-1">

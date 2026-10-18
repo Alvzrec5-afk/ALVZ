@@ -106,7 +106,7 @@ export function GalleryManager(props: Props) {
           <MenuIcon />
         </button>
       </div>
-      {copied && <p className="text-xs text-emerald-400 mt-1">Lien copié ✓</p>}
+      {copied && <p className="text-xs text-accent mt-1">Lien copié ✓</p>}
 
       <p className="text-xs text-muted mt-2">
         {props.photos.length} photos · {props.collections.length} collection{props.collections.length > 1 ? "s" : ""}

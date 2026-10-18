@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { GalleryDesign } from "@/lib/design";
+import { themeAttr, type GalleryDesign } from "@/lib/design";
 import type { Collection, PhotoView } from "@/lib/types";
 import { ChevronDown, DownloadIcon, HeartIcon } from "@/components/icons";
 import { Wordmark } from "@/components/wordmark";
@@ -39,11 +39,11 @@ export function ClientGallery(props: Props) {
 
   // Couleur de fond de la page (zones de rebond iPhone comprises)
   useEffect(() => {
-    document.documentElement.dataset.theme = design.color_theme;
+    document.documentElement.dataset.theme = themeAttr(design);
     return () => {
-      document.documentElement.dataset.theme = "dark";
+      document.documentElement.dataset.theme = "auto";
     };
-  }, [design.color_theme]);
+  }, [design]);
 
   const visible = useMemo(
     () =>
@@ -112,7 +112,7 @@ export function ClientGallery(props: Props) {
 
   return (
     <div
-      data-theme={design.color_theme}
+      data-theme={themeAttr(design)}
       className={`fs-${design.font_style} min-h-svh bg-bg text-ink`}
       onContextMenu={props.watermark ? (e) => (e.target as HTMLElement).tagName === "IMG" && e.preventDefault() : undefined}
     >

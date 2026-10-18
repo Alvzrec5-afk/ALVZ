@@ -43,13 +43,20 @@ export type GalleryDesign = {
   cover_focus_y: number;
   font_style: FontStyle;
   color_theme: ColorTheme;
+  /** true : l'ambiance suit le réglage clair/sombre de l'appareil du visiteur (Noir ou Blanc). */
+  color_follow_device: boolean;
   grid_style: GridStyle;
   grid_size: GridSize;
   grid_spacing: GridSpacing;
 };
 
 export const DESIGN_FIELDS =
-  "cover_layout, cover_focus_x, cover_focus_y, font_style, color_theme, grid_style, grid_size, grid_spacing";
+  "cover_layout, cover_focus_x, cover_focus_y, font_style, color_theme, color_follow_device, grid_style, grid_size, grid_spacing";
+
+/** Valeur de data-theme à appliquer : « auto » suit l'appareil. */
+export function themeAttr(d: Pick<GalleryDesign, "color_theme" | "color_follow_device">) {
+  return d.color_follow_device ? "auto" : d.color_theme;
+}
 
 /** Valide une modification envoyée par le studio : seules les clés et valeurs connues passent. */
 export function sanitizeSettingsPatch(patch: Record<string, unknown>) {
@@ -67,7 +74,7 @@ export function sanitizeSettingsPatch(patch: Record<string, unknown>) {
     const v = patch[key];
     if (typeof v === "number" && Number.isFinite(v)) out[key] = Math.min(100, Math.max(0, v));
   }
-  for (const key of ["watermark", "downloads_enabled", "download_web_enabled", "favorites_enabled"]) {
+  for (const key of ["watermark", "downloads_enabled", "download_web_enabled", "favorites_enabled", "color_follow_device"]) {
     if (typeof patch[key] === "boolean") out[key] = patch[key];
   }
   if (typeof patch.title === "string" && patch.title.trim()) out.title = patch.title.trim().slice(0, 200);

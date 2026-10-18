@@ -2,6 +2,7 @@
 
 /* ALVZ.REC — palette éditoriale : blanc chaud, encre profonde, très peu de couleur. */
 :root,
+[data-theme="auto"],
 [data-theme="blanc"] {
   --bg: #fbfaf8;
   --bg-soft: #f3f1ed;
@@ -10,10 +11,14 @@
   --line: #e6e2dc;
   --danger: #a23b2a;
   --heart: #b8473b;
+  --accent: #0e7f57;
+  --warn: #a8640c;
   color-scheme: light;
 }
 
 [data-theme="sable"] {
+  --accent: #0e7f57;
+  --warn: #a05d0a;
   --bg: #efe8de;
   --bg-soft: #e5ddd1;
   --ink: #2b2620;
@@ -25,6 +30,8 @@
 }
 
 [data-theme="anthracite"] {
+  --accent: #34d399;
+  --warn: #fbbf24;
   --bg: #23262a;
   --bg-soft: #2c3035;
   --ink: #e9e6e0;
@@ -45,6 +52,24 @@
   --danger: #e07a68;
   --heart: #e2766b;
   color-scheme: dark;
+  --accent: #34d399;
+  --warn: #fbbf24;
+}
+
+/* Ambiance automatique : suit le réglage clair/sombre de l'appareil */
+@media (prefers-color-scheme: dark) {
+  [data-theme="auto"] {
+    --bg: #0e0e0d;
+    --bg-soft: #181816;
+    --ink: #ece8e2;
+    --muted: #8e8a83;
+    --line: #2a2926;
+    --danger: #e07a68;
+    --heart: #e2766b;
+    color-scheme: dark;
+    --accent: #34d399;
+    --warn: #fbbf24;
+  }
 }
 
 @theme inline {
@@ -55,6 +80,8 @@
   --color-line: var(--line);
   --color-danger: var(--danger);
   --color-heart: var(--heart);
+  --color-accent: var(--accent);
+  --color-warn: var(--warn);
   --font-display: var(--font-cormorant), "Times New Roman", serif;
   --font-sans: var(--font-inter), system-ui, sans-serif;
 }
@@ -214,6 +241,12 @@ body {
 /* Logo : version blanche sur fonds sombres, version foncée sur Blanc et Sable */
 .logo-on-light { display: none; }
 [data-theme="blanc"] .logo-on-dark,
-[data-theme="sable"] .logo-on-dark { display: none; }
+[data-theme="sable"] .logo-on-dark,
+[data-theme="auto"] .logo-on-dark { display: none; }
 [data-theme="blanc"] .logo-on-light,
-[data-theme="sable"] .logo-on-light { display: block; }
+[data-theme="sable"] .logo-on-light,
+[data-theme="auto"] .logo-on-light { display: block; }
+@media (prefers-color-scheme: dark) {
+  [data-theme="auto"] .logo-on-dark { display: block; }
+  [data-theme="auto"] .logo-on-light { display: none; }
+}

@@ -219,7 +219,7 @@ function PasswordSetting({ gallery, onDone }: { gallery: ManagedGallery; onDone:
       {gallery.hasPassword && (
         <button className="text-xs text-muted mt-3 hover:text-danger" disabled={busy} onClick={() => apply(null)}>Retirer le mot de passe</button>
       )}
-      {msg && <p className="text-xs text-emerald-400 mt-3">{msg}</p>}
+      {msg && <p className="text-xs text-accent mt-3">{msg}</p>}
     </div>
   );
 }
@@ -261,10 +261,10 @@ function SlugSetting({ gallery, onDone }: { gallery: ManagedGallery; onDone: () 
       </div>
       <div className="mt-4 flex items-center gap-4">
         <button className="btn" disabled={busy || value === gallery.slug}>{busy ? "…" : "Enregistrer le lien"}</button>
-        {msg && <span className={`text-xs ${msg.ok ? "text-emerald-400" : "text-danger"}`}>{msg.text}</span>}
+        {msg && <span className={`text-xs ${msg.ok ? "text-accent" : "text-danger"}`}>{msg.text}</span>}
       </div>
       {!gallery.hasPassword && (
-        <p className="text-xs text-amber-400 mt-3">
+        <p className="text-xs text-warn mt-3">
           Conseil : un lien lisible est facile à deviner. Ajoutez un mot de passe (Confidentialité) pour une galerie privée.
         </p>
       )}

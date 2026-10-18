@@ -4,9 +4,9 @@ import { useActionState } from "react";
 import { unlockGallery } from "@/app/g/[slug]/actions";
 import { LockIcon } from "@/components/icons";
 import { Wordmark } from "@/components/wordmark";
-import type { ColorTheme, FontStyle } from "@/lib/design";
+import type { FontStyle } from "@/lib/design";
 
-function Shell({ theme, children }: { theme: ColorTheme; children: React.ReactNode }) {
+function Shell({ theme, children }: { theme: string; children: React.ReactNode }) {
   return (
     <div data-theme={theme} className="min-h-svh bg-bg text-ink flex flex-col items-center justify-center px-6 text-center">
       <Wordmark height={48} className="absolute top-8" />
@@ -15,7 +15,7 @@ function Shell({ theme, children }: { theme: ColorTheme; children: React.ReactNo
   );
 }
 
-export function ExpiredScreen({ theme }: { theme: ColorTheme }) {
+export function ExpiredScreen({ theme }: { theme: string }) {
   return (
     <Shell theme={theme}>
       <p className="eyebrow text-muted mb-6">Galerie</p>
@@ -27,7 +27,7 @@ export function ExpiredScreen({ theme }: { theme: ColorTheme }) {
   );
 }
 
-export function LockScreen({ slug, title, theme, fontStyle }: { slug: string; title: string; theme: ColorTheme; fontStyle: FontStyle }) {
+export function LockScreen({ slug, title, theme, fontStyle }: { slug: string; title: string; theme: string; fontStyle: FontStyle }) {
   const [state, action, pending] = useActionState(unlockGallery.bind(null, slug), null);
   return (
     <Shell theme={theme}>

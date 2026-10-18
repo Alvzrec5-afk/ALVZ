@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { formatLongDate } from "@/lib/dates";
+import { themeAttr } from "@/lib/design";
 import { findGalleryBySlug, getFavoriteListId, hasAccess, isExpired } from "@/lib/gallery-access";
 import { PHOTO_FIELDS, toPhotoViews } from "@/lib/photos";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -19,8 +20,8 @@ export default async function GalleryPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   const gallery = await findGalleryBySlug(slug);
   if (!gallery) notFound();
-  if (isExpired(gallery)) return <ExpiredScreen theme={gallery.color_theme} />;
-  if (!(await hasAccess(gallery))) return <LockScreen slug={slug} title={gallery.title} theme={gallery.color_theme} fontStyle={gallery.font_style} />;
+  if (isExpired(gallery)) return <ExpiredScreen theme={themeAttr(gallery)} />;
+  if (!(await hasAccess(gallery))) return <LockScreen slug={slug} title={gallery.title} theme={themeAttr(gallery)} fontStyle={gallery.font_style} />;
 
   const db = createServiceClient();
   const listId = await getFavoriteListId(gallery);
@@ -48,6 +49,7 @@ export default async function GalleryPage({ params }: { params: Promise<{ slug: 
         cover_focus_y: gallery.cover_focus_y,
         font_style: gallery.font_style,
         color_theme: gallery.color_theme,
+        color_follow_device: gallery.color_follow_device,
         grid_style: gallery.grid_style,
         grid_size: gallery.grid_size,
         grid_spacing: gallery.grid_spacing,

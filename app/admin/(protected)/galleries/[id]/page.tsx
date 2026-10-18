@@ -55,6 +55,7 @@ export default async function GalleryPage({ params }: { params: Promise<{ id: st
       cover_focus_y: g.cover_focus_y,
       font_style: g.font_style,
       color_theme: g.color_theme,
+      color_follow_device: g.color_follow_device,
       grid_style: g.grid_style,
       grid_size: g.grid_size,
       grid_spacing: g.grid_spacing,
