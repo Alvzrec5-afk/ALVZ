@@ -29,6 +29,10 @@ import {
   MoneyIcon,
   PeopleIcon,
   UploadIcon,
+  FilmIcon,
+  HeartIcon,
+  MegaphoneIcon,
+  BrushIcon,
   CloseIcon,
   ColumnIcon,
   ConnectorIcon,
@@ -121,6 +125,16 @@ const BOARD_ICONS: Record<string, typeof BoardIcon> = {
   shotlist: ChecklistIcon,
   checklist: CameraIcon,
   timeline: ClockIcon,
+  photo: ImageIcon,
+  video: FilmIcon,
+  notes: NoteIcon,
+  palette: PaletteIcon,
+  link: LinkIcon,
+  comment: CommentIcon,
+  heart: HeartIcon,
+  megaphone: MegaphoneIcon,
+  brush: BrushIcon,
+  table: TableIcon,
 };
 
 /** Choix d'une couleur : teinte douce (`color`) ou couleur pleine / libre (`hex`). */
@@ -1669,7 +1683,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     return (
       <div className="p-2">
         <div className="aspect-[4/3] bg-bg-soft overflow-hidden grid grid-cols-2 grid-rows-2 gap-px">
-          {covers.length ? (
+          {covers.length && !BOARD_ICONS[it.data.icon ?? ""] ? (
             covers.map((src, i) => (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -2320,6 +2334,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           onInk={(ink) => applyInk([sel.id], ink)}
           onEdit={sel.kind !== "arrow" ? () => startEdit(sel) : undefined}
           onOpen={sel.kind === "board" ? () => openBoard(sel) : undefined}
+          onIcon={sel.kind === "board" && role === "admin" ? (icon) => update(sel.id, { data: { ...sel.data, icon } }) : undefined}
           onDelete={() => remove(sel.id)}
         />
       )}
@@ -2554,6 +2569,7 @@ function SelectionBar({
   onInk,
   onEdit,
   onOpen,
+  onIcon,
   onDelete,
 }: {
   pos: { left: number; top: number };
@@ -2562,9 +2578,12 @@ function SelectionBar({
   onInk?: (ink: "auto" | "dark" | "light") => void;
   onEdit?: () => void;
   onOpen?: () => void;
+  /** Planche (studio seulement) : choisir son pictogramme ; `undefined` = aperçu des images. */
+  onIcon?: (icon: string | undefined) => void;
   onDelete: () => void;
 }) {
   const [palette, setPalette] = useState(false);
+  const [icons, setIcons] = useState(false);
   return (
     <div
       data-ui
@@ -2573,14 +2592,39 @@ function SelectionBar({
       // La palette est plus large que la barre : on la garde entière à l'écran.
       style={{
         left: Math.min(Math.max(pos.left, palette ? 330 : 130), (typeof window !== "undefined" ? window.innerWidth : 1200) - (palette ? 330 : 130)),
-        top: Math.max(8, palette ? pos.top - 84 : pos.top),
+        top: Math.max(8, palette ? pos.top - 84 : icons ? pos.top - 52 : pos.top),
       }}
     >
+      {icons && onIcon && (
+        <div className="flex flex-wrap items-center justify-center gap-1 bg-bg border border-line shadow-lg rounded-2xl px-2 py-1.5 max-w-[92vw]">
+          {Object.entries(BOARD_ICONS).map(([key, Icon]) => (
+            <button
+              key={key}
+              onClick={() => onIcon(key)}
+              aria-label={`Pictogramme ${key}`}
+              className={`w-8 h-8 rounded-full flex items-center justify-center hover:bg-bg-soft ${item.data.icon === key ? "bg-bg-soft text-ink ring-2 ring-emerald-500" : "text-muted"}`}
+            >
+              <Icon className="w-4 h-4" />
+            </button>
+          ))}
+          <span className="w-px h-5 bg-line mx-0.5" />
+          <button
+            onClick={() => onIcon(undefined)}
+            className={`h-8 px-2.5 rounded-full text-[11px] hover:bg-bg-soft ${!item.data.icon ? "text-ink ring-2 ring-emerald-500" : "text-muted"}`}
+            title="Afficher les images de la planche"
+          >
+            Images
+          </button>
+        </div>
+      )}
       {palette && onColor && <Palette current={item.data} onColor={onColor} onInk={item.kind !== "color" ? onInk : undefined} />}
       <div className="flex items-center gap-1 bg-bg border border-line shadow-lg rounded-full px-2 h-10">
         {onColor && (
           <button
-            onClick={() => setPalette((o) => !o)}
+            onClick={() => {
+              setPalette((o) => !o);
+              setIcons(false);
+            }}
             className="h-8 pl-1.5 pr-3 rounded-full flex items-center gap-2 text-[11px] text-muted hover:text-ink"
             title="Couleur"
           >
@@ -2589,6 +2633,22 @@ function SelectionBar({
           </button>
         )}
         {onColor && <span className="w-px h-5 bg-line mx-1" />}
+        {onIcon && (
+          <button
+            onClick={() => {
+              setIcons((o) => !o);
+              setPalette(false);
+            }}
+            className="w-8 h-8 flex items-center justify-center text-muted hover:text-ink"
+            aria-label="Pictogramme"
+            title="Pictogramme"
+          >
+            {(() => {
+              const Icon = BOARD_ICONS[item.data.icon ?? ""] ?? ImageIcon;
+              return <Icon className="w-4 h-4" />;
+            })()}
+          </button>
+        )}
       {onOpen && (
         <button onClick={onOpen} className="h-8 px-3 rounded-full bg-ink text-bg text-[11px] tracking-wider uppercase mr-1">
           Ouvrir

@@ -118,7 +118,7 @@ colonne d'en-tête « Fait » = cases à cocher, `data.calc = "budget"` (TOTAL =
 BUDGET DU CLIENT saisi, BÉNÉFICE = budget − total ; `budgetFigures` dans `board-canvas.tsx`).
 Carte `table` (bouton « Tableau », = Tableau de Milanote) : `data.cells` (lignes × colonnes, 1re ligne en gras),
 Tab / Entrée pour avancer, boutons + / − Ligne / Colonne ; tableaux Markdown « | a | b | » de l'import Milanote.
-Le bouton des sous-tableaux s'appelle « Planche » (comme Milanote). Le canevas annule tout défilement natif
+Le bouton des sous-tableaux s'appelle « Planche » (comme Milanote). Pictogramme d'une planche (`data.icon`, `BOARD_ICONS`) : toujours affiché, même si elle contient des images (sinon aperçu des images) ; choisi seulement par le studio (bouton Pictogramme de la barre de la carte ; `applyBoardOps` garde l'ancien pour un client). Le canevas annule tout défilement natif
 (`onScroll`) : sinon le focus d'un champ décale la vue.
 Liste des tableaux (`boards-list.tsx`) : grille ou liste à petites vignettes (choix mémorisé, `boards-view`) ;
 vignette = couverture choisie (`boards.cover_key`, envoi via `/api/admin/boards/[id]/cover`, `setBoardCover`) sinon

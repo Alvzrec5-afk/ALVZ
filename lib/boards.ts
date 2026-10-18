@@ -327,6 +327,8 @@ export async function applyBoardOps(
       // La carte garde toujours le même sous-tableau ; à la création, il en faut un nouveau.
       const before = row?.data as BoardData | null;
       data.boardId = before?.boardId ?? data.boardId ?? crypto.randomUUID();
+      // Le pictogramme d'une planche : seul le studio le choisit.
+      if (actor.role === "client") data.icon = before?.icon;
       // Nom du sous-tableau : seulement à la création ou si la carte a vraiment été renommée.
       const src = !row && it.copyOf ? sourceOf.get(it.copyOf) : undefined;
       const srcBoard = src?.kind === "board" ? (src.data as BoardData | null)?.boardId : undefined;
