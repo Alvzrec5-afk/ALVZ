@@ -30,6 +30,7 @@ export async function createGallery(_: FormState, form: FormData): Promise<FormS
       event_date: eventDate || null,
       slug: newSlug(),
       password_hash: password ? await bcrypt.hash(password, 10) : null,
+      design: { grid_style: "columns", grid_size: "large", cover_layout: "center", font_style: "sans" },
     })
     .select("id")
     .single();

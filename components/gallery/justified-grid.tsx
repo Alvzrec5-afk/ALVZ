@@ -64,7 +64,7 @@ export function PhotoGrid({ photos, style, size, spacing, favorites, favoritesEn
   }, []);
 
   const bp = width < 640 ? 0 : width < 1100 ? 1 : 2; // téléphone, tablette, ordinateur
-  const gap = spacing === "fine" ? [3, 6, 8][bp] : [10, 18, 26][bp];
+  const gap = spacing === "fine" ? [8, 8, 10][bp] : [16, 20, 28][bp];
   const small = size === "small";
   const target = small ? [110, 180, 220][bp] : [170, 260, 320][bp];
   const columnCount = style === "square" ? (small ? [3, 4, 6] : [2, 3, 4])[bp] : (small ? [3, 4, 5] : [2, 3, 3])[bp];

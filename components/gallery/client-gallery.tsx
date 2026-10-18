@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { themeAttr, type GalleryDesign } from "@/lib/design";
 import type { Collection, PhotoView } from "@/lib/types";
-import { ChevronDown, DownloadIcon, HeartIcon } from "@/components/icons";
+import { DownloadIcon, HeartIcon } from "@/components/icons";
 import { Wordmark } from "@/components/wordmark";
 import { PhotoGrid } from "./justified-grid";
 import { Lightbox } from "./lightbox";
@@ -136,67 +136,68 @@ export function ClientGallery(props: Props) {
 
       <div ref={gridTop} />
 
-      {/* Barre de navigation discrète */}
-      <header className="sticky top-0 z-30 bg-bg/90 backdrop-blur-md border-b border-line">
-        <div className="mx-auto max-w-[1800px] px-3 sm:px-8 h-14 sm:h-16 flex items-center gap-3">
-          <div className="hidden md:block w-56 shrink-0 min-w-0">
-            <p className="gallery-title text-base truncate">{props.title}</p>
-          </div>
-          <nav ref={navRef} className="relative flex-1 min-w-0 flex md:justify-center gap-6 overflow-x-auto no-scrollbar px-2">
-            {indicator && (
-              <span
-                aria-hidden
-                className="absolute bottom-[7px] h-px bg-ink transition-[left,width] duration-500 ease-[cubic-bezier(0.22,0.8,0.2,1)]"
-                style={{ left: indicator.left, width: indicator.width }}
-              />
-            )}
-            {props.collections.length > 1 &&
-              props.collections.map((c) => (
-                <button
-                  key={c.id}
-                  data-tab={c.id}
-                  onClick={() => selectTab(c.id)}
-                  className={`eyebrow whitespace-nowrap py-2 transition-colors duration-300 ${tab === c.id ? "text-ink" : "text-muted hover:text-ink"}`}
-                >
-                  {c.name}
-                </button>
-              ))}
-            {props.collections.length <= 1 && <span className="md:hidden gallery-title text-base truncate">{props.title}</span>}
-            {props.favoritesEnabled && favorites.size > 0 && (
+      {/* En-tête de la galerie : nom du client, signature, actions */}
+      <header className="sticky top-0 z-30 bg-bg border-b border-line">
+        <div className="mx-auto max-w-[1800px] px-5 sm:px-8 pt-[max(env(safe-area-inset-top),0.9rem)] pb-3 flex items-center gap-3">
+          <button className="flex-1 min-w-0 text-left" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Revenir à la couverture">
+            <p className="gallery-title text-xl sm:text-2xl truncate">{props.title}</p>
+            <p className="eyebrow text-muted text-[9px] mt-1">ALVZ.REC{props.date ? ` · ${props.date}` : ""}</p>
+          </button>
+          <div className="flex items-center -mr-2">
+            {props.favoritesEnabled && (
               <button
-                data-tab={FAVORITES_TAB}
-                onClick={() => selectTab(FAVORITES_TAB)}
-                className={`eyebrow whitespace-nowrap py-2 transition-colors duration-300 flex items-center gap-1.5 ${tab === FAVORITES_TAB ? "text-ink" : "text-muted hover:text-ink"}`}
+                onClick={() => selectTab(tab === FAVORITES_TAB ? props.collections[0]?.id ?? "" : FAVORITES_TAB)}
+                className={`relative flex items-center gap-1.5 h-10 px-2 transition-colors ${tab === FAVORITES_TAB ? "text-heart" : "text-ink/80 hover:text-ink"}`}
+                aria-label="Ma sélection"
               >
-                <HeartIcon className="w-3.5 h-3.5" filled={tab === FAVORITES_TAB} /> Ma sélection {favorites.size}
+                <HeartIcon className="w-[22px] h-[22px]" filled={tab === FAVORITES_TAB} />
+                {design.nav_style === "labels" && <span className="eyebrow text-[10px]">Favoris</span>}
+                {favorites.size > 0 && (
+                  <span key={favorites.size} className="absolute top-1 left-6 min-w-4 h-4 px-1 rounded-full bg-heart text-white text-[9px] leading-4 text-center animate-[heartPop_0.45s_ease-out]">
+                    {favorites.size}
+                  </span>
+                )}
               </button>
             )}
-          </nav>
-          <div className="flex items-center justify-end md:w-56 shrink-0">
-            {props.downloadsEnabled && (
+            {(props.downloadsEnabled || props.favoritesEnabled) && (
               <div className="relative">
                 <button
-                  className={design.nav_style === "labels" ? "flex items-center gap-2 h-10 px-2 eyebrow text-muted hover:text-ink transition-colors" : "icon-btn"}
+                  className="flex items-center gap-1.5 h-10 px-2 text-ink/80 hover:text-ink transition-colors"
                   onClick={() => setMenu((m) => !m)}
-                  aria-label="Télécharger"
+                  aria-label="Menu"
                   disabled={zip !== null}
                 >
-                  <DownloadIcon className={design.nav_style === "labels" ? "w-4 h-4" : "w-5 h-5"} />
-                  {design.nav_style === "labels" && <span className="hidden min-[380px]:inline">Télécharger</span>}
+                  {props.downloadsEnabled && design.nav_style === "labels" ? <DownloadIcon className="w-5 h-5" /> : <DotsVertical />}
+                  {design.nav_style === "labels" && <span className="eyebrow text-[10px]">{props.downloadsEnabled ? "Télécharger" : "Menu"}</span>}
                 </button>
                 {menu && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setMenu(false)} />
-                    <div className="absolute right-0 mt-2 z-20 w-64 bg-bg border border-line shadow-xl py-2">
-                      {activeCollection && props.collections.length > 1 && (
-                        <button className="w-full text-left px-5 py-3 text-sm hover:bg-bg-soft" onClick={() => startZip(activeCollection.id)}>
-                          Télécharger « {activeCollection.name} »
+                    <div className="absolute right-0 mt-2 z-20 w-64 bg-bg border border-line shadow-xl py-2 animate-[fadeUp_0.2s_ease-out_both]">
+                      {props.favoritesEnabled && (
+                        <button
+                          className="w-full text-left px-5 py-3 text-sm hover:bg-bg-soft flex items-center gap-3"
+                          onClick={() => {
+                            setMenu(false);
+                            selectTab(FAVORITES_TAB);
+                          }}
+                        >
+                          <HeartIcon className="w-4 h-4" /> Ma sélection{favorites.size > 0 ? ` (${favorites.size})` : ""}
                         </button>
                       )}
-                      <button className="w-full text-left px-5 py-3 text-sm hover:bg-bg-soft" onClick={() => startZip(null)}>
-                        Télécharger toute la galerie
-                      </button>
-                      <p className="px-5 pt-2 pb-1 text-[11px] text-muted leading-snug">Photos en haute définition, au format ZIP.</p>
+                      {props.downloadsEnabled && (
+                        <>
+                          {activeCollection && props.collections.length > 1 && (
+                            <button className="w-full text-left px-5 py-3 text-sm hover:bg-bg-soft flex items-center gap-3" onClick={() => startZip(activeCollection.id)}>
+                              <DownloadIcon className="w-4 h-4" /> Télécharger « {activeCollection.name} »
+                            </button>
+                          )}
+                          <button className="w-full text-left px-5 py-3 text-sm hover:bg-bg-soft flex items-center gap-3" onClick={() => startZip(null)}>
+                            <DownloadIcon className="w-4 h-4" /> Télécharger toute la galerie
+                          </button>
+                          <p className="px-5 pt-2 pb-1 text-[11px] text-muted leading-snug">Photos en haute définition, au format ZIP.</p>
+                        </>
+                      )}
                     </div>
                   </>
                 )}
@@ -204,16 +205,50 @@ export function ClientGallery(props: Props) {
             )}
           </div>
         </div>
+        {(props.collections.length > 1 || tab === FAVORITES_TAB) && (
+          <nav ref={navRef} className="relative mx-auto max-w-[1800px] flex md:justify-center gap-6 overflow-x-auto no-scrollbar px-5 sm:px-8">
+            {indicator && (
+              <span
+                aria-hidden
+                className="absolute bottom-0 h-px bg-ink transition-[left,width] duration-500 ease-[cubic-bezier(0.22,0.8,0.2,1)]"
+                style={{ left: indicator.left, width: indicator.width }}
+              />
+            )}
+            {props.collections.map((c) => (
+              <button
+                key={c.id}
+                data-tab={c.id}
+                onClick={() => selectTab(c.id)}
+                className={`eyebrow whitespace-nowrap py-3 transition-colors duration-300 ${tab === c.id ? "text-ink" : "text-muted hover:text-ink"}`}
+              >
+                {c.name}
+              </button>
+            ))}
+            {tab === FAVORITES_TAB && (
+              <button data-tab={FAVORITES_TAB} className="eyebrow whitespace-nowrap py-3 text-ink flex items-center gap-1.5">
+                <HeartIcon className="w-3.5 h-3.5" filled /> Ma sélection
+              </button>
+            )}
+          </nav>
+        )}
       </header>
 
-      <main className="mx-auto max-w-[1800px] px-1 sm:px-8 pt-1 sm:pt-8 pb-24 protect">
-        {tab === FAVORITES_TAB && (
+      <main className="mx-auto max-w-[1800px] px-2 sm:px-8 pt-2 sm:pt-8 pb-24 protect">
+        {tab === FAVORITES_TAB && favorites.size > 0 && (
           <p className="text-center text-xs text-muted py-6">
             Sélection enregistrée pour {email}. Elle est automatiquement transmise à ALVZ.REC.
           </p>
         )}
         {visible.length === 0 ? (
-          <p className="py-32 text-center gallery-title text-2xl text-muted">Aucune photo ici pour l&apos;instant.</p>
+          tab === FAVORITES_TAB ? (
+            <div className="py-28 text-center px-8">
+              <HeartIcon className="w-6 h-6 mx-auto text-muted" />
+              <p className="gallery-title text-2xl mt-5">Votre sélection est vide</p>
+              <p className="text-sm text-muted mt-3">Touchez ♡ sur vos photos préférées pour les retrouver ici.</p>
+            </div>
+          ) : (
+            <p className="py-32 text-center gallery-title text-2xl text-muted">Aucune photo ici pour l&apos;instant.</p>
+          )
         ) : (
           <div key={tab} className="animate-[gridIn_0.6s_ease-out_both]">
           <PhotoGrid
@@ -332,11 +367,10 @@ function Cover({
   const enter = (light: boolean, delay = 0.9) => (
     <button
       onClick={onEnter}
-      className={`mt-10 inline-flex flex-col items-center gap-2 eyebrow transition-colors animate-[fadeUp_1.6s_ease-out_both] ${light ? "text-white/80 hover:text-white" : "text-muted hover:text-ink"}`}
+      className={`mt-10 inline-block border px-8 sm:px-10 py-4 eyebrow tracking-[0.3em] transition-colors duration-300 animate-[fadeUp_1.6s_ease-out_both] ${light ? "border-white/85 text-white hover:bg-white hover:text-black" : "border-ink/70 text-ink hover:bg-ink hover:text-bg"}`}
       style={{ animationDelay: `${delay + words.length * 0.14}s` }}
     >
-      Voir la galerie
-      <ChevronDown className="w-4 h-4 animate-bounce [animation-duration:2.4s]" />
+      Afficher la galerie
     </button>
   );
   const heading = (cls: string, withDate = true) => (
@@ -463,7 +497,13 @@ function Cover({
           {img("absolute inset-0 w-full h-full")}
           <div className={`absolute inset-0 ${bottom ? "bg-gradient-to-b from-black/20 via-transparent to-black/70" : "bg-black/30"}`} />
           {layout === "frame" && <div className="absolute inset-4 sm:inset-8 border border-white/80 pointer-events-none" />}
-          {topLogo(true)}
+          {layout === "center" ? (
+            <div className="absolute bottom-0 inset-x-0 z-10 flex justify-center pb-[max(env(safe-area-inset-bottom),2.25rem)] animate-[fadeIn_1.6s_1.2s_ease-out_both]">
+              <Wordmark height={40} tone="white" />
+            </div>
+          ) : (
+            topLogo(true)
+          )}
           <div
             style={fadeOnScroll}
             className={`absolute text-white px-6 sm:px-14 ${bottom ? "inset-x-0 bottom-0 pb-[max(env(safe-area-inset-bottom),3rem)] sm:pb-20 text-left" : "inset-0 flex flex-col items-center justify-center text-center"}`}
@@ -542,5 +582,15 @@ function EmailDialog({ slug, onCancel, onDone }: { slug: string; onCancel: () =>
         </div>
       </form>
     </div>
+  );
+}
+
+function DotsVertical() {
+  return (
+    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor" aria-hidden>
+      <circle cx="12" cy="5" r="1.7" />
+      <circle cx="12" cy="12" r="1.7" />
+      <circle cx="12" cy="19" r="1.7" />
+    </svg>
   );
 }
