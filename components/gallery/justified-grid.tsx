@@ -77,13 +77,17 @@ export function PhotoGrid({ photos, style, size, spacing, favorites, favoritesEn
     const el = ref.current;
     if (!el) return;
     const io = new IntersectionObserver(
-      (entries) =>
+      (entries) => {
+        // Apparition en cascade : chaque photo d'un même lot arrive un peu après la précédente
+        let i = 0;
         entries.forEach((e) => {
           if (e.isIntersecting) {
+            (e.target as HTMLElement).style.transitionDelay = `${Math.min(i++ * 70, 560)}ms`;
             e.target.classList.add("is-visible");
             io.unobserve(e.target);
           }
-        }),
+        });
+      },
       { rootMargin: "0px 0px -6% 0px" },
     );
     el.querySelectorAll(".reveal:not(.is-visible)").forEach((n) => io.observe(n));
@@ -93,7 +97,7 @@ export function PhotoGrid({ photos, style, size, spacing, favorites, favoritesEn
   const tile = (p: PhotoView, box: React.CSSProperties, displayWidth: number, cover: boolean) => {
     const fav = favorites.has(p.id);
     return (
-      <div key={p.id} className="reveal group relative bg-bg-soft overflow-hidden" style={box}>
+      <div key={p.id} data-photo-id={p.id} className="reveal group relative bg-bg-soft overflow-hidden" style={box}>
         <button className="block w-full h-full cursor-zoom-in" onClick={() => onOpen(p.id)} aria-label={`Ouvrir ${p.filename}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -104,7 +108,11 @@ export function PhotoGrid({ photos, style, size, spacing, favorites, favoritesEn
             loading="lazy"
             decoding="async"
             draggable={false}
-            className={`w-full h-full ${cover ? "object-cover" : "object-contain"} transition-transform duration-[1.2s] ease-out group-hover:scale-[1.015]`}
+            ref={(el) => {
+              if (el?.complete) el.classList.add("is-loaded");
+            }}
+            onLoad={(e) => e.currentTarget.classList.add("is-loaded")}
+            className={`tile-img w-full h-full ${cover ? "object-cover" : "object-contain"}`}
           />
         </button>
         {favoritesEnabled && (
@@ -113,7 +121,7 @@ export function PhotoGrid({ photos, style, size, spacing, favorites, favoritesEn
             className={`absolute bottom-1 right-1 w-9 h-9 flex items-center justify-center text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-opacity ${fav ? "opacity-100" : "opacity-0 group-hover:opacity-90 [@media(hover:none)]:opacity-70"}`}
             aria-label={fav ? "Retirer des favoris" : "Ajouter aux favoris"}
           >
-            <HeartIcon className="w-5 h-5" filled={fav} />
+            <HeartIcon className={`w-5 h-5 ${fav ? "animate-[heartPop_0.45s_ease-out]" : ""}`} filled={fav} />
           </button>
         )}
       </div>

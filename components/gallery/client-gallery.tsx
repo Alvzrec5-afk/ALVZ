@@ -36,6 +36,20 @@ export function ClientGallery(props: Props) {
   const [menu, setMenu] = useState(false);
   const [zip, setZip] = useState<{ done: number; total: number } | null>(null);
   const gridTop = useRef<HTMLDivElement>(null);
+  const navRef = useRef<HTMLElement>(null);
+  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
+
+  // Trait sous l'onglet actif, qui glisse d'une collection à l'autre
+  useEffect(() => {
+    const nav = navRef.current;
+    const measure = () => {
+      const active = nav?.querySelector<HTMLElement>(`[data-tab="${CSS.escape(tab)}"]`);
+      setIndicator(active ? { left: active.offsetLeft, width: active.offsetWidth } : null);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [tab, favorites.size, props.collections.length]);
 
   // Couleur de fond de la page (zones de rebond iPhone comprises)
   useEffect(() => {
@@ -126,13 +140,21 @@ export function ClientGallery(props: Props) {
           <div className="hidden md:block w-56 shrink-0 min-w-0">
             <p className="gallery-title text-base truncate">{props.title}</p>
           </div>
-          <nav className="flex-1 min-w-0 flex md:justify-center gap-6 overflow-x-auto no-scrollbar px-2">
+          <nav ref={navRef} className="relative flex-1 min-w-0 flex md:justify-center gap-6 overflow-x-auto no-scrollbar px-2">
+            {indicator && (
+              <span
+                aria-hidden
+                className="absolute bottom-[7px] h-px bg-ink transition-[left,width] duration-500 ease-[cubic-bezier(0.22,0.8,0.2,1)]"
+                style={{ left: indicator.left, width: indicator.width }}
+              />
+            )}
             {props.collections.length > 1 &&
               props.collections.map((c) => (
                 <button
                   key={c.id}
+                  data-tab={c.id}
                   onClick={() => selectTab(c.id)}
-                  className={`eyebrow whitespace-nowrap py-2 border-b transition-colors ${tab === c.id ? "border-ink" : "border-transparent text-muted hover:text-ink"}`}
+                  className={`eyebrow whitespace-nowrap py-2 transition-colors duration-300 ${tab === c.id ? "text-ink" : "text-muted hover:text-ink"}`}
                 >
                   {c.name}
                 </button>
@@ -140,8 +162,9 @@ export function ClientGallery(props: Props) {
             {props.collections.length <= 1 && <span className="md:hidden gallery-title text-base truncate">{props.title}</span>}
             {props.favoritesEnabled && favorites.size > 0 && (
               <button
+                data-tab={FAVORITES_TAB}
                 onClick={() => selectTab(FAVORITES_TAB)}
-                className={`eyebrow whitespace-nowrap py-2 border-b transition-colors flex items-center gap-1.5 ${tab === FAVORITES_TAB ? "border-ink" : "border-transparent text-muted hover:text-ink"}`}
+                className={`eyebrow whitespace-nowrap py-2 transition-colors duration-300 flex items-center gap-1.5 ${tab === FAVORITES_TAB ? "text-ink" : "text-muted hover:text-ink"}`}
               >
                 <HeartIcon className="w-3.5 h-3.5" filled={tab === FAVORITES_TAB} /> Ma sélection {favorites.size}
               </button>
@@ -184,8 +207,8 @@ export function ClientGallery(props: Props) {
         {visible.length === 0 ? (
           <p className="py-32 text-center gallery-title text-2xl text-muted">Aucune photo ici pour l&apos;instant.</p>
         ) : (
+          <div key={tab} className="animate-[gridIn_0.6s_ease-out_both]">
           <PhotoGrid
-            key={tab}
             photos={visible}
             style={design.grid_style}
             size={design.grid_size}
@@ -195,6 +218,7 @@ export function ClientGallery(props: Props) {
             onOpen={(id) => setOpen(visible.findIndex((p) => p.id === id))}
             onToggleFavorite={toggleFavorite}
           />
+          </div>
         )}
       </main>
 
@@ -255,11 +279,44 @@ function Cover({
   onEnter: () => void;
 }) {
   const focus = { objectPosition: `${design.cover_focus_x}% ${design.cover_focus_y}%` };
+  const sectionRef = useRef<HTMLElement>(null);
+
+  // Profondeur au défilement : la photo glisse plus lentement que la page, le texte s'efface.
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const p = Math.min(1, Math.max(0, window.scrollY / (el.offsetHeight || 1)));
+      el.style.setProperty("--p", p.toFixed(3));
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
+
   const img = (cls: string) =>
     cover ? (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={cover.src} alt="" className={`${cls} object-cover animate-[coverIn_2.4s_ease-out_both]`} style={focus} />
+      <div className={`${cls} overflow-hidden`}>
+        <div className="w-full h-full" style={{ transform: "translateY(calc(var(--p, 0) * 22%))" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={cover.src}
+            alt=""
+            className="w-full h-full object-cover animate-[coverIn_1.6s_ease-out_both,kenBurns_14s_cubic-bezier(0.2,0.6,0.2,1)_both]"
+            style={focus}
+          />
+        </div>
+      </div>
     ) : null;
+  const words = title.split(/\s+/).filter(Boolean);
   const enter = (light: boolean) => (
     <button
       onClick={onEnter}
@@ -271,14 +328,25 @@ function Cover({
   );
   const heading = (cls: string) => (
     <>
-      <h1 className={`gallery-title break-words animate-[fadeUp_1.6s_0.3s_ease-out_both] ${cls}`}>{title}</h1>
-      {date && <p className="eyebrow mt-5 opacity-80 animate-[fadeUp_1.6s_0.6s_ease-out_both]">{date}</p>}
+      <h1 className={`gallery-title break-words ${cls}`} aria-label={title}>
+        {words.map((w, i) => (
+          <span key={i} aria-hidden className="inline-block animate-[wordIn_1.1s_cubic-bezier(0.22,0.8,0.2,1)_both]" style={{ animationDelay: `${0.35 + i * 0.14}s` }}>
+            {w}
+            {i < words.length - 1 ? "\u00a0" : ""}
+          </span>
+        ))}
+      </h1>
+      {date && (
+        <p className="eyebrow mt-5 opacity-80 animate-[fadeUp_1.4s_ease-out_both]" style={{ animationDelay: `${0.5 + words.length * 0.14}s` }}>
+          {date}
+        </p>
+      )}
     </>
   );
 
   if (design.cover_layout === "split") {
     return (
-      <section className="min-h-svh flex flex-col-reverse md:flex-row protect">
+      <section ref={sectionRef} className="min-h-svh flex flex-col-reverse md:flex-row protect">
         <div className="md:w-[42%] flex flex-col items-center justify-center text-center px-8 py-14 md:py-0">
           <Wordmark height={48} className="mb-12" />
           {heading("text-[clamp(2.2rem,5vw,4.5rem)]")}
@@ -291,7 +359,7 @@ function Cover({
 
   if (design.cover_layout === "framed") {
     return (
-      <section className="min-h-svh flex flex-col items-center px-5 sm:px-12 pt-[max(env(safe-area-inset-top),1.5rem)] pb-10 protect">
+      <section ref={sectionRef} className="min-h-svh flex flex-col items-center px-5 sm:px-12 pt-[max(env(safe-area-inset-top),1.5rem)] pb-10 protect">
         <Wordmark height={40} className="mb-6" />
         <div className="relative w-full flex-1 min-h-[55svh] overflow-hidden bg-bg-soft">{img("absolute inset-0 w-full h-full")}</div>
         <div className="text-center pt-10">
@@ -304,13 +372,14 @@ function Cover({
 
   const bottom = design.cover_layout === "bottom";
   return (
-    <section className="relative h-svh w-full overflow-hidden bg-black protect">
+    <section ref={sectionRef} className="relative h-svh w-full overflow-hidden bg-black protect">
       {img("absolute inset-0 w-full h-full")}
       <div className={`absolute inset-0 ${bottom ? "bg-gradient-to-b from-black/20 via-transparent to-black/70" : "bg-black/30"}`} />
       <div className="absolute top-0 inset-x-0 flex justify-center pt-[max(env(safe-area-inset-top),1.75rem)] text-white/90">
         <Wordmark height={44} tone="white" />
       </div>
       <div
+        style={{ opacity: "calc(1 - var(--p, 0) * 1.6)", transform: "translateY(calc(var(--p, 0) * -60px))" }}
         className={`absolute text-white px-6 sm:px-14 ${bottom ? "inset-x-0 bottom-0 pb-[max(env(safe-area-inset-bottom),3rem)] sm:pb-20 text-left" : "inset-0 flex flex-col items-center justify-center text-center"}`}
       >
         {heading("text-[clamp(2.6rem,9vw,7.5rem)]")}
