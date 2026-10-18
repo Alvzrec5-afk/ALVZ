@@ -310,3 +310,8 @@ alter table public.board_items drop constraint board_items_kind_check;
 alter table public.board_items add constraint board_items_kind_check
   check (kind in ('note', 'image', 'todo', 'column', 'arrow', 'board', 'color', 'link'));
 create index board_items_board_ref_idx on public.board_items ((data->>'boardId')) where kind = 'board';
+
+-- Cartes « tableau » (grille de cellules, comme le Tableau de Milanote).
+alter table public.board_items drop constraint board_items_kind_check;
+alter table public.board_items add constraint board_items_kind_check
+  check (kind in ('note', 'image', 'todo', 'column', 'arrow', 'board', 'color', 'link', 'table'));

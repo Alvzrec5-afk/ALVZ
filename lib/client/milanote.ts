@@ -9,7 +9,8 @@ import type { TodoEntry } from "@/lib/board-types";
 export type ImportCard =
   | { kind: "note"; text: string }
   | { kind: "todo"; title: string; items: TodoEntry[] }
-  | { kind: "link"; url: string; title: string };
+  | { kind: "link"; url: string; title: string }
+  | { kind: "table"; cells: string[][] };
 export type ImportGroup = { title: string | null; cards: ImportCard[] };
 
 const CHECK = /^\s*(?:[-*+]|\d+[.)])?\s*(?:\[( |x|X)\]|(☐|☑|✓|✔|☒))\s+(.*)$/;
@@ -34,6 +35,13 @@ function plain(line: string) {
 const uid = () => crypto.randomUUID();
 
 function blockToCard(lines: string[]): ImportCard | null {
+  // Tableau Markdown « | a | b | » (la ligne « |---|---| » est ignorée).
+  if (lines.length >= 1 && lines.every((l) => /^\s*\|.*\|\s*$/.test(l))) {
+    const cells = lines
+      .filter((l) => !/^\s*\|[\s:|-]+\|\s*$/.test(l))
+      .map((l) => l.trim().replace(/^\||\|$/g, "").split("|").map((c) => plain(c.trim())));
+    if (cells.length) return { kind: "table", cells };
+  }
   const checks = lines.map((l) => CHECK.exec(l));
   if (checks.some(Boolean)) {
     const title = lines

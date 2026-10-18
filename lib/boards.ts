@@ -7,6 +7,8 @@ import {
   MAX_WIDTH,
   MIN_WIDTH,
   NOTE_COLORS,
+  TABLE_MAX_COLS,
+  TABLE_MAX_ROWS,
   type BoardData,
   type BoardItem,
   type BoardItemInput,
@@ -157,11 +159,18 @@ function cleanKind(kind: BoardKind, d: BoardData): BoardData {
     }
     case "board":
       return { boardId: isUuid(d.boardId) ? d.boardId : undefined, title: text(d.title, 200) ?? "" };
+    case "table": {
+      // Grille rectangulaire, bornée (60 lignes × 12 colonnes, 1000 caractères par cellule).
+      const rows = (Array.isArray(d.cells) ? d.cells : []).slice(0, TABLE_MAX_ROWS).map((r) => (Array.isArray(r) ? r : []));
+      const cols = Math.min(TABLE_MAX_COLS, Math.max(1, ...rows.map((r) => r.length)));
+      const cells = rows.map((r) => Array.from({ length: cols }, (_, i) => text(r[i], 1000) ?? ""));
+      return { cells: cells.length ? cells : [Array.from({ length: cols }, () => "")] };
+    }
   }
 }
 
-const KINDS: BoardKind[] = ["note", "image", "todo", "column", "arrow", "board", "color", "link"];
-const CLIENT_KINDS: BoardKind[] = ["note", "todo", "link"];
+const KINDS: BoardKind[] = ["note", "image", "todo", "column", "arrow", "board", "color", "link", "table"];
+const CLIENT_KINDS: BoardKind[] = ["note", "todo", "link", "table"];
 
 /**
  * Applique une série de modifications. Toutes les cartes visées doivent appartenir au tableau ;

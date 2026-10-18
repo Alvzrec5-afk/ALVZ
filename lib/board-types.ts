@@ -1,6 +1,6 @@
 /** Tableaux façon Milanote : types partagés entre le navigateur et le serveur. */
 
-export type BoardKind = "note" | "image" | "todo" | "column" | "arrow" | "board" | "color" | "link";
+export type BoardKind = "note" | "image" | "todo" | "column" | "arrow" | "board" | "color" | "link" | "table";
 
 /** Teintes des notes : mélangées au fond, elles restent douces en mode clair comme en mode sombre. */
 export const NOTE_COLORS = {
@@ -46,6 +46,8 @@ export type BoardData = {
   url?: string;
   /** Sous-tableau : identifiant du tableau ouvert par la carte (nom dans `title`). */
   boardId?: string;
+  /** Tableau (grille) : cellules ligne par ligne ; la première ligne sert d'en-tête. */
+  cells?: string[][];
 };
 
 /** Ce que le navigateur envoie pour créer ou modifier une carte. */
@@ -75,7 +77,9 @@ export type BoardItem = BoardItemInput & {
 
 export type BoardOp = { op: "put"; item: BoardItemInput } | { op: "delete"; id: string };
 
-export const DEFAULT_WIDTH: Record<BoardKind, number> = { note: 240, image: 280, todo: 260, column: 280, arrow: 0, board: 200, color: 160, link: 300 };
+export const DEFAULT_WIDTH: Record<BoardKind, number> = { note: 240, image: 280, todo: 260, column: 280, arrow: 0, board: 200, color: 160, link: 300, table: 420 };
+export const TABLE_MAX_ROWS = 60;
+export const TABLE_MAX_COLS = 12;
 
 export const isHex = (v: unknown): v is string => typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v);
 

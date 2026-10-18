@@ -103,6 +103,10 @@ Couleurs : toute carte (sauf flèche) a un fond `data.color` (teinte douce, `NOT
 pleine `SOLID_COLORS` ou libre) ; texte blanc/encre auto (`inkOn`) ; palette dans la barre de la carte et pour une
 sélection multiple. Outils de la barre de gauche : clic = carte au centre, glisser-déposer = carte à l'endroit
 lâché (ou rangée dans la colonne visée).
+Carte `table` (bouton « Tableau », = Tableau de Milanote) : `data.cells` (lignes × colonnes, 1re ligne en gras),
+Tab / Entrée pour avancer, boutons + / − Ligne / Colonne ; tableaux Markdown « | a | b | » de l'import Milanote.
+Le bouton des sous-tableaux s'appelle « Planche » (comme Milanote). Le canevas annule tout défilement natif
+(`onScroll`) : sinon le focus d'un champ décale la vue.
 
 **Galerie client (`/g/<lien>`)** — `components/gallery/client-gallery.tsx` : couverture animée,
 en-tête collant (Contacter, ♡ sélection, menu), grilles (`justified-grid.tsx`), visionneuse
@@ -127,6 +131,9 @@ images des tableaux). Schéma de référence :
 `supabase/schema.sql` (à tenir à jour après chaque migration).
 
 ## En attente / idées discutées
+
+- **Migration à appliquer au moment de publier** (pas encore faite sur Supabase) : le dernier bloc de
+  `supabase/schema.sql` (contrainte `board_items_kind_check` avec `table`). Puis retirer cette ligne.
 
 - Tableaux, idées pour la suite : annuler / rétablir, commentaires sur une carte, aperçu des liens
   (Pinterest, Instagram), cocher les listes du studio côté client, temps réel au lieu du rafraîchissement.

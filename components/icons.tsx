@@ -223,3 +223,9 @@ export const LinkIcon = ({ className = "w-5 h-5" }: P) => (
     <path d="M10 14a4 4 0 0 0 5.66 0l3.17-3.17a4 4 0 0 0-5.66-5.66L12 6.34M14 10a4 4 0 0 0-5.66 0l-3.17 3.17a4 4 0 0 0 5.66 5.66L12 17.66" />
   </svg>
 );
+export const TableIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <rect x="3.5" y="5" width="17" height="14" rx="1" />
+    <path d="M3.5 9.5h17M3.5 14.25h17M9.25 5v14M14.75 5v14" />
+  </svg>
+);

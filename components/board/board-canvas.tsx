@@ -8,6 +8,8 @@ import {
   MIN_WIDTH,
   NOTE_COLORS,
   SOLID_COLORS,
+  TABLE_MAX_COLS,
+  TABLE_MAX_ROWS,
   inkOn,
   type BoardData,
   type BoardItem,
@@ -33,6 +35,7 @@ import {
   PaletteIcon,
   PencilIcon,
   PlusIcon,
+  TableIcon,
   TrashIcon,
 } from "@/components/icons";
 import { BoardSync, type SyncStatus } from "./sync";
@@ -118,12 +121,14 @@ function AutoTextarea({
   value,
   onChange,
   onDone,
+  onKey,
   placeholder,
   className = "",
 }: {
   value: string;
   onChange: (v: string) => void;
   onDone: () => void;
+  onKey?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   placeholder?: string;
   className?: string;
 }) {
@@ -137,7 +142,7 @@ function AutoTextarea({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    el.focus();
+    el.focus({ preventScroll: true });
     el.setSelectionRange(el.value.length, el.value.length);
   }, []);
   return (
@@ -151,6 +156,7 @@ function AutoTextarea({
       onKeyDown={(e) => {
         if (e.key === "Escape") (e.target as HTMLTextAreaElement).blur();
         e.stopPropagation();
+        onKey?.(e);
       }}
       className={`block w-full resize-none bg-transparent outline-none overflow-hidden select-text ${className}`}
     />
@@ -437,6 +443,11 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     const it = create("column", { title: "", color: "blanc" }, at);
     setEditing({ id: it.id, field: "title" });
   };
+  const addTable = (at?: At, extra?: Extra) =>
+    ensureName(() => {
+      const it = create("table", { cells: Array.from({ length: 3 }, () => ["", "", ""]) }, at, extra);
+      setEditing({ id: it.id, field: "c:0:0" });
+    });
   const imageDrop = useRef<{ at: At; extra?: Extra } | null>(null);
 
   /**
@@ -584,7 +595,9 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
                     ? { text: card.text, color: "blanc" }
                     : card.kind === "link"
                       ? { url: card.url, title: card.title }
-                      : { title: card.title, items: card.items },
+                      : card.kind === "table"
+                        ? { cells: card.cells }
+                        : { title: card.title, items: card.items },
               }),
             );
           }
@@ -1127,7 +1140,14 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     setSelected(it.id);
     setEditing({
       id: it.id,
-      field: it.kind === "todo" || it.kind === "column" || it.kind === "board" || it.kind === "color" ? "title" : it.kind === "image" ? "caption" : undefined,
+      field:
+        it.kind === "todo" || it.kind === "column" || it.kind === "board" || it.kind === "color"
+          ? "title"
+          : it.kind === "image"
+            ? "caption"
+            : it.kind === "table"
+              ? "c:0:0"
+              : undefined,
     });
   };
 
@@ -1216,6 +1236,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         {it.kind === "board" && renderBoardCard(it, ed)}
         {it.kind === "color" && renderColor(it, ed)}
         {it.kind === "link" && renderLink(it, ed)}
+        {it.kind === "table" && renderTable(it, editable, ed, isSel)}
 
         {it.kind === "column" && (
           <div>
@@ -1405,6 +1426,96 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     );
   }
 
+  /** Carte « tableau » : grille de cellules (1re ligne en gras), comme le Tableau de Milanote. */
+  function renderTable(it: BoardItem, editable: boolean, ed: Editing, isSel: boolean) {
+    const cells = it.data.cells?.length ? it.data.cells : [["", "", ""]];
+    const cols = cells[0].length;
+    const setCells = (next: string[][]) => updateData(it.id, { cells: next });
+    const field = (r: number, c: number) => `c:${r}:${c}`;
+    const go = (r: number, c: number) => {
+      if (selected !== it.id) setSelected(it.id);
+      setEditing({ id: it.id, field: field(r, c) });
+    };
+    return (
+      <div className="px-2 pt-3 pb-2">
+        <table className="w-full table-fixed border-collapse text-[12px] leading-snug">
+          <tbody>
+            {cells.map((row, r) => (
+              <tr key={r}>
+                {row.map((cell, c) => {
+                  const here = ed?.field === field(r, c);
+                  return (
+                    <td
+                      key={c}
+                      data-nodrag={editable ? "" : undefined}
+                      onClick={editable && !here ? () => go(r, c) : undefined}
+                      className={`border border-current/15 align-top px-2 py-1.5 ${r === 0 ? "font-medium" : ""} ${editable ? "cursor-text" : ""}`}
+                      style={{ borderColor: "color-mix(in srgb, currentColor 18%, transparent)" }}
+                    >
+                      {here ? (
+                        <AutoTextarea
+                          value={cell}
+                          onChange={(v) => setCells(cells.map((rr, i) => (i === r ? rr.map((x, j) => (j === c ? v : x)) : rr)))}
+                          onDone={() => setEditing((cur) => (cur?.id === it.id && cur.field === field(r, c) ? null : cur))}
+                          onKey={(e) => {
+                            // Tab : cellule suivante ; Entrée : cellule du dessous (Maj + Entrée : retour à la ligne).
+                            if (e.key === "Tab") {
+                              e.preventDefault();
+                              const n = r * cols + c + (e.shiftKey ? -1 : 1);
+                              if (n >= 0 && n < cells.length * cols) go(Math.floor(n / cols), n % cols);
+                            } else if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              if (r + 1 < cells.length) go(r + 1, c);
+                              else if (cells.length < TABLE_MAX_ROWS) {
+                                setCells([...cells, Array.from({ length: cols }, () => "")]);
+                                go(r + 1, c);
+                              }
+                            }
+                          }}
+                          className="text-[12px]"
+                        />
+                      ) : cell ? (
+                        <span className="block whitespace-pre-wrap break-words">
+                          <Linkified text={cell} />
+                        </span>
+                      ) : (
+                        <span className="opacity-30">{r === 0 ? "Titre" : "…"}</span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {editable && isSel && (
+          <div data-nodrag className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[11px] opacity-70">
+            {cells.length < TABLE_MAX_ROWS && (
+              <button data-nodrag onClick={() => setCells([...cells, Array.from({ length: cols }, () => "")])} className="hover:opacity-100">
+                + Ligne
+              </button>
+            )}
+            {cols < TABLE_MAX_COLS && (
+              <button data-nodrag onClick={() => setCells(cells.map((rr) => [...rr, ""]))} className="hover:opacity-100">
+                + Colonne
+              </button>
+            )}
+            {cells.length > 1 && (
+              <button data-nodrag onClick={() => setCells(cells.slice(0, -1))} className="hover:opacity-100">
+                − Ligne
+              </button>
+            )}
+            {cols > 1 && (
+              <button data-nodrag onClick={() => setCells(cells.map((rr) => rr.slice(0, -1)))} className="hover:opacity-100">
+                − Colonne
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   function renderTodo(it: BoardItem, editable: boolean, ed: Editing) {
     const entries = it.data.items ?? [];
     const done = entries.filter((e) => e.done).length;
@@ -1525,7 +1636,8 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         }),
     },
     { label: "Liste", Icon: ChecklistIcon, run: () => addTodo(), drop: addTodo },
-    { label: "Tableau", Icon: BoardIcon, run: () => addBoard(), drop: addBoard, admin: true },
+    { label: "Tableau", Icon: TableIcon, run: () => addTable(), drop: addTable },
+    { label: "Planche", Icon: BoardIcon, run: () => addBoard(), drop: addBoard, admin: true },
     { label: "Colonne", Icon: ColumnIcon, run: () => addColumn(), drop: (at) => addColumn(at), admin: true },
     { label: "Couleur", Icon: PaletteIcon, run: () => addColor(), drop: addColor, admin: true },
     { label: "Flèche", Icon: ConnectorIcon, run: () => setArrowMode((m) => (m ? null : { from: null })), admin: true, active: Boolean(arrowMode) },
@@ -1605,6 +1717,12 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       }}
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDrop}
+      // Le navigateur fait défiler la zone pour montrer un champ qui prend le focus : on l'annule,
+      // le tableau se déplace uniquement par sa propre vue (sinon tout se décale).
+      onScroll={(e) => {
+        e.currentTarget.scrollTop = 0;
+        e.currentTarget.scrollLeft = 0;
+      }}
       data-tick={tick}
     >
       {/* Le tableau : coordonnées libres, déplacé et zoomé d'un bloc */}
