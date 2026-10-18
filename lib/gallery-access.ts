@@ -16,7 +16,8 @@ export type PublicGallery = {
   downloads_enabled: boolean;
   favorites_enabled: boolean;
   download_web_enabled: boolean;
-} & GalleryDesign;
+  design: Record<string, unknown> | null;
+} & Omit<GalleryDesign, "nav_style">;
 
 export const GALLERY_FIELDS = `id, slug, title, event_date, cover_photo_id, password_hash, expires_at, watermark, downloads_enabled, favorites_enabled, download_web_enabled, ${DESIGN_FIELDS}`;
 

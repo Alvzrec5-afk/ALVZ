@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdminApi } from "@/lib/auth";
 import { parisEndOfDay } from "@/lib/dates";
-import { sanitizeSettingsPatch } from "@/lib/design";
+import { pickDesign, sanitizeSettingsPatch } from "@/lib/design";
 import { createSessionClient } from "@/lib/supabase/server";
 import { newSlug } from "@/lib/tokens";
 
@@ -42,7 +42,13 @@ export async function createGallery(_: FormState, form: FormData): Promise<FormS
 /** Modifie un ou plusieurs réglages (design, options, nom, date…). Les valeurs sont validées côté serveur. */
 export async function updateGallerySettings(galleryId: string, patch: Record<string, unknown>) {
   const { supabase } = await requireAdminApi();
-  const clean = sanitizeSettingsPatch(patch);
+  const clean: Record<string, unknown> = sanitizeSettingsPatch(patch);
+  const designPatch = pickDesign(patch);
+  if (Object.keys(designPatch).length > 0) {
+    const { data: current, error: readError } = await supabase.from("galleries").select("design").eq("id", galleryId).single();
+    if (readError) return { error: readError.message };
+    clean.design = { ...((current?.design as Record<string, unknown>) ?? {}), ...designPatch };
+  }
   if (Object.keys(clean).length === 0) return { error: "Aucune modification valide" };
   const { error } = await supabase
     .from("galleries")

@@ -37,6 +37,7 @@ create table public.galleries (
   grid_spacing text not null default 'fine' check (grid_spacing in ('fine','wide')),
   favorites_enabled boolean not null default true,
   download_web_enabled boolean not null default false,
+  design jsonb not null default '{}'::jsonb, -- réglages de design validés par l'application
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

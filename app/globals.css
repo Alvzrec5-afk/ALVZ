@@ -16,7 +16,16 @@
   color-scheme: light;
 }
 
+/* Palettes claires avec une couleur de marque pour les titres */
+[data-theme="or"] { --bg: #fdfcf8; --bg-soft: #f6f2e8; --ink: #2a2620; --muted: #8f8676; --line: #ebe4d4; --brand: #8c7a4f; --danger: #a23b2a; --heart: #a8473b; --accent: #0e7f57; --warn: #a8640c; color-scheme: light; }
+[data-theme="rose"] { --bg: #fbf8f7; --bg-soft: #f3edeb; --ink: #2b2324; --muted: #8e8183; --line: #ebe2e0; --brand: #8f6e70; --danger: #a23b2a; --heart: #a8473b; --accent: #0e7f57; --warn: #a8640c; color-scheme: light; }
+[data-theme="terracotta"] { --bg: #fbf8f5; --bg-soft: #f1ebe5; --ink: #2b241f; --muted: #8d7f73; --line: #e8ded4; --brand: #8e6448; --danger: #a23b2a; --heart: #a8473b; --accent: #0e7f57; --warn: #a8640c; color-scheme: light; }
+[data-theme="olive"] { --bg: #f8f8f4; --bg-soft: #eeeee6; --ink: #262820; --muted: #868a78; --line: #e3e4da; --brand: #7c8261; --danger: #a23b2a; --heart: #a8473b; --accent: #0e7f57; --warn: #a8640c; color-scheme: light; }
+[data-theme="agave"] { --bg: #f8f9f8; --bg-soft: #edf1ef; --ink: #212725; --muted: #7f8a86; --line: #e1e6e3; --brand: #6c8a80; --danger: #a23b2a; --heart: #a8473b; --accent: #0e7f57; --warn: #a8640c; color-scheme: light; }
+[data-theme="mer"] { --bg: #f9f9fa; --bg-soft: #edeef2; --ink: #22242b; --muted: #82848f; --line: #e2e3e8; --brand: #6f7286; --danger: #a23b2a; --heart: #a8473b; --accent: #0e7f57; --warn: #a8640c; color-scheme: light; }
+
 [data-theme="sable"] {
+  --brand: #8a7764;
   --accent: #0e7f57;
   --warn: #a05d0a;
   --bg: #efe8de;
@@ -224,6 +233,7 @@ body {
 
 /* Styles typographiques des galeries */
 .gallery-title {
+  color: var(--brand, inherit);
   font-family: var(--g-font);
   font-weight: var(--g-weight);
   text-transform: var(--g-transform);
@@ -231,21 +241,25 @@ body {
   font-style: var(--g-style, normal);
   line-height: 1.05;
 }
+.fs-sans { --g-font: var(--font-inter), sans-serif; --g-weight: 500; --g-transform: uppercase; --g-tracking: 0.14em; }
 .fs-classic { --g-font: var(--font-cormorant), serif; --g-weight: 300; --g-transform: uppercase; --g-tracking: 0.08em; }
 .fs-modern { --g-font: var(--font-inter), sans-serif; --g-weight: 300; --g-transform: uppercase; --g-tracking: 0.3em; }
+.fs-timeless { --g-font: var(--font-cormorant), serif; --g-weight: 300; --g-transform: none; --g-tracking: 0.02em; }
 .fs-editorial { --g-font: var(--font-playfair), serif; --g-weight: 400; --g-transform: none; --g-tracking: 0.01em; --g-style: italic; }
+.fs-bold { --g-font: var(--font-montserrat), sans-serif; --g-weight: 700; --g-transform: uppercase; --g-tracking: 0.12em; }
 .fs-minimal { --g-font: var(--font-montserrat), sans-serif; --g-weight: 200; --g-transform: none; --g-tracking: 0.04em; }
+.fs-subtle { --g-font: var(--font-cormorant), serif; --g-weight: 400; --g-transform: uppercase; --g-tracking: 0.28em; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideIn { from { transform: translateX(100%); } to { transform: none; } }
 
 /* Logo : version blanche sur fonds sombres, version foncée sur Blanc et Sable */
 .logo-on-light { display: none; }
-[data-theme="blanc"] .logo-on-dark,
-[data-theme="sable"] .logo-on-dark,
-[data-theme="auto"] .logo-on-dark { display: none; }
-[data-theme="blanc"] .logo-on-light,
-[data-theme="sable"] .logo-on-light,
-[data-theme="auto"] .logo-on-light { display: block; }
+[data-theme="blanc"] .logo-on-dark, [data-theme="sable"] .logo-on-dark, [data-theme="auto"] .logo-on-dark,
+[data-theme="or"] .logo-on-dark, [data-theme="rose"] .logo-on-dark, [data-theme="terracotta"] .logo-on-dark,
+[data-theme="olive"] .logo-on-dark, [data-theme="agave"] .logo-on-dark, [data-theme="mer"] .logo-on-dark { display: none; }
+[data-theme="blanc"] .logo-on-light, [data-theme="sable"] .logo-on-light, [data-theme="auto"] .logo-on-light,
+[data-theme="or"] .logo-on-light, [data-theme="rose"] .logo-on-light, [data-theme="terracotta"] .logo-on-light,
+[data-theme="olive"] .logo-on-light, [data-theme="agave"] .logo-on-light, [data-theme="mer"] .logo-on-light { display: block; }
 @media (prefers-color-scheme: dark) {
   [data-theme="auto"] .logo-on-dark { display: block; }
   [data-theme="auto"] .logo-on-light { display: none; }
@@ -270,3 +284,6 @@ body {
 @media (hover: hover) {
   .group:hover .tile-img.is-loaded { transform: scale(1.02); }
 }
+/* Sur une photo, le titre reste blanc quelle que soit la palette */
+.text-white .gallery-title, .gallery-title.text-white { color: #fff; }
+@keyframes lineIn { from { transform: scaleX(0); } to { transform: scaleX(1); } }

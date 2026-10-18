@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireAdminPage } from "@/lib/auth";
 import { toParisDateInput } from "@/lib/dates";
-import { DESIGN_FIELDS, type GalleryDesign } from "@/lib/design";
+import { DESIGN_FIELDS, readDesign } from "@/lib/design";
 import { PHOTO_FIELDS, toPhotoViews } from "@/lib/photos";
 import type { Collection, PhotoRow } from "@/lib/types";
 import { GalleryManager, type ManagedGallery } from "@/components/admin/gallery-manager";
@@ -49,17 +49,7 @@ export default async function GalleryPage({ params }: { params: Promise<{ id: st
     downloadsEnabled: g.downloads_enabled,
     downloadWebEnabled: g.download_web_enabled,
     favoritesEnabled: g.favorites_enabled,
-    design: {
-      cover_layout: g.cover_layout,
-      cover_focus_x: g.cover_focus_x,
-      cover_focus_y: g.cover_focus_y,
-      font_style: g.font_style,
-      color_theme: g.color_theme,
-      color_follow_device: g.color_follow_device,
-      grid_style: g.grid_style,
-      grid_size: g.grid_size,
-      grid_spacing: g.grid_spacing,
-    } as GalleryDesign,
+    design: readDesign(g),
   };
 
   return (

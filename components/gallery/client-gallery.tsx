@@ -19,6 +19,8 @@ type Props = {
   downloadWebEnabled: boolean;
   favoritesEnabled: boolean;
   cover: { src: string; width: number; height: number } | null;
+  /** Deuxième photo (mise en page Diptyque). */
+  coverAlt: string | null;
   collections: Collection[];
   photos: PhotoView[];
   favorites: { email: string | null; photoIds: string[] };
@@ -130,7 +132,7 @@ export function ClientGallery(props: Props) {
       className={`fs-${design.font_style} min-h-svh bg-bg text-ink`}
       onContextMenu={props.watermark ? (e) => (e.target as HTMLElement).tagName === "IMG" && e.preventDefault() : undefined}
     >
-      <Cover design={design} cover={props.cover} title={props.title} date={props.date} onEnter={scrollToGrid} />
+      <Cover design={design} cover={props.cover} coverAlt={props.coverAlt} title={props.title} date={props.date} onEnter={scrollToGrid} />
 
       <div ref={gridTop} />
 
@@ -173,8 +175,14 @@ export function ClientGallery(props: Props) {
           <div className="flex items-center justify-end md:w-56 shrink-0">
             {props.downloadsEnabled && (
               <div className="relative">
-                <button className="icon-btn" onClick={() => setMenu((m) => !m)} aria-label="Télécharger" disabled={zip !== null}>
-                  <DownloadIcon />
+                <button
+                  className={design.nav_style === "labels" ? "flex items-center gap-2 h-10 px-2 eyebrow text-muted hover:text-ink transition-colors" : "icon-btn"}
+                  onClick={() => setMenu((m) => !m)}
+                  aria-label="Télécharger"
+                  disabled={zip !== null}
+                >
+                  <DownloadIcon className={design.nav_style === "labels" ? "w-4 h-4" : "w-5 h-5"} />
+                  {design.nav_style === "labels" && <span className="hidden min-[380px]:inline">Télécharger</span>}
                 </button>
                 {menu && (
                   <>
@@ -268,12 +276,14 @@ export function ClientGallery(props: Props) {
 function Cover({
   design,
   cover,
+  coverAlt,
   title,
   date,
   onEnter,
 }: {
   design: GalleryDesign;
   cover: Props["cover"];
+  coverAlt: string | null;
   title: string;
   date: string;
   onEnter: () => void;
@@ -302,31 +312,34 @@ function Cover({
     };
   }, []);
 
-  const img = (cls: string) =>
-    cover ? (
-      <div className={`${cls} overflow-hidden`}>
-        <div className="w-full h-full" style={{ transform: "translateY(calc(var(--p, 0) * 22%))" }}>
+  const img = (cls: string, src: string | null | undefined = cover?.src, parallax = true) =>
+    src ? (
+      <div className={`${cls} overflow-hidden bg-bg-soft`}>
+        <div className="w-full h-full" style={parallax ? { transform: "translateY(calc(var(--p, 0) * 22%))" } : undefined}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={cover.src}
+            src={src}
             alt=""
             className="w-full h-full object-cover animate-[coverIn_1.6s_ease-out_both,kenBurns_14s_cubic-bezier(0.2,0.6,0.2,1)_both]"
             style={focus}
           />
         </div>
       </div>
-    ) : null;
+    ) : (
+      <div className={`${cls} bg-bg-soft`} />
+    );
   const words = title.split(/\s+/).filter(Boolean);
-  const enter = (light: boolean) => (
+  const enter = (light: boolean, delay = 0.9) => (
     <button
       onClick={onEnter}
-      className={`mt-10 inline-flex flex-col items-center gap-2 eyebrow transition-colors animate-[fadeUp_1.6s_0.9s_ease-out_both] ${light ? "text-white/80 hover:text-white" : "text-muted hover:text-ink"}`}
+      className={`mt-10 inline-flex flex-col items-center gap-2 eyebrow transition-colors animate-[fadeUp_1.6s_ease-out_both] ${light ? "text-white/80 hover:text-white" : "text-muted hover:text-ink"}`}
+      style={{ animationDelay: `${delay + words.length * 0.14}s` }}
     >
       Voir la galerie
       <ChevronDown className="w-4 h-4 animate-bounce [animation-duration:2.4s]" />
     </button>
   );
-  const heading = (cls: string) => (
+  const heading = (cls: string, withDate = true) => (
     <>
       <h1 className={`gallery-title break-words ${cls}`} aria-label={title}>
         {words.map((w, i) => (
@@ -336,57 +349,148 @@ function Cover({
           </span>
         ))}
       </h1>
-      {date && (
+      {withDate && date && (
         <p className="eyebrow mt-5 opacity-80 animate-[fadeUp_1.4s_ease-out_both]" style={{ animationDelay: `${0.5 + words.length * 0.14}s` }}>
           {date}
         </p>
       )}
     </>
   );
-
-  if (design.cover_layout === "split") {
-    return (
-      <section ref={sectionRef} className="min-h-svh flex flex-col-reverse md:flex-row protect">
-        <div className="md:w-[42%] flex flex-col items-center justify-center text-center px-8 py-14 md:py-0">
-          <Wordmark height={48} className="mb-12" />
-          {heading("text-[clamp(2.2rem,5vw,4.5rem)]")}
-          {enter(false)}
-        </div>
-        <div className="relative h-[62svh] md:h-auto md:flex-1 overflow-hidden bg-bg-soft">{img("absolute inset-0 w-full h-full")}</div>
-      </section>
-    );
-  }
-
-  if (design.cover_layout === "framed") {
-    return (
-      <section ref={sectionRef} className="min-h-svh flex flex-col items-center px-5 sm:px-12 pt-[max(env(safe-area-inset-top),1.5rem)] pb-10 protect">
-        <Wordmark height={40} className="mb-6" />
-        <div className="relative w-full flex-1 min-h-[55svh] overflow-hidden bg-bg-soft">{img("absolute inset-0 w-full h-full")}</div>
-        <div className="text-center pt-10">
-          {heading("text-[clamp(2.2rem,6vw,5rem)]")}
-          {enter(false)}
-        </div>
-      </section>
-    );
-  }
-
-  const bottom = design.cover_layout === "bottom";
-  return (
-    <section ref={sectionRef} className="relative h-svh w-full overflow-hidden bg-black protect">
-      {img("absolute inset-0 w-full h-full")}
-      <div className={`absolute inset-0 ${bottom ? "bg-gradient-to-b from-black/20 via-transparent to-black/70" : "bg-black/30"}`} />
-      <div className="absolute top-0 inset-x-0 flex justify-center pt-[max(env(safe-area-inset-top),1.75rem)] text-white/90">
-        <Wordmark height={44} tone="white" />
-      </div>
-      <div
-        style={{ opacity: "calc(1 - var(--p, 0) * 1.6)", transform: "translateY(calc(var(--p, 0) * -60px))" }}
-        className={`absolute text-white px-6 sm:px-14 ${bottom ? "inset-x-0 bottom-0 pb-[max(env(safe-area-inset-bottom),3rem)] sm:pb-20 text-left" : "inset-0 flex flex-col items-center justify-center text-center"}`}
-      >
-        {heading("text-[clamp(2.6rem,9vw,7.5rem)]")}
-        <div className={bottom ? "" : ""}>{enter(true)}</div>
-      </div>
-    </section>
+  const fadeOnScroll = { opacity: "calc(1 - var(--p, 0) * 1.6)", transform: "translateY(calc(var(--p, 0) * -60px))" };
+  const topLogo = (light: boolean) => (
+    <div className={`absolute top-0 inset-x-0 z-10 flex justify-center pt-[max(env(safe-area-inset-top),1.75rem)] ${light ? "text-white/90" : ""}`}>
+      <Wordmark height={44} tone={light ? "white" : "auto"} />
+    </div>
   );
+  const big = "text-[clamp(2.4rem,8.5vw,7rem)]";
+  const medium = "text-[clamp(2rem,5.5vw,4.5rem)]";
+
+  switch (design.cover_layout) {
+    case "split":
+      return (
+        <section ref={sectionRef} className="min-h-svh flex flex-col-reverse md:flex-row protect">
+          <div className="md:w-[42%] flex flex-col items-center justify-center text-center px-8 py-14 md:py-0">
+            <Wordmark height={48} className="mb-12" />
+            {heading(medium)}
+            {enter(false)}
+          </div>
+          <div className="relative h-[62svh] md:h-auto md:flex-1">{img("absolute inset-0 w-full h-full")}</div>
+        </section>
+      );
+
+    case "framed":
+      return (
+        <section ref={sectionRef} className="min-h-svh flex flex-col items-center px-5 sm:px-12 pt-[max(env(safe-area-inset-top),1.5rem)] pb-10 protect">
+          <Wordmark height={40} className="mb-6" />
+          <div className="relative w-full flex-1 min-h-[55svh]">{img("absolute inset-0 w-full h-full")}</div>
+          <div className="text-center pt-10">
+            {heading(medium)}
+            {enter(false)}
+          </div>
+        </section>
+      );
+
+    case "journal":
+      return (
+        <section ref={sectionRef} className="relative min-h-svh protect px-5 sm:px-12 pt-[max(env(safe-area-inset-top),1.5rem)] pb-10 flex flex-col">
+          <Wordmark height={40} className="self-center mb-6" />
+          <div className="relative w-full sm:w-[62%] h-[52svh] sm:h-[68svh]">{img("absolute inset-0 w-full h-full")}</div>
+          <div className="mt-8 sm:mt-0 sm:absolute sm:right-12 sm:bottom-16 text-left sm:text-right sm:max-w-[34%]">
+            {heading(medium)}
+            {enter(false)}
+          </div>
+        </section>
+      );
+
+    case "stamp":
+      return (
+        <section ref={sectionRef} className="min-h-svh flex flex-col items-center justify-center text-center px-6 py-16 protect">
+          <Wordmark height={40} className="mb-12" />
+          <div className="relative w-[62vw] max-w-[380px] aspect-[4/5]">{img("absolute inset-0 w-full h-full", cover?.src, false)}</div>
+          <div className="mt-10">
+            {heading(medium)}
+            {enter(false)}
+          </div>
+        </section>
+      );
+
+    case "classic":
+      return (
+        <section ref={sectionRef} className="protect">
+          <div className="relative h-[82svh] w-full">
+            {img("absolute inset-0 w-full h-full")}
+            <div className="absolute top-0 inset-x-0 flex justify-center pt-[max(env(safe-area-inset-top),1.5rem)]">
+              <Wordmark height={40} tone="white" />
+            </div>
+          </div>
+          <div className="mx-auto max-w-[1800px] px-5 sm:px-8 py-6 flex items-end justify-between gap-6">
+            <div>{heading("text-[clamp(1.6rem,4vw,2.8rem)]", false)}</div>
+            {date && <p className="eyebrow text-muted shrink-0 pb-1">{date}</p>}
+          </div>
+        </section>
+      );
+
+    case "none":
+      return (
+        <section ref={sectionRef} className="pt-[max(env(safe-area-inset-top),2rem)] pb-14 px-6 text-center protect">
+          <Wordmark height={40} className="mb-14" />
+          {heading(medium)}
+        </section>
+      );
+
+    case "divider":
+      return (
+        <section ref={sectionRef} className="relative h-svh w-full overflow-hidden bg-black protect">
+          <div className="absolute inset-0 flex gap-[3px]">
+            {img("relative flex-1 h-full")}
+            {img("relative flex-1 h-full", coverAlt ?? cover?.src)}
+          </div>
+          <div className="absolute inset-0 bg-black/30" />
+          {topLogo(true)}
+          <div style={fadeOnScroll} className="absolute inset-0 flex flex-col items-center justify-center text-center text-white px-6">
+            {heading(big)}
+            {enter(true)}
+          </div>
+        </section>
+      );
+
+    default: {
+      // Mises en page plein écran : centre, bas gauche, cadre fin, lignes, contour
+      const layout = design.cover_layout;
+      const bottom = layout === "bottom";
+      return (
+        <section ref={sectionRef} className="relative h-svh w-full overflow-hidden bg-black protect">
+          {img("absolute inset-0 w-full h-full")}
+          <div className={`absolute inset-0 ${bottom ? "bg-gradient-to-b from-black/20 via-transparent to-black/70" : "bg-black/30"}`} />
+          {layout === "frame" && <div className="absolute inset-4 sm:inset-8 border border-white/80 pointer-events-none" />}
+          {topLogo(true)}
+          <div
+            style={fadeOnScroll}
+            className={`absolute text-white px-6 sm:px-14 ${bottom ? "inset-x-0 bottom-0 pb-[max(env(safe-area-inset-bottom),3rem)] sm:pb-20 text-left" : "inset-0 flex flex-col items-center justify-center text-center"}`}
+          >
+            {layout === "stripe" ? (
+              <div className="w-full max-w-4xl">
+                <span className="block h-px bg-white/80 mb-8 origin-left animate-[lineIn_1.2s_0.2s_ease-out_both]" />
+                {heading(big)}
+                <span className="block h-px bg-white/80 mt-8 origin-right animate-[lineIn_1.2s_0.2s_ease-out_both]" />
+                {enter(true)}
+              </div>
+            ) : layout === "outline" ? (
+              <div className="border border-white/85 px-8 sm:px-16 py-14 sm:py-20 max-w-3xl animate-[fadeIn_1.2s_ease-out_both]">
+                {heading(medium)}
+                {enter(true, 0.6)}
+              </div>
+            ) : (
+              <>
+                {heading(big)}
+                {enter(true)}
+              </>
+            )}
+          </div>
+        </section>
+      );
+    }
+  }
 }
 
 function EmailDialog({ slug, onCancel, onDone }: { slug: string; onCancel: () => void; onDone: (email: string, ids: string[]) => void }) {
