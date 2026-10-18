@@ -66,10 +66,12 @@ Vidéos, Coordonnées, Outils → Clients & e-mails, Déconnexion) ; sur mobile 
   onglets, `collections-sidebar.tsx` glisser-déposer), `photos-panel.tsx` (envoi, tri, couverture,
   suppression, visionneuse `admin-viewer.tsx`), `design-panel.tsx` (12 couvertures, polices, couleurs,
   grilles), `settings-panel.tsx` (lien, mot de passe, expiration, téléchargements (option « Demander l'e-mail avant le téléchargement » = `galleries.download_email_required` : même fenêtre / liste `favorite_lists` que les favoris, contrôlée par `needsDownloadEmail` dans les routes download et archive), favoris, filigrane,
-  carte de visite), activité (favoris + téléchargements).
+  carte de visite), activité (favoris + téléchargements : `downloads-panel.tsx` = chiffres, photos les plus
+  téléchargées, « Par personne » (photos + ZIP par e-mail), historique).
 - Vidéos : `app/admin/(protected)/videos/` — projets vidéo = galeries avec `kind = 'video'`
   (onglets Vidéos / Design / Paramètres). `videos-panel.tsx` : envoi, fiche vidéo (lien direct,
-  téléchargement autorisé ou non, commentaires, activité).
+  téléchargement autorisé ou non, commentaires, activité ; liste « Téléchargements » = `video_events` kind download
+  avec `email` si connu ; l'option « Demander l'e-mail » s'applique aussi aux vidéos, `video-page.tsx` réutilise `EmailDialog`).
 - Clients & e-mails : `app/admin/(protected)/clients/` — adresses issues des favoris et
   téléchargements, envoi Gmail un e-mail par personne (`app/api/admin/mail`), désinscription
   (`/desinscription`, `/api/unsubscribe`).

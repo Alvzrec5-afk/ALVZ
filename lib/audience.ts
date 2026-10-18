@@ -15,9 +15,10 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Toutes les adresses laissées par les clients (favoris, téléchargements), de la plus récente à la plus ancienne. */
 export async function loadAudience(supabase: SupabaseClient): Promise<AudienceMember[]> {
-  const [lists, downloads, unsubs] = await Promise.all([
+  const [lists, downloads, videoDownloads, unsubs] = await Promise.all([
     supabase.from("favorite_lists").select("email, created_at, galleries(title)"),
     supabase.from("downloads").select("email, created_at, galleries(title)").not("email", "is", null).limit(10000),
+    supabase.from("video_events").select("email, created_at, videos(galleries(title))").eq("kind", "download").not("email", "is", null).limit(10000),
     supabase.from("mail_unsubscribes").select("email"),
   ]);
   if (lists.error) throw new Error(lists.error.message);
@@ -42,6 +43,9 @@ export async function loadAudience(supabase: SupabaseClient): Promise<AudienceMe
   };
   (lists.data ?? []).forEach((r) => add(r, "fav"));
   (downloads.data ?? []).forEach((r) => add(r, "dl"));
+  (videoDownloads.data ?? []).forEach((r) =>
+    add({ email: r.email, created_at: r.created_at, galleries: (r.videos as { galleries?: unknown } | null)?.galleries ?? null }, "dl"),
+  );
 
   return [...byEmail.values()]
     .map(({ titles, ...m }) => ({ ...m, galleries: [...titles] }))

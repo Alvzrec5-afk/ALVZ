@@ -18,7 +18,11 @@ export type AdminVideo = VideoView & {
   views: number;
   avgWatched: number;
   downloadCount: number;
+  /** Téléchargements, du plus récent au plus ancien (e-mail si le visiteur l'a indiqué). */
+  downloadLog: { email: string | null; quality: string | null; at: string }[];
 };
+
+const dateFmt = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
 
 const size = (n: number) => (n >= 1024 ** 3 ? `${(n / 1024 ** 3).toFixed(2).replace(".", ",")} Go` : `${Math.max(1, Math.round(n / 1024 ** 2))} Mo`);
 
@@ -187,6 +191,21 @@ function VideoDetail({ galleryId, slug, video, onBack }: { galleryId: string; sl
               </div>
             ))}
           </div>
+
+          {video.downloadLog.length > 0 && (
+            <>
+              <h3 className="label mt-10 mb-2">Téléchargements</h3>
+              <ul className="divide-y divide-line border-y border-line">
+                {video.downloadLog.slice(0, 100).map((d, i) => (
+                  <li key={i} className="flex items-center gap-3 py-2.5 text-sm">
+                    <span className="flex-1 min-w-0 truncate">{d.email ?? <span className="text-muted">Visiteur non identifié</span>}</span>
+                    <span className="text-xs text-muted shrink-0">{d.quality ?? ""}</span>
+                    <span className="text-xs text-muted shrink-0 w-28 text-right">{dateFmt.format(new Date(d.at))}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
 
           <h3 className="label mt-10 mb-2">Commentaires du client</h3>
           <VideoComments

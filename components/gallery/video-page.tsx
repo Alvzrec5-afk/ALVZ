@@ -9,6 +9,7 @@ import { Wordmark } from "@/components/wordmark";
 import { VideoPlayer, formatTime, type PlayerHandle } from "@/components/video/video-player";
 import { VideoComments } from "@/components/video/video-comments";
 import { VideoCards, type VideoCard } from "./video-cards";
+import { EmailDialog } from "./client-gallery";
 
 function formatSize(n: number) {
   return n >= 1024 ** 3 ? `${(n / 1024 ** 3).toFixed(2).replace(".", ",")} Go` : `${Math.max(1, Math.round(n / 1024 ** 2))} Mo`;
@@ -21,6 +22,8 @@ export function VideoPage(props: {
   video: VideoView;
   comments: VideoComment[];
   others: VideoCard[];
+  /** Option de la galerie : l'e-mail est demandé avant le téléchargement (pas encore donné). */
+  askEmail?: boolean;
   /** Retour à la galerie (absent pour un projet vidéo d'un seul clip). */
   backHref: string | null;
 }) {
@@ -30,6 +33,13 @@ export function VideoPage(props: {
   const [, setTick] = useState(0); // rafraîchit l'heure affichée dans le champ de commentaire
   const [highlight, setHighlight] = useState<string | null>(null);
   const [downloadOpen, setDownloadOpen] = useState(false);
+  const [needEmail, setNeedEmail] = useState(Boolean(props.askEmail));
+  const [pendingDownload, setPendingDownload] = useState<string | null>(null);
+  const guard = (e: React.MouseEvent, href: string) => {
+    if (!needEmail) return;
+    e.preventDefault();
+    setPendingDownload(href);
+  };
   const token = useRef<string | null>(null);
   const api = `/api/g/${slug}/videos/${video.id}`;
 
@@ -108,7 +118,11 @@ export function VideoPage(props: {
               {video.downloads.length > 0 && (
                 <div className="relative shrink-0">
                   {video.downloads.length === 1 ? (
-                    <a href={`${api}/download?q=${video.downloads[0].quality}`} className="btn btn-ghost flex items-center gap-2">
+                    <a
+                      href={`${api}/download?q=${video.downloads[0].quality}`}
+                      onClick={(e) => guard(e, `${api}/download?q=${video.downloads[0].quality}`)}
+                      className="btn btn-ghost flex items-center gap-2"
+                    >
                       <DownloadIcon className="w-4 h-4" /> Télécharger
                     </a>
                   ) : (
@@ -121,7 +135,10 @@ export function VideoPage(props: {
                       <div className="fixed inset-0 z-10" onClick={() => setDownloadOpen(false)} />
                       <div className="absolute right-0 mt-1 z-20 w-60 bg-bg-soft border border-line py-1 shadow-xl text-sm">
                         {video.downloads.map((d) => (
-                          <a key={d.quality} href={`${api}/download?q=${d.quality}`} className="flex justify-between px-4 py-3 hover:bg-bg" onClick={() => setDownloadOpen(false)}>
+                          <a key={d.quality} href={`${api}/download?q=${d.quality}`} className="flex justify-between px-4 py-3 hover:bg-bg" onClick={(e) => {
+                            setDownloadOpen(false);
+                            guard(e, `${api}/download?q=${d.quality}`);
+                          }}>
                             {d.label} <span className="text-muted">{formatSize(d.bytes)}</span>
                           </a>
                         ))}
@@ -166,6 +183,21 @@ export function VideoPage(props: {
           )}
         </div>
       </main>
+      {pendingDownload && (
+        <EmailDialog
+          slug={slug}
+          purpose="download"
+          onCancel={() => setPendingDownload(null)}
+          onDone={() => {
+            setNeedEmail(false);
+            const a = document.createElement("a");
+            a.href = pendingDownload;
+            a.download = "";
+            a.click();
+            setPendingDownload(null);
+          }}
+        />
+      )}
     </div>
   );
 }

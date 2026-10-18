@@ -1,4 +1,4 @@
-import { loadAccessibleGallery } from "@/lib/gallery-access";
+import { loadAccessibleGallery, needsDownloadEmail, visitorEmail } from "@/lib/gallery-access";
 import { presignGet } from "@/lib/storage";
 import { createServiceClient } from "@/lib/supabase/server";
 import { downloadKey, findPublicVideo, fromOwnPage, videoDownloads, videoFileName } from "@/lib/videos";
@@ -18,9 +18,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
   const quality = new URL(req.url).searchParams.get("q") ?? "";
   const allowed = videoDownloads(video, gallery).find((d) => d.quality === quality);
   if (!allowed) return Response.json({ error: "Téléchargement non autorisé" }, { status: 403 });
+  const noEmail = await needsDownloadEmail(gallery);
+  if (noEmail) return noEmail;
 
   try {
-    await db.from("video_events").insert({ video_id: video.id, kind: "download", quality: allowed.label });
+    await db.from("video_events").insert({ video_id: video.id, kind: "download", quality: allowed.label, email: await visitorEmail(gallery) });
   } catch {}
   return Response.redirect(await presignGet(downloadKey(video, quality), { downloadName: videoFileName(video, quality) }), 302);
 }

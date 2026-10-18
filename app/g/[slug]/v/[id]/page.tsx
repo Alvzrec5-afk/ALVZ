@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { readDesign, themeAttr } from "@/lib/design";
-import { findGalleryBySlug, hasAccess, isExpired } from "@/lib/gallery-access";
+import { findGalleryBySlug, hasAccess, isExpired, visitorEmail } from "@/lib/gallery-access";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { VideoComment, VideoRow } from "@/lib/types";
 import { VIDEO_FIELDS, findPublicVideo, toVideoView } from "@/lib/videos";
@@ -30,10 +30,11 @@ export default async function VideoRoute({ params }: { params: Promise<{ slug: s
   const db = createServiceClient();
   const video = await findPublicVideo(db, gallery.id, id);
   if (!video) notFound();
-  const [view, { data: comments }, { data: others }] = await Promise.all([
+  const [view, { data: comments }, { data: others }, email] = await Promise.all([
     toVideoView(video, gallery, { slug }),
     db.from("video_comments").select("id, time_sec, author, body, resolved, created_at").eq("video_id", video.id).order("time_sec"),
     db.from("videos").select(VIDEO_FIELDS).eq("gallery_id", gallery.id).eq("status", "ready").neq("id", video.id).order("position"),
+    gallery.download_email_required ? visitorEmail(gallery) : Promise.resolve(null),
   ]);
   const more = await Promise.all(
     ((others ?? []) as VideoRow[]).map(async (v) => ({
@@ -52,6 +53,7 @@ export default async function VideoRoute({ params }: { params: Promise<{ slug: s
       video={view}
       comments={(comments ?? []) as VideoComment[]}
       others={more}
+      askEmail={gallery.download_email_required && !email}
       backHref={gallery.kind === "video" && more.length === 0 ? null : `/g/${slug}`}
     />
   );

@@ -374,3 +374,6 @@ $$;
 
 -- Téléchargement : demander l'e-mail du client avant (pour récupérer les adresses).
 alter table public.galleries add column if not exists download_email_required boolean not null default false;
+
+-- Téléchargements vidéo : e-mail du visiteur (s'il l'a indiqué).
+alter table public.video_events add column if not exists email text;

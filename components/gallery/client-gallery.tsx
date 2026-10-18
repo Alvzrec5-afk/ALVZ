@@ -589,7 +589,7 @@ function Cover({
   }
 }
 
-function EmailDialog({
+export function EmailDialog({
   slug,
   purpose = "favorites",
   onCancel,

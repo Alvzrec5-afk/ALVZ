@@ -40,7 +40,7 @@ export default async function GalleryPage({ params }: { params: Promise<{ id: st
       .limit(1000),
     supabase
       .from("videos")
-      .select(`${VIDEO_FIELDS}, video_comments(id, time_sec, author, body, resolved, created_at), video_events(kind, watched_pct)`)
+      .select(`${VIDEO_FIELDS}, video_comments(id, time_sec, author, body, resolved, created_at), video_events(kind, watched_pct, quality, email, created_at)`)
       .eq("gallery_id", id)
       .eq("status", "ready")
       .order("position"),
@@ -48,7 +48,7 @@ export default async function GalleryPage({ params }: { params: Promise<{ id: st
   if (!g) notFound();
   if (g.deleted_at) redirect("/admin/trash");
 
-  type VideoWithActivity = VideoRow & { video_comments: VideoComment[]; video_events: { kind: string; watched_pct: number }[] };
+  type VideoWithActivity = VideoRow & { video_comments: VideoComment[]; video_events: { kind: string; watched_pct: number; quality: string | null; email: string | null; created_at: string }[] };
   const videos: AdminVideo[] = await Promise.all(
     ((videoRows ?? []) as VideoWithActivity[]).map(async (v) => {
       const plays = v.video_events.filter((e) => e.kind === "view");
@@ -60,6 +60,10 @@ export default async function GalleryPage({ params }: { params: Promise<{ id: st
         views: plays.length,
         avgWatched: plays.length ? Math.round(plays.reduce((s, e) => s + e.watched_pct, 0) / plays.length) : 0,
         downloadCount: v.video_events.filter((e) => e.kind === "download").length,
+        downloadLog: v.video_events
+          .filter((e) => e.kind === "download")
+          .sort((a, b) => b.created_at.localeCompare(a.created_at))
+          .map((e) => ({ email: e.email, quality: e.quality, at: e.created_at })),
       };
     }),
   );
