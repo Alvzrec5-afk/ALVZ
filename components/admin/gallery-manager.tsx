@@ -30,6 +30,7 @@ export type ManagedGallery = {
   downloadWebEnabled: boolean;
   favoritesEnabled: boolean;
   design: GalleryDesign;
+  kind: "photo" | "video";
 };
 
 type Props = {
@@ -53,7 +54,11 @@ const TABS = [
 export function GalleryManager(props: Props) {
   const { gallery } = props;
   const router = useRouter();
-  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("photos");
+  const isVideo = gallery.kind === "video";
+  // Projet vidéo : vidéos, design, paramètres. Galerie photo : photos, design, paramètres, activité.
+  const tabs = TABS.filter((t) => (isVideo ? ["videos", "design", "settings"].includes(t.id) : t.id !== "videos"));
+  const home = isVideo ? "/admin/videos" : "/admin";
+  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>(isVideo ? "videos" : "photos");
   const [menu, setMenu] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const [activityTab, setActivityTab] = useState<"favorites" | "downloads">("favorites");
@@ -63,7 +68,9 @@ export function GalleryManager(props: Props) {
     acc[p.collectionId] = (acc[p.collectionId] ?? 0) + 1;
     return acc;
   }, {});
-  const cover = props.photos.find((p) => p.id === gallery.coverPhotoId) ?? props.photos[0];
+  const coverPhoto = props.photos.find((p) => p.id === gallery.coverPhotoId) ?? props.photos[0];
+  const cover = coverPhoto ? { src: coverPhoto.web } : props.videos[0] ? { src: props.videos[0].poster } : null;
+  const filled = (isVideo ? props.videos.length : props.photos.length) > 0;
   const downloadCounts = props.downloads.reduce<Record<string, number>>((acc, d) => {
     if (d.kind === "photo" && d.photo_id) acc[d.photo_id] = (acc[d.photo_id] ?? 0) + 1;
     return acc;
@@ -86,7 +93,7 @@ export function GalleryManager(props: Props) {
     setDeleting(true);
     try {
       await purge("gallery", gallery.id);
-      router.replace("/admin");
+      router.replace(home);
       router.refresh();
     } catch (e) {
       alert(e instanceof Error ? e.message : String(e));
@@ -94,8 +101,8 @@ export function GalleryManager(props: Props) {
     }
   }
 
-  const status = gallery.expired ? "bg-danger" : props.photos.length > 0 ? "bg-emerald-500" : "bg-muted";
-  const statusLabel = gallery.expired ? "Expirée" : props.photos.length > 0 ? "En ligne" : "Vide";
+  const status = gallery.expired ? "bg-danger" : filled ? "bg-emerald-500" : "bg-muted";
+  const statusLabel = gallery.expired ? "Expirée" : filled ? "En ligne" : "Vide";
   const activityItems = [
     ["favorites", "Favoris", props.favoriteLists.length],
     ["downloads", "Téléchargements", props.downloads.length],
@@ -105,7 +112,7 @@ export function GalleryManager(props: Props) {
     <div className={`lg:h-svh lg:flex lg:flex-col ${deleting ? "opacity-40 pointer-events-none" : ""}`}>
       {/* Ordinateur : barre du haut (retour, nom, statut, aperçu, partage) */}
       <div className="hidden lg:flex items-center gap-4 h-[72px] shrink-0 px-5 border-b border-line">
-        <Link href="/admin" className="icon-btn" aria-label="Retour aux galeries">
+        <Link href={home} className="icon-btn" aria-label="Retour">
           <ArrowLeft />
         </Link>
         <div className="min-w-0">
@@ -114,7 +121,7 @@ export function GalleryManager(props: Props) {
             {formatLongDate(gallery.eventDate || null) || "Ajouter une date d'événement"}
           </button>
         </div>
-        <span className={`ml-2 shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-semibold tracking-widest uppercase ${gallery.expired ? "bg-danger/15 text-danger" : props.photos.length > 0 ? "bg-emerald-500/15 text-emerald-600" : "bg-bg-soft text-muted"}`}>
+        <span className={`ml-2 shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-semibold tracking-widest uppercase ${gallery.expired ? "bg-danger/15 text-danger" : filled ? "bg-emerald-500/15 text-emerald-600" : "bg-bg-soft text-muted"}`}>
           <span className={`w-1.5 h-1.5 rounded-full ${status}`} /> {statusLabel}
         </span>
         <div className="flex-1" />
@@ -143,7 +150,7 @@ export function GalleryManager(props: Props) {
       {/* Mobile : en-tête */}
       <div className="lg:hidden">
       <div className="flex items-center gap-2 -mx-2">
-        <Link href="/admin" className="icon-btn" aria-label="Retour aux galeries">
+        <Link href={home} className="icon-btn" aria-label="Retour">
           <ArrowLeft />
         </Link>
         <span className={`w-2 h-2 rounded-full shrink-0 ${status}`} />
@@ -173,8 +180,9 @@ export function GalleryManager(props: Props) {
       {copied && <p className="text-xs text-accent mt-1">Lien copié ✓</p>}
 
       <p className="text-xs text-muted mt-2">
-        {props.photos.length} photos · {props.collections.length} collection{props.collections.length > 1 ? "s" : ""}
-        {props.videos.length > 0 && ` · ${props.videos.length} vidéo${props.videos.length > 1 ? "s" : ""}`}
+        {isVideo
+          ? `${props.videos.length} vidéo${props.videos.length > 1 ? "s" : ""}`
+          : `${props.photos.length} photos · ${props.collections.length} collection${props.collections.length > 1 ? "s" : ""}`}
       </p>
 
       {/* Menu latéral : sections de la galerie */}
@@ -183,13 +191,13 @@ export function GalleryManager(props: Props) {
           <div className="absolute inset-0 bg-black/50 animate-[fadeIn_0.2s_ease-out_both]" onClick={() => setDrawer(false)} />
           <aside className="absolute right-0 top-0 h-full w-[78%] max-w-xs bg-bg border-l border-line px-6 pt-[max(env(safe-area-inset-top),1rem)] animate-[slideIn_0.25s_ease-out_both]">
             <div className="flex items-center justify-between h-12">
-              <span className="eyebrow text-muted">Galerie</span>
+              <span className="eyebrow text-muted">{isVideo ? "Projet vidéo" : "Galerie"}</span>
               <button className="icon-btn -mr-2" onClick={() => setDrawer(false)} aria-label="Fermer">
                 <CloseIcon />
               </button>
             </div>
             <nav className="mt-6">
-              {TABS.map(({ id, label, Icon }) => (
+              {tabs.map(({ id, label, Icon }) => (
                 <button
                   key={id}
                   onClick={() => {
@@ -209,8 +217,10 @@ export function GalleryManager(props: Props) {
         </div>
       )}
 
-      {tab !== "photos" && (
-        <button onClick={() => setTab("photos")} className="mt-6 eyebrow text-muted hover:text-ink">← Photos</button>
+      {tab !== (isVideo ? "videos" : "photos") && (
+        <button onClick={() => setTab(isVideo ? "videos" : "photos")} className="mt-6 eyebrow text-muted hover:text-ink">
+          ← {isVideo ? "Vidéos" : "Photos"}
+        </button>
       )}
       </div>
 
@@ -220,13 +230,13 @@ export function GalleryManager(props: Props) {
         <button onClick={() => setTab("design")} className="block w-full aspect-[16/10] bg-bg-soft overflow-hidden" title="Modifier la couverture">
           {cover ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={cover.web} alt="" className="w-full h-full object-cover" style={{ objectPosition: `${gallery.design.cover_focus_x}% ${gallery.design.cover_focus_y}%` }} />
+            <img src={cover.src} alt="" className="w-full h-full object-cover" style={{ objectPosition: `${gallery.design.cover_focus_x}% ${gallery.design.cover_focus_y}%` }} />
           ) : (
             <span className="eyebrow text-muted">Aucune couverture</span>
           )}
         </button>
-        <div className="grid grid-cols-5 border-b border-line">
-          {TABS.map(({ id, label, Icon }) => (
+        <div className="grid border-b border-line" style={{ gridTemplateColumns: `repeat(${tabs.length}, 1fr)` }}>
+          {tabs.map(({ id, label, Icon }) => (
             <button
               key={id}
               onClick={() => setTab(id)}

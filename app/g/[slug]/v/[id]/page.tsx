@@ -52,6 +52,7 @@ export default async function VideoRoute({ params }: { params: Promise<{ slug: s
       video={view}
       comments={(comments ?? []) as VideoComment[]}
       others={more}
+      backHref={gallery.kind === "video" && more.length === 0 ? null : `/g/${slug}`}
     />
   );
 }

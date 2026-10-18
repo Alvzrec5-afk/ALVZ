@@ -25,9 +25,11 @@ export async function createGallery(_: FormState, form: FormData): Promise<FormS
   if (!title) return { error: "Le nom du client est obligatoire." };
   const eventDate = String(form.get("event_date") ?? "").trim();
   const password = String(form.get("password") ?? "");
+  const kind = form.get("kind") === "video" ? "video" : "photo";
   const { data, error } = await supabase
     .from("galleries")
     .insert({
+      kind,
       title,
       event_date: eventDate || null,
       slug: newSlug(),
@@ -37,8 +39,8 @@ export async function createGallery(_: FormState, form: FormData): Promise<FormS
     .select("id")
     .single();
   if (error) return { error: error.message };
-  await supabase.from("collections").insert({ gallery_id: data.id, name: "Galerie", position: 0 });
-  revalidatePath("/admin");
+  if (kind === "photo") await supabase.from("collections").insert({ gallery_id: data.id, name: "Galerie", position: 0 });
+  revalidatePath(kind === "photo" ? "/admin" : "/admin/videos");
   redirect(`/admin/galleries/${data.id}`);
 }
 

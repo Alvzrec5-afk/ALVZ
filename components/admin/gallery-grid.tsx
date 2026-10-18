@@ -51,7 +51,13 @@ const DotsIcon = () => (
   </svg>
 );
 
-export function GalleryGrid({ galleries }: { galleries: GalleryCard[] }) {
+const LABELS = {
+  photo: { title: "Galeries", one: "galerie", newHref: "/admin/galleries/new", newLabel: "Nouvelle galerie", first: "Créer votre première galerie", unit: "photo", empty: "Aucune photo", manage: "Gérer les photos", view: "Voir la galerie" },
+  video: { title: "Vidéos", one: "projet", newHref: "/admin/videos/new", newLabel: "Nouveau projet", first: "Créer votre premier projet vidéo", unit: "vidéo", empty: "Aucune vidéo", manage: "Gérer les vidéos", view: "Voir comme le client" },
+} as const;
+
+export function GalleryGrid({ galleries, kind = "photo" }: { galleries: GalleryCard[]; kind?: "photo" | "video" }) {
+  const L = LABELS[kind];
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -87,7 +93,7 @@ export function GalleryGrid({ galleries }: { galleries: GalleryCard[] }) {
 
   async function remove(g: GalleryCard) {
     setMenu(null);
-    if (!confirm(`Supprimer définitivement « ${g.title} » et ses ${g.photoCount} photos ?`)) return;
+    if (!confirm(`Supprimer définitivement « ${g.title} » et ses ${g.photoCount} ${L.unit}s ?`)) return;
     setBusy(g.id);
     try {
       await purge("gallery", g.id);
@@ -104,7 +110,7 @@ export function GalleryGrid({ galleries }: { galleries: GalleryCard[] }) {
       {/* En-tête : titre, recherche, nouvelle galerie */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-10 min-w-0">
-          <h1 className="display text-4xl sm:text-5xl">Galeries</h1>
+          <h1 className="display text-4xl sm:text-5xl">{L.title}</h1>
           <label className="hidden lg:flex items-center gap-3 text-muted w-72">
             <SearchIcon />
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher" className="w-full bg-transparent outline-none text-[15px] text-ink placeholder:text-muted" />
@@ -114,12 +120,12 @@ export function GalleryGrid({ galleries }: { galleries: GalleryCard[] }) {
           <button className="icon-btn" onClick={() => setSearchOpen((o) => !o)} aria-label="Rechercher">
             <SearchIcon />
           </button>
-          <Link href="/admin/galleries/new" className="icon-btn" aria-label="Nouvelle galerie" title="Nouvelle galerie">
+          <Link href={L.newHref} className="icon-btn" aria-label={L.newLabel} title={L.newLabel}>
             <PlusIcon />
           </Link>
         </div>
         <span className="hidden lg:block">
-          <Link href="/admin/galleries/new" className="btn">Nouvelle galerie</Link>
+          <Link href={L.newHref} className="btn">{L.newLabel}</Link>
         </span>
       </div>
 
@@ -136,7 +142,7 @@ export function GalleryGrid({ galleries }: { galleries: GalleryCard[] }) {
       {/* Barre secondaire : nombre + tri */}
       <div className="mt-6 mb-8 flex items-center justify-between">
         <span className="eyebrow text-muted">
-          {visible.length} galerie{visible.length > 1 ? "s" : ""}
+          {visible.length} {L.one}{visible.length > 1 ? "s" : ""}
         </span>
         <div className="relative flex items-center">
           <button
@@ -182,12 +188,12 @@ export function GalleryGrid({ galleries }: { galleries: GalleryCard[] }) {
       </div>
 
       {galleries.length === 0 ? (
-        <Link href="/admin/galleries/new" className="block border border-dashed border-line py-24 text-center hover:border-ink transition-colors">
-          <p className="display text-2xl">Créer votre première galerie</p>
+        <Link href={L.newHref} className="block border border-dashed border-line py-24 text-center hover:border-ink transition-colors">
+          <p className="display text-2xl">{L.first}</p>
           <p className="text-sm text-muted mt-3">Touchez ici ou le bouton + en haut.</p>
         </Link>
       ) : visible.length === 0 ? (
-        <p className="py-16 text-center text-sm text-muted">Aucune galerie ne correspond à « {query} ».</p>
+        <p className="py-16 text-center text-sm text-muted">Aucun résultat ne correspond à « {query} ».</p>
       ) : (
         <ul
           className={
@@ -206,7 +212,7 @@ export function GalleryGrid({ galleries }: { galleries: GalleryCard[] }) {
             const meta = (
               <>
                 {status}
-                {g.photoCount} photo{g.photoCount > 1 ? "s" : ""}
+                {g.photoCount} {L.unit}{g.photoCount > 1 ? "s" : ""}
                 {g.bytes > 0 && <span className={view === "grid" ? "hidden sm:inline" : ""}>· {formatBytes(g.bytes)}</span>}
                 {g.locked && <LockIcon className="w-3 h-3" />}
               </>
@@ -215,7 +221,7 @@ export function GalleryGrid({ galleries }: { galleries: GalleryCard[] }) {
               // eslint-disable-next-line @next/next/no-img-element
               <img src={g.cover} alt="" loading="lazy" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.03]" />
             ) : (
-              <span className="w-full h-full flex items-center justify-center text-[10px] text-muted text-center px-1">Aucune photo</span>
+              <span className="w-full h-full flex items-center justify-center text-[10px] text-muted text-center px-1">{L.empty}</span>
             );
             const dots = (
               <button
@@ -267,8 +273,8 @@ export function GalleryGrid({ galleries }: { galleries: GalleryCard[] }) {
                     <div className="fixed inset-x-0 bottom-0 z-50 pb-[max(env(safe-area-inset-bottom),0.5rem)] sm:pb-1 sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-1.5 sm:top-10 sm:w-52 bg-bg-soft border-t sm:border border-line py-1 shadow-xl text-[15px] sm:text-sm animate-[fadeUp_0.2s_ease-out_both] sm:animate-none">
                       <p className="sm:hidden px-5 pt-3 pb-2 eyebrow text-muted truncate">{g.title}</p>
                       <button className="block w-full text-left px-5 sm:px-4 py-3.5 sm:py-2.5 hover:bg-bg" onClick={() => copyLink(g)}>Copier le lien client</button>
-                      <a className="block px-5 sm:px-4 py-3.5 sm:py-2.5 hover:bg-bg" href={`/g/${g.slug}`} target="_blank" rel="noreferrer" onClick={() => setMenu(null)}>Voir la galerie</a>
-                      <Link className="block px-5 sm:px-4 py-3.5 sm:py-2.5 hover:bg-bg" href={`/admin/galleries/${g.id}`}>Gérer les photos</Link>
+                      <a className="block px-5 sm:px-4 py-3.5 sm:py-2.5 hover:bg-bg" href={`/g/${g.slug}`} target="_blank" rel="noreferrer" onClick={() => setMenu(null)}>{L.view}</a>
+                      <Link className="block px-5 sm:px-4 py-3.5 sm:py-2.5 hover:bg-bg" href={`/admin/galleries/${g.id}`}>{L.manage}</Link>
                       <button className="block w-full text-left px-5 sm:px-4 py-3.5 sm:py-2.5 text-danger hover:bg-bg" onClick={() => remove(g)}>Supprimer</button>
                     </div>
                   </>

@@ -4,10 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Wordmark } from "@/components/wordmark";
-import { CardIcon, CloseIcon, ImageIcon, LogoutIcon, MegaphoneIcon, MenuIcon } from "@/components/icons";
+import { CardIcon, CloseIcon, FilmIcon, ImageIcon, LogoutIcon, MegaphoneIcon, MenuIcon } from "@/components/icons";
 
 const NAV = [
   { href: "/admin", label: "Galeries", Icon: ImageIcon, match: (p: string) => p === "/admin" || p.startsWith("/admin/galleries") },
+  { href: "/admin/videos", label: "Vidéos", Icon: FilmIcon, match: (p: string) => p.startsWith("/admin/videos") },
   { href: "/admin/settings", label: "Coordonnées", Icon: CardIcon, match: (p: string) => p.startsWith("/admin/settings") },
 ];
 const TOOLS = [{ href: "/admin/clients", label: "Clients & e-mails", Icon: MegaphoneIcon, match: (p: string) => p.startsWith("/admin/clients") }];

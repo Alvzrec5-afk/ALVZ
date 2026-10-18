@@ -21,6 +21,8 @@ export function VideoPage(props: {
   video: VideoView;
   comments: VideoComment[];
   others: VideoCard[];
+  /** Retour à la galerie (absent pour un projet vidéo d'un seul clip). */
+  backHref: string | null;
 }) {
   const { video, design, slug } = props;
   const player = useRef<PlayerHandle>(null);
@@ -68,10 +70,14 @@ export function VideoPage(props: {
     <div data-theme={themeAttr(design)} className={`fs-${design.font_style} min-h-svh bg-bg text-ink`}>
       <header className="sticky top-0 z-30 bg-bg/95 border-b border-line">
         <div className="mx-auto max-w-[1400px] h-14 sm:h-16 px-3 sm:px-8 grid grid-cols-[1fr_auto_1fr] items-center">
-          <Link href={`/g/${slug}`} className="flex items-center gap-2 min-w-0 text-sm text-muted hover:text-ink">
-            <ArrowLeft className="w-5 h-5 shrink-0" />
-            <span className="truncate hidden sm:inline">{props.galleryTitle}</span>
-          </Link>
+          {props.backHref ? (
+            <Link href={props.backHref} className="flex items-center gap-2 min-w-0 text-sm text-muted hover:text-ink">
+              <ArrowLeft className="w-5 h-5 shrink-0" />
+              <span className="truncate hidden sm:inline">{props.galleryTitle}</span>
+            </Link>
+          ) : (
+            <span className="truncate text-sm text-muted hidden sm:inline">{props.galleryTitle}</span>
+          )}
           <Wordmark height={26} />
           <span />
         </div>

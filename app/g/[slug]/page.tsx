@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { formatLongDate } from "@/lib/dates";
 import type { Contact } from "@/lib/contact";
 import { readDesign, themeAttr } from "@/lib/design";
@@ -45,6 +45,9 @@ export default async function GalleryPage({ params }: { params: Promise<{ slug: 
       poster: await presignGet(videoKey(v.gallery_id as string, v.id as string, "poster.jpg")),
     })),
   );
+
+  // Projet vidéo avec un seul clip : le client arrive directement sur le lecteur.
+  if (gallery.kind === "video" && videos.length === 1) redirect(`/g/${slug}/v/${videos[0].id}`);
 
   const views = await toPhotoViews((photos ?? []) as PhotoRow[], gallery.watermark);
   const visibleCollections = ((collections ?? []) as Collection[]).filter((c) => views.some((p) => p.collectionId === c.id));

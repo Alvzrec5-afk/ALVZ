@@ -184,6 +184,9 @@ alter table public.mail_campaigns enable row level security;
 create policy "admin full access" on public.mail_campaigns
   for all to authenticated using ((select private.is_admin())) with check ((select private.is_admin()));
 
+-- Type de galerie : photos (Galeries) ou projet vidéo (espace Vidéos du studio).
+alter table public.galleries add column kind text not null default 'photo' check (kind in ('photo', 'video'));
+
 -- Vidéos : original + versions 1080p / 720p / 480p préparées dans le navigateur.
 create table public.videos (
   id uuid primary key default gen_random_uuid(),

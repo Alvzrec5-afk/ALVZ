@@ -6,6 +6,7 @@ import { sign, unsign } from "@/lib/tokens";
 
 export type PublicGallery = {
   id: string;
+  kind: "photo" | "video";
   slug: string;
   title: string;
   event_date: string | null;
@@ -19,7 +20,7 @@ export type PublicGallery = {
   design: Record<string, unknown> | null;
 } & Omit<GalleryDesign, "nav_style" | "show_contact">;
 
-export const GALLERY_FIELDS = `id, slug, title, event_date, cover_photo_id, password_hash, expires_at, watermark, downloads_enabled, favorites_enabled, download_web_enabled, ${DESIGN_FIELDS}`;
+export const GALLERY_FIELDS = `id, kind, slug, title, event_date, cover_photo_id, password_hash, expires_at, watermark, downloads_enabled, favorites_enabled, download_web_enabled, ${DESIGN_FIELDS}`;
 
 export async function findGalleryBySlug(slug: string) {
   if (!/^[A-Za-z0-9_-]{3,64}$/.test(slug)) return null;
