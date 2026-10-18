@@ -66,6 +66,8 @@ export type BoardItemInput = {
   position: number;
   data: BoardData;
   sizeBytes?: number;
+  /** Carte collée (Cmd + V) : copie de cette carte — le serveur duplique son image ou sa planche. */
+  copyOf?: string;
 };
 
 /** Ce que le navigateur reçoit. */

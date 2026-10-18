@@ -89,7 +89,11 @@ const toInput = (it: BoardItem): BoardItemInput => ({
   parentId: it.parentId,
   position: it.position,
   data: it.data,
+  ...(it.copyOf ? { copyOf: it.copyOf } : {}),
 });
+
+/** Marque des cartes copiées (Cmd + C) dans le presse-papiers, reconnue au collage, même dans un autre tableau. */
+const CLIP = "ALVZ-BOARD:";
 
 const noteBg = (color: NoteColor | undefined, hex?: string) =>
   hex ? hex : !color || color === "blanc" ? "var(--bg)" : `color-mix(in srgb, ${NOTE_COLORS[color]} 30%, var(--bg))`;
@@ -454,9 +458,9 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
   );
 
   /** Supprime toutes les cartes sélectionnées (une seule confirmation). */
-  const removeGroup = useCallback(() => {
+  const removeGroup = useCallback((ask = true) => {
     const ids = groupRef.current.filter((id) => itemsRef.current[id] && canEdit(itemsRef.current[id]));
-    if (!ids.length || !confirm(`Supprimer ${ids.length} carte${ids.length > 1 ? "s" : ""} ?`)) return;
+    if (!ids.length || (ask && !confirm(`Supprimer ${ids.length} carte${ids.length > 1 ? "s" : ""} ?`))) return;
     const all = { ...itemsRef.current };
     const gone = new Set(ids);
     for (const id of ids) {
@@ -511,6 +515,87 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       router.push(`${boardBase}${it.data.boardId}`);
     },
     [boardBase, router, sync],
+  );
+
+  // ——— Copier / coller (Cmd + C, Cmd + X, Cmd + V) ———
+
+  const clipboard = useRef<string | null>(null); // secours si le presse-papiers est refusé
+
+  /** Copie la sélection : cartes, contenu de leurs colonnes, et flèches entre elles. */
+  const copySelection = useCallback(() => {
+    const roots = (groupRef.current.length ? groupRef.current : selected ? [selected] : []).filter((id) => itemsRef.current[id]);
+    if (!roots.length) return false;
+    const all = itemsRef.current;
+    const ids = new Set(roots.filter((id) => all[id].kind !== "arrow"));
+    for (const it of Object.values(all)) if (it.parentId && ids.has(it.parentId)) ids.add(it.id);
+    for (const it of Object.values(all)) {
+      if (it.kind === "arrow" && it.data.from && it.data.to && ids.has(it.data.from) && ids.has(it.data.to)) ids.add(it.id);
+    }
+    if (!ids.size) return false;
+    const payload = CLIP + JSON.stringify({ v: 1, from: endpoint, items: [...ids].map((id) => ({ ...all[id], comments: undefined })) });
+    clipboard.current = payload;
+    navigator.clipboard?.writeText(payload).catch(() => undefined);
+    return true;
+  }, [endpoint, selected]);
+
+  /** Colle des cartes copiées : nouveaux identifiants, colonnes et flèches reliées, images et planches dupliquées. */
+  const pasteCards = useCallback(
+    (raw: string) => {
+      let parsed: { from?: string; items?: BoardItem[] };
+      try {
+        parsed = JSON.parse(raw.slice(CLIP.length));
+      } catch {
+        return;
+      }
+      // Un client ne colle ni images ni planches (elles appartiennent au studio).
+      const source = (parsed.items ?? []).filter((it) => role === "admin" || (it.kind !== "image" && it.kind !== "board"));
+      if (!source.length) return;
+      const idMap = new Map(source.map((it) => [it.id, crypto.randomUUID()]));
+      const tops = source.filter((it) => !it.parentId || !idMap.has(it.parentId)).filter((it) => it.kind !== "arrow");
+      // Même tableau : juste à côté de l'original. Autre tableau : au centre de l'écran.
+      let dx = 40;
+      let dy = 40;
+      if (parsed.from !== endpoint && tops.length) {
+        const c = viewCenter();
+        dx = Math.round(c.x - Math.min(...tops.map((t) => t.x)) - 120);
+        dy = Math.round(c.y - Math.min(...tops.map((t) => t.y)) - 80);
+      }
+      let z = maxZ();
+      const all = { ...itemsRef.current };
+      const created: BoardItem[] = [];
+      for (const it of source) {
+        const id = idMap.get(it.id)!;
+        const inParent = it.parentId && idMap.has(it.parentId);
+        const data = { ...it.data };
+        if (it.kind === "arrow") {
+          data.from = data.from ? idMap.get(data.from) : undefined;
+          data.to = data.to ? idMap.get(data.to) : undefined;
+        }
+        if (it.kind === "board") data.boardId = crypto.randomUUID();
+        const copy: BoardItem = {
+          ...it,
+          id,
+          x: inParent ? it.x : it.x + dx,
+          y: inParent ? it.y : it.y + dy,
+          z: ++z,
+          parentId: inParent ? idMap.get(it.parentId!)! : null,
+          data,
+          author: role === "client" ? nameRef.current : it.author,
+          mine: true,
+          comments: it.kind === "comment" ? [] : undefined,
+          copyOf: it.kind === "image" || it.kind === "board" ? it.id : undefined,
+        };
+        all[id] = copy;
+        created.push(copy);
+      }
+      setItems(all);
+      for (const c of [...created].sort((a, b) => Number(a.kind !== "column") - Number(b.kind !== "column"))) push({ op: "put", item: toInput(c) });
+      setSelectedState(null);
+      setGroup(created.filter((c) => c.kind !== "arrow" && !c.parentId).map((c) => c.id));
+      lastActivity.current = Date.now();
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [endpoint, push, role, setGroup, setItems],
   );
 
   // ——— Ajout de cartes ———
@@ -1251,6 +1336,16 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       const t = e.target as HTMLElement;
       if (t.closest("input, textarea")) return;
       if (e.key === " ") spaceDown.current = true;
+      if ((e.metaKey || e.ctrlKey) && (e.key === "c" || e.key === "x") && !e.shiftKey) {
+        if (!copySelection()) return;
+        e.preventDefault();
+        if (e.key === "x") {
+          // Couper : copier puis retirer (Cmd + Z les fait revenir).
+          if (groupRef.current.length > 1) removeGroup(false);
+          else if (selected) remove(selected);
+        }
+        return;
+      }
       if ((e.metaKey || e.ctrlKey) && (e.key === "z" || e.key === "Z" || e.key === "y")) {
         e.preventDefault();
         if (e.key === "y" || e.shiftKey) redo();
@@ -1277,6 +1372,13 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     const paste = (e: ClipboardEvent) => {
       const t = e.target as HTMLElement;
       if (t.closest?.("input, textarea") || !canAdd) return;
+      const pasted = e.clipboardData?.getData("text/plain") ?? "";
+      const cards = pasted.startsWith(CLIP) ? pasted : !pasted && clipboard.current ? clipboard.current : null;
+      if (cards) {
+        e.preventDefault();
+        ensureName(() => pasteCards(cards));
+        return;
+      }
       const files = [...(e.clipboardData?.files ?? [])];
       if (files.length) {
         e.preventDefault();
@@ -1303,7 +1405,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       window.removeEventListener("keydown", key);
       window.removeEventListener("paste", paste);
     };
-  }, [addImages, canAdd, canEdit, create, ensureName, redo, remove, removeGroup, selected, setGroup, setSelected, undo]);
+  }, [addImages, canAdd, canEdit, copySelection, create, ensureName, pasteCards, redo, remove, removeGroup, selected, setGroup, setSelected, undo]);
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -2140,7 +2242,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
               Couleur
             </button>
           )}
-          <button onClick={removeGroup} className="ml-1 w-8 h-8 flex items-center justify-center text-muted hover:text-danger" aria-label="Supprimer la sélection" title="Supprimer">
+          <button onClick={() => removeGroup()} className="ml-1 w-8 h-8 flex items-center justify-center text-muted hover:text-danger" aria-label="Supprimer la sélection" title="Supprimer">
             <TrashIcon className="w-4 h-4" />
           </button>
           <button onClick={() => setGroup([])} className="w-8 h-8 flex items-center justify-center text-muted hover:text-ink" aria-label="Désélectionner" title="Désélectionner">

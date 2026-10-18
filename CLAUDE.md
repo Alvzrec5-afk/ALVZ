@@ -130,6 +130,10 @@ pages publiques). Les éléments dans la corbeille comptent toujours dans le sto
 (`push` → étape après 0,6 s de calme, `replay`). Pour que ce soit fiable, supprimer une carte met
 `board_items.deleted_at` (et `boards.deleted_at` pour une planche) ; la remettre l'efface ; `purgeDeletedItems`
 efface pour de bon (images, planches) ce qui a plus de 24 h, à l'ouverture du tableau dans le studio.
+Copier / couper / coller (Cmd + C / X / V) : `copySelection` met les cartes (+ contenu des colonnes + flèches
+entre elles) dans le presse-papiers avec la marque `ALVZ-BOARD:` ; `pasteCards` recrée tout avec de nouveaux ids,
+même dans un autre tableau ; `copyOf` dit au serveur de dupliquer l'image (CopyObject) ou la planche
+(`duplicateBoard` avec `parentId` / `id`). Studio seulement pour images et planches ; discussion non copiée.
 Navigation : dans un tableau (plein écran), bouton ☰ « Studio » à gauche de la barre (`board-header.tsx`).
 Page client `/t/…` vue par le studio connecté (`isStudioSession`, `lib/auth.ts`) : logo → /admin et bouton
 « Retour au studio » (ouvre le même tableau dans le studio) ; les clients ne voient rien de plus.

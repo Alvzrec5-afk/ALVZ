@@ -267,6 +267,17 @@ export async function applyBoardOps(
   const owns = (row: { board_id: string; client_id: string | null }) =>
     row.board_id === boardId && (actor.role === "admin" || Boolean(actor.canEditAll) || row.client_id === actor.clientId);
 
+  // Cartes collées (studio) : on retrouve l'original pour dupliquer son image ou sa planche.
+  const copyIds = actor.role === "admin"
+    ? [...new Set(ops.flatMap((o) => (o.op === "put" && isUuid(o.item?.copyOf) && !known.has(o.item.id) ? [o.item.copyOf!] : [])))]
+    : [];
+  const { data: sources } = copyIds.length
+    ? await db.from("board_items").select("id, board_id, kind, size_bytes, data").in("id", copyIds)
+    : { data: [] };
+  const sourceOf = new Map((sources ?? []).map((r) => [r.id as string, r]));
+  const imageCopies: { from: string; to: string }[] = [];
+  const boardCopies: { from: string; to: string; title: string }[] = [];
+
   // Colonnes créées dans ce même envoi : on peut déjà y ranger des cartes.
   const newColumns = new Set(
     ops.flatMap((o) => (o.op === "put" && o.item?.kind === "column" && isUuid(o.item.id) && !known.has(o.item.id) ? [o.item.id] : [])),
@@ -307,8 +318,15 @@ export async function applyBoardOps(
       const before = row?.data as BoardData | null;
       data.boardId = before?.boardId ?? data.boardId ?? crypto.randomUUID();
       // Nom du sous-tableau : seulement à la création ou si la carte a vraiment été renommée.
-      if (!row || (before?.title ?? "") !== (data.title ?? "")) subBoards.push({ id: data.boardId, title: data.title || "Sans titre" });
+      const src = !row && it.copyOf ? sourceOf.get(it.copyOf) : undefined;
+      const srcBoard = src?.kind === "board" ? (src.data as BoardData | null)?.boardId : undefined;
+      if (isUuid(srcBoard)) boardCopies.push({ from: srcBoard, to: data.boardId, title: data.title || "Sans titre" });
+      else if (!row || (before?.title ?? "") !== (data.title ?? "")) subBoards.push({ id: data.boardId, title: data.title || "Sans titre" });
       if (row?.deleted_at) restoredSubBoards.push(data.boardId);
+    }
+    const imageSrc = !row && it.kind === "image" && it.copyOf ? sourceOf.get(it.copyOf) : undefined;
+    if (imageSrc?.kind === "image" && Number(imageSrc.size_bytes) > 0) {
+      imageCopies.push({ from: boardImageKey(imageSrc.board_id as string, imageSrc.id as string), to: boardImageKey(boardId, it.id) });
     }
     puts.push({
       id: it.id,
@@ -326,9 +344,11 @@ export async function applyBoardOps(
       size_bytes:
         row && Number(row.size_bytes) > 0
           ? row.size_bytes
-          : it.kind === "image"
-            ? Math.round(num(it.sizeBytes, 0, MAX_BOARD_IMAGE_BYTES))
-            : 0,
+          : imageSrc?.kind === "image" && Number(imageSrc.size_bytes) > 0
+            ? imageSrc.size_bytes
+            : it.kind === "image"
+              ? Math.round(num(it.sizeBytes, 0, MAX_BOARD_IMAGE_BYTES))
+              : 0,
       // Toujours explicites : dans un envoi groupé, un champ absent serait remis à vide.
       ...(row
         ? { author: row.author, client_id: row.client_id }
@@ -360,6 +380,12 @@ export async function applyBoardOps(
       subBoards.filter((b) => existing.has(b.id)).map((b) => db.from("boards").update({ title: b.title }).eq("id", b.id).eq("parent_id", boardId)),
     );
   }
+  // Images et planches collées : copie du fichier / de la planche entière avant d'enregistrer les cartes.
+  await Promise.all(imageCopies.map((c) => copyObject(c.from, c.to).catch(() => undefined)));
+  for (const c of boardCopies) {
+    const { data: exists } = await db.from("boards").select("id").eq("id", c.to).maybeSingle();
+    if (!exists) await duplicateBoard(db, c.from, c.title, { parentId: boardId, id: c.to });
+  }
   // Colonnes d'abord : les cartes du même envoi peuvent y être rangées.
   for (const group of [puts.filter((p) => p.kind === "column"), puts.filter((p) => p.kind !== "column")]) {
     if (!group.length) continue;
@@ -383,7 +409,13 @@ export async function applyBoardOps(
  * Copie complète d'un tableau : cartes, colonnes, flèches, planches (à toutes les profondeurs) et images.
  * Les identifiants sont renouvelés ; la copie n'est pas partagée (nouveau lien, partage désactivé).
  */
-export async function duplicateBoard(db: SupabaseClient, sourceId: string, title: string) {
+export async function duplicateBoard(
+  db: SupabaseClient,
+  sourceId: string,
+  title: string,
+  /** Planche collée ailleurs : la copie est rangée sous `parentId`, avec l'identifiant déjà choisi par la carte. */
+  opts: { parentId?: string | null; id?: string } = {},
+) {
   // Tous les tableaux à copier, du haut vers le bas.
   const tree: { id: string; title: string; parent_id: string | null; gallery_id: string | null; client_can_add: boolean }[] = [];
   const { data: top } = await db.from("boards").select("id, title, parent_id, gallery_id, client_can_add").eq("id", sourceId).maybeSingle();
@@ -406,13 +438,13 @@ export async function duplicateBoard(db: SupabaseClient, sourceId: string, title
   const usage = await storageUsage(db);
   if (usage.total + imageBytes > usage.limit) throw new Error("Stockage plein : impossible de copier les images de ce tableau.");
 
-  const boardIds = new Map(tree.map((b) => [b.id, crypto.randomUUID()]));
+  const boardIds = new Map(tree.map((b) => [b.id, b.id === sourceId && opts.id ? opts.id : crypto.randomUUID()]));
   const itemIds = new Map(items.map((i) => [i.id as string, crypto.randomUUID()]));
   const { error: boardError } = await db.from("boards").insert(
     tree.map((b) => ({
       id: boardIds.get(b.id),
       title: b.id === sourceId ? title : b.title,
-      parent_id: b.id === sourceId ? top.parent_id : boardIds.get(b.parent_id!),
+      parent_id: b.id === sourceId ? (opts.parentId !== undefined ? opts.parentId : top.parent_id) : boardIds.get(b.parent_id!),
       gallery_id: b.gallery_id,
       client_can_add: b.client_can_add,
       share_slug: newSlug(),
