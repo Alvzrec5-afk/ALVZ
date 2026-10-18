@@ -1,0 +1,16 @@
+{
+  "name": "ALVZ Studio",
+  "short_name": "ALVZ Studio",
+  "description": "Studio ALVZ.REC : galeries, clients et e-mails.",
+  "id": "/admin",
+  "start_url": "/admin",
+  "scope": "/admin",
+  "display": "standalone",
+  "background_color": "#0e0e0d",
+  "theme_color": "#0e0e0d",
+  "lang": "fr",
+  "icons": [
+    { "src": "/studio-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/apple-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}
