@@ -62,7 +62,7 @@ Le message doit indiquer « Connexion Oracle opérationnelle ». Sinon, le messa
 ### Vidéos (clips)
 
 Dans une galerie : onglet **Vidéos** (icône ▶) → **Ajouter des vidéos**. Faites-le depuis votre Mac (Chrome ou Safari à jour) :
-votre ordinateur prépare automatiquement trois qualités (1080p, 720p, 480p) puis envoie tout, original compris.
+votre ordinateur prépare automatiquement jusqu'à quatre qualités (4K si l'original est en 4K et dure moins de 10 minutes, puis 1080p, 720p, 480p) puis envoie tout, original compris.
 Gardez la page ouverte pendant la préparation.
 
 - Chaque client reçoit la qualité adaptée à sa connexion et à son écran (il peut aussi la choisir).

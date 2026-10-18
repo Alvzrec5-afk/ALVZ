@@ -62,8 +62,8 @@ export function allKeys(galleryId: string, photoId: string, ext: string) {
   return [...VARIANTS.map((v) => variantKey(galleryId, photoId, v)), originalKey(galleryId, photoId, ext)];
 }
 
-/** Vidéos : galleries/<galerie>/videos/<vidéo>/{original.ext, 1080.mp4, 720.mp4, 480.mp4, poster.jpg} */
-export const RENDITION_HEIGHTS = [1080, 720, 480] as const;
+/** Vidéos : galleries/<galerie>/videos/<vidéo>/{original.ext, 2160.mp4, 1080.mp4, 720.mp4, 480.mp4, poster.jpg} */
+export const RENDITION_HEIGHTS = [2160, 1080, 720, 480] as const;
 
 export function videoKey(galleryId: string, videoId: string, name: string) {
   return `galleries/${galleryId}/videos/${videoId}/${name}`;

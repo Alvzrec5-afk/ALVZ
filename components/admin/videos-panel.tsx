@@ -6,7 +6,7 @@ import { deleteVideo, deleteVideoComment, setVideoCommentResolved, updateVideo }
 import type { VideoComment, VideoView } from "@/lib/types";
 import { VideoUploader } from "@/lib/client/video-uploader";
 import { ArrowLeft, FilmIcon, PlusCircleIcon } from "@/components/icons";
-import { VideoPlayer, formatTime, type PlayerHandle } from "@/components/video/video-player";
+import { VideoPlayer, formatTime, qualityLabel, type PlayerHandle } from "@/components/video/video-player";
 import { VideoComments } from "@/components/video/video-comments";
 import { Toggle } from "./ui";
 
@@ -82,7 +82,7 @@ export function VideosPanel({ galleryId, slug, watermark, videos }: { galleryId:
           ))}
           <div className="px-4 py-3 flex flex-wrap gap-4 text-xs text-muted bg-bg-soft">
             {busy ? (
-              <span>Gardez cette page ouverte : votre ordinateur prépare les versions 1080p, 720p et 480p, puis les envoie.</span>
+              <span>Gardez cette page ouverte : votre ordinateur prépare les versions 4K, 1080p, 720p et 480p, puis les envoie.</span>
             ) : (
               <button className="hover:text-ink" onClick={() => uploader.clearFinished()}>Effacer la liste</button>
             )}
@@ -170,7 +170,7 @@ function VideoDetail({ galleryId, slug, video, onBack }: { galleryId: string; sl
             aria-label="Titre de la vidéo"
           />
           <p className="text-xs text-muted mt-2">
-            {formatTime(video.duration)} · {video.sources.map((s) => `${s.h}p`).join(" / ")} · original {size(video.sizeBytes)}
+            {formatTime(video.duration)} · {video.sources.map((s) => qualityLabel(s.h)).join(" / ")} · original {size(video.sizeBytes)}
             {video.watermarked && " · filigrane incrusté"}
           </p>
 

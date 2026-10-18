@@ -92,8 +92,7 @@ export class VideoUploader {
     // Bibliothèque de conversion chargée seulement au premier envoi (page du studio plus légère).
     const { analyzeVideo, checkBrowserSupport, makePoster, makeRendition, renditionSize } = await import("./video");
     this.update(item, { step: "Analyse" });
-    const info = await analyzeVideo(file);
-    await checkBrowserSupport(info);
+    const info = await checkBrowserSupport(await analyzeVideo(file));
 
     const prepared = await withRetry(() =>
       api<Prepared>("/api/admin/videos/prepare", {

@@ -16,7 +16,7 @@ type Body = {
 };
 
 /** Débit moyen visé par qualité (octets par seconde), pour estimer la place nécessaire. */
-const RATE: Record<number, number> = { 1080: 5e6 / 8, 720: 2.5e6 / 8, 480: 1e6 / 8 };
+const RATE: Record<number, number> = { 2160: 14e6 / 8, 1080: 5e6 / 8, 720: 2.5e6 / 8, 480: 1e6 / 8 };
 
 function extensionOf(filename: string) {
   const m = /\.([a-z0-9]{1,5})$/i.exec(filename);

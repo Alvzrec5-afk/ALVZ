@@ -1,6 +1,6 @@
 /**
  * Prépare les vidéos dans le navigateur (WebCodecs, accélération matérielle) :
- * versions 1080p / 720p / 480p au format MP4 lisible partout, image d'aperçu,
+ * versions 4K / 1080p / 720p / 480p au format MP4 lisible partout, image d'aperçu,
  * filigrane incrusté si demandé. Rien n'est envoyé à un service extérieur.
  */
 import {
@@ -17,9 +17,11 @@ import {
 } from "mediabunny";
 import { ctx2d, drawWatermark, makeCanvas, toJpeg } from "./image";
 
-export const QUALITIES = [1080, 720, 480] as const;
+export const QUALITIES = [2160, 1080, 720, 480] as const;
 /** Débit visé par qualité (bits/s) : net sur téléphone comme sur grand écran. */
-const BITRATE: Record<number, number> = { 1080: 5_000_000, 720: 2_500_000, 480: 1_000_000 };
+const BITRATE: Record<number, number> = { 2160: 14_000_000, 1080: 5_000_000, 720: 2_500_000, 480: 1_000_000 };
+/** La version 4K est préparée en mémoire : au-delà de cette durée, on s'arrête au 1080p. */
+const MAX_4K_SECONDS = 10 * 60;
 
 export type VideoInfo = { duration: number; width: number; height: number; qualities: number[] };
 
@@ -39,7 +41,7 @@ export async function analyzeVideo(file: File): Promise<VideoInfo> {
     const height = track.displayHeight;
     // « 1080p » = petit côté de l'image (fonctionne aussi pour les vidéos verticales).
     const short = Math.min(width, height);
-    const qualities = QUALITIES.filter((q) => q <= short);
+    const qualities = QUALITIES.filter((q) => q <= short && (q < 2160 || duration <= MAX_4K_SECONDS));
     return { duration, width, height, qualities: qualities.length ? qualities : [480] };
   } finally {
     input.dispose();
@@ -53,10 +55,15 @@ export function renditionSize(info: VideoInfo, quality: number) {
   return { width: even(info.width * ratio), height: even(info.height * ratio) };
 }
 
-export async function checkBrowserSupport(info: VideoInfo) {
-  const { width, height } = renditionSize(info, info.qualities[0]);
-  const ok = await canEncodeVideo("avc", { width, height, bitrate: BITRATE[info.qualities[0]] });
-  if (!ok) throw new Error("Ce navigateur ne sait pas préparer les vidéos. Utilisez Chrome ou Safari à jour sur ordinateur.");
+/** Garde les qualités que ce navigateur sait produire (la 4K est retirée si elle n'est pas prise en charge). */
+export async function checkBrowserSupport(info: VideoInfo): Promise<VideoInfo> {
+  const supported: number[] = [];
+  for (const q of info.qualities) {
+    const { width, height } = renditionSize(info, q);
+    if (await canEncodeVideo("avc", { width, height, bitrate: BITRATE[q] })) supported.push(q);
+  }
+  if (supported.length === 0) throw new Error("Ce navigateur ne sait pas préparer les vidéos. Utilisez Chrome ou Safari à jour sur ordinateur.");
+  return { ...info, qualities: supported };
 }
 
 export async function makePoster(file: File, info: VideoInfo, watermark: boolean): Promise<Blob> {

@@ -15,6 +15,8 @@ type Props = {
   onWatched?: (pct: number) => void;
 };
 
+export const qualityLabel = (h: number) => (h >= 2160 ? "4K" : `${h}p`);
+
 export const formatTime = (s: number) => {
   const t = Math.max(0, Math.floor(s || 0));
   const h = Math.floor(t / 3600);
@@ -60,7 +62,7 @@ export const VideoPlayer = forwardRef<PlayerHandle, Props>(function VideoPlayer(
     const width = (box.current?.clientWidth ?? 1280) * Math.min(2, window.devicePixelRatio || 1);
     const short = Math.min(video.width, video.height);
     const scale = (h: number) => (video.width >= video.height ? (video.width * h) / short : h);
-    const i = sources.findIndex((s) => scale(s.h) <= width * 1.25);
+    const i = sources.findIndex((s) => scale(s.h) <= width * 1.4);
     return i === -1 ? sources.length - 1 : i;
   }, [sources, video.width, video.height]);
 
@@ -212,7 +214,7 @@ export const VideoPlayer = forwardRef<PlayerHandle, Props>(function VideoPlayer(
 
   const markers = useMemo(() => comments.filter((c) => !c.resolved), [comments]);
   const showChrome = chrome || !playing || menu;
-  const label = (i: number) => `${sources[i].h}p`;
+  const label = (i: number) => qualityLabel(sources[i].h);
 
   return (
     <div
@@ -365,7 +367,7 @@ export const VideoPlayer = forwardRef<PlayerHandle, Props>(function VideoPlayer(
                       className={`block w-full text-left px-4 py-2 hover:bg-white/10 ${mode === q ? "text-white" : "text-white/70"}`}
                     >
                       {mode === q ? "✓ " : ""}
-                      {q === "auto" ? "Automatique" : `${q}p`}
+                      {q === "auto" ? "Automatique" : qualityLabel(q)}
                     </button>
                   ))}
                 </div>
