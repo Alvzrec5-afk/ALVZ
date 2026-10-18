@@ -21,6 +21,8 @@ type Props = {
   positions: Record<string, number>;
   favoriteCounts: Record<string, number>;
   downloadCounts: Record<string, number>;
+  /** E-mails des personnes qui ont téléchargé la photo (seule ou en ZIP). */
+  downloadEmails: Record<string, string[]>;
   activeId: string;
   onActive: (id: string) => void;
 };
@@ -174,6 +176,7 @@ export function PhotosPanel(props: Props) {
                   onOpen={() => !dragging.current && setViewer(order.findIndex((o) => o.id === p.id))}
                   favorites={props.favoriteCounts[p.id] ?? 0}
                   downloads={props.downloadCounts[p.id] ?? 0}
+                  emails={props.downloadEmails[p.id] ?? []}
                   onCover={() => run(() => setCover(props.galleryId, p.id))}
                   onDelete={() => {
                     if (confirm(`Supprimer ${p.filename} ?`)) {
@@ -196,6 +199,7 @@ export function PhotosPanel(props: Props) {
           coverId={coverId}
           favoriteCounts={props.favoriteCounts}
           downloadCounts={props.downloadCounts}
+          downloadEmails={props.downloadEmails}
           onCover={async (p) => {
             await setCover(props.galleryId, p.id);
             setCoverId(p.id);
@@ -221,6 +225,7 @@ function SortablePhoto({
   onOpen,
   favorites,
   downloads,
+  emails,
   onCover,
   onDelete,
 }: {
@@ -229,6 +234,7 @@ function SortablePhoto({
   onOpen: () => void;
   favorites: number;
   downloads: number;
+  emails: string[];
   onCover: () => void;
   onDelete: () => void;
 }) {
@@ -245,14 +251,18 @@ function SortablePhoto({
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={photo.thumb} alt={photo.filename} loading="lazy" draggable={false} className="w-full h-full object-cover lg:object-contain lg:p-[7%]" />
       {isCover && <span className="absolute top-1.5 left-1.5 bg-black/60 text-white text-[10px] tracking-widest uppercase px-1.5 py-0.5">Couverture</span>}
-      {(favorites > 0 || downloads > 0) && (
-        <span className="absolute bottom-1.5 left-1.5 flex items-center gap-2 text-white text-[11px] drop-shadow">
+      {(favorites > 0 || downloads > 0 || emails.length > 0) && (
+        <span
+          className="absolute bottom-1.5 left-1.5 flex items-center gap-2 text-white text-[11px] drop-shadow"
+          title={emails.length ? `Téléchargée par : ${emails.join(", ")}` : undefined}
+        >
           {favorites > 0 && (
             <span className="flex items-center gap-1">
               <HeartIcon className="w-3.5 h-3.5" filled /> {favorites}
             </span>
           )}
           {downloads > 0 && <span>↓ {downloads}</span>}
+          {emails.length > 0 && <span>@ {emails.length}</span>}
         </span>
       )}
       <div className="absolute inset-x-0 top-0 flex justify-end gap-1 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity">

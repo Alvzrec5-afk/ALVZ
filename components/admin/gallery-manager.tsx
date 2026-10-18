@@ -86,6 +86,21 @@ export function GalleryManager(raw: Props) {
     if (d.kind === "photo" && d.photo_id) acc[d.photo_id] = (acc[d.photo_id] ?? 0) + 1;
     return acc;
   }, {});
+  // Qui a téléchargé chaque photo (seule ou dans un ZIP) : visiteurs qui ont donné leur e-mail.
+  const downloadEmails: Record<string, string[]> = {};
+  for (const d of props.downloads) {
+    if (!d.email) continue;
+    const ids =
+      d.kind === "photo"
+        ? d.photo_id
+          ? [d.photo_id]
+          : []
+        : props.photos.filter((p) => !d.collection_id || p.collectionId === d.collection_id).map((p) => p.id);
+    for (const id of ids) {
+      const list = (downloadEmails[id] ??= []);
+      if (!list.includes(d.email)) list.push(d.email);
+    }
+  }
   const [copied, setCopied] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -318,6 +333,7 @@ export function GalleryManager(raw: Props) {
             photos={props.photos}
             positions={props.positions}
             downloadCounts={downloadCounts}
+            downloadEmails={downloadEmails}
             favoriteCounts={props.favoriteLists.reduce<Record<string, number>>((acc, l) => {
               l.photoIds.forEach((id) => (acc[id] = (acc[id] ?? 0) + 1));
               return acc;

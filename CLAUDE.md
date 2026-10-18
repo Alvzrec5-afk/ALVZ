@@ -67,7 +67,8 @@ Vidéos, Coordonnées, Outils → Clients & e-mails, Déconnexion) ; sur mobile 
   suppression, visionneuse `admin-viewer.tsx`), `design-panel.tsx` (12 couvertures, polices, couleurs,
   grilles), `settings-panel.tsx` (lien, mot de passe, expiration, téléchargements (option « Demander l'e-mail avant le téléchargement » = `galleries.download_email_required` : même fenêtre / liste `favorite_lists` que les favoris, contrôlée par `needsDownloadEmail` dans les routes download et archive), favoris, filigrane,
   carte de visite), activité (favoris + téléchargements : `downloads-panel.tsx` = chiffres, photos les plus
-  téléchargées, « Par personne » (photos + ZIP par e-mail), historique).
+  téléchargées, « Par personne » (photos + ZIP par e-mail), historique) ; sur chaque photo de l'onglet Photos : « @ n » et, dans `admin-viewer`,
+  « Téléchargée par : e-mails » (`downloadEmails` calculé dans `gallery-manager`, ZIP compris).
 - Vidéos : `app/admin/(protected)/videos/` — projets vidéo = galeries avec `kind = 'video'`
   (onglets Vidéos / Design / Paramètres). `videos-panel.tsx` : envoi, fiche vidéo (lien direct,
   téléchargement autorisé ou non, commentaires, activité ; liste « Téléchargements » = `video_events` kind download
