@@ -30,6 +30,12 @@ export function inkOn(hex: string) {
 export type TodoEntry = { id: string; text: string; done: boolean; indent?: number };
 
 export type BoardData = {
+  /** Taille du texte de la carte (1 = normale ; 0,85 petite … 2,6 titre). */
+  fontSize?: number;
+  /** Image rognée : zone gardée, en fractions de l'image (0 à 1). L'original reste intact. */
+  crop?: { x: number; y: number; w: number; h: number };
+  /** Flèche courbe : décalage du milieu de la flèche, perpendiculaire à la ligne droite (px). */
+  bend?: number;
   text?: string;
   color?: NoteColor;
   title?: string;

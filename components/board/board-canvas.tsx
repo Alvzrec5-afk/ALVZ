@@ -96,6 +96,15 @@ const toInput = (it: BoardItem): BoardItemInput => ({
   ...(it.copyOf ? { copyOf: it.copyOf } : {}),
 });
 
+/** Tailles de texte proposées (multiplie la taille normale de 13 px). */
+const FONT_SIZES = [
+  ["Petit", 0.85],
+  ["Normal", 1],
+  ["Grand", 1.35],
+  ["Très grand", 1.85],
+  ["Titre", 2.6],
+] as const;
+
 /** Clic droit, clic à deux doigts du trackpad, ou Ctrl + clic (Mac) : ouvre le menu, ne déplace rien. */
 const isContextClick = (e: { button: number; ctrlKey: boolean; pointerType?: string }) =>
   e.button === 2 || (e.button === 0 && e.ctrlKey && e.pointerType === "mouse");
@@ -276,6 +285,9 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     },
     [setGroup],
   );
+  const [cropping, setCropping] = useState<string | null>(null); // image en cours de recadrage
+  const [capturing, setCapturing] = useState(false);
+  const worldRef = useRef<HTMLDivElement>(null);
   // Menu du clic droit : position à l'écran (dans le tableau), point du tableau visé, carte visée.
   const [menu, setMenu] = useState<{ left: number; top: number; at: { x: number; y: number }; target: string | null } | null>(null);
   const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
@@ -1200,7 +1212,12 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
 
   const onBackgroundDown = (e: React.PointerEvent) => {
     if (isContextClick(e)) return; // clic droit / deux doigts / Ctrl + clic : menu (onContextMenu)
-    if ((e.target as HTMLElement).closest("[data-ui], input, textarea, button, a, [data-nodrag]")) return;
+    const t = e.target as HTMLElement;
+    if (t.closest("[data-ui]")) return;
+    // Au doigt, glisser sur une case de tableau, une case à cocher ou un lien fait aussi défiler le tableau
+    // (un simple toucher garde son effet : ouvrir la case, cocher…). Seul le champ en cours d'écriture reste à lui.
+    const field = t.closest("input, textarea");
+    if (t.closest("input, textarea, button, a, [data-nodrag]") && (e.pointerType === "mouse" || (field && field === document.activeElement))) return;
     setMenu(null);
     lastActivity.current = Date.now();
     if (arrowMode && e.pointerType === "mouse") setArrowMode(null);
@@ -1364,16 +1381,34 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
 
   // ——— Flèches et barre de la carte sélectionnée (mesurées après chaque rendu) ———
 
-  const [geom, setGeom] = useState<{ arrows: { id: string; d: string; mx: number; my: number }[]; sel: Box | null }>({ arrows: [], sel: null });
+  // mx/my : milieu de la flèche (poignée de courbure) ; cx/cy + nx/ny : milieu de la ligne droite et sa perpendiculaire.
+  type ArrowGeom = { id: string; d: string; mx: number; my: number; cx: number; cy: number; nx: number; ny: number };
+  const [geom, setGeom] = useState<{ arrows: ArrowGeom[]; sel: Box | null }>({ arrows: [], sel: null });
   useLayoutEffect(() => {
     const next = {
       arrows: arrows.flatMap((a) => {
         const A = a.data.from ? boxOf(a.data.from) : null;
         const B = a.data.to ? boxOf(a.data.to) : null;
         if (!A || !B) return [];
-        const p = edgePoint(A, B.x + B.w / 2, B.y + B.h / 2, 6);
-        const q = edgePoint(B, A.x + A.w / 2, A.y + A.h / 2, 8);
-        return [{ id: a.id, d: `M${p.x.toFixed(1)},${p.y.toFixed(1)} L${q.x.toFixed(1)},${q.y.toFixed(1)}`, mx: (p.x + q.x) / 2, my: (p.y + q.y) / 2 }];
+        const ax = A.x + A.w / 2;
+        const ay = A.y + A.h / 2;
+        const bx = B.x + B.w / 2;
+        const by = B.y + B.h / 2;
+        const len = Math.hypot(bx - ax, by - ay) || 1;
+        const nx = -(by - ay) / len;
+        const ny = (bx - ax) / len;
+        const cx = (ax + bx) / 2;
+        const cy = (ay + by) / 2;
+        const bend = a.data.bend ?? 0;
+        // Flèche courbe : elle passe par le point « sommet », décalé de `bend` à angle droit de la ligne droite.
+        const top = { x: cx + nx * bend, y: cy + ny * bend };
+        const p = edgePoint(A, bend ? top.x : bx, bend ? top.y : by, 6);
+        const q = edgePoint(B, bend ? top.x : ax, bend ? top.y : ay, 8);
+        const f = (n: number) => n.toFixed(1);
+        const d = bend
+          ? `M${f(p.x)},${f(p.y)} Q${f(2 * top.x - (p.x + q.x) / 2)},${f(2 * top.y - (p.y + q.y) / 2)} ${f(q.x)},${f(q.y)}`
+          : `M${f(p.x)},${f(p.y)} L${f(q.x)},${f(q.y)}`;
+        return [{ id: a.id, d, mx: bend ? top.x : (p.x + q.x) / 2, my: bend ? top.y : (p.y + q.y) / 2, cx, cy, nx, ny }];
       }),
       sel: selected && items[selected] && items[selected].kind !== "arrow" ? boxOf(selected) : null,
     };
@@ -1618,6 +1653,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           ...(it.kind !== "color" && it.kind !== "column" ? inkStyle(it.data) : null),
           outline: isSel || firstPick || inGroup ? "2px solid #10b981" : undefined,
           outlineOffset: 1,
+          ...(it.data.fontSize ? { fontSize: `${13 * it.data.fontSize}px` } : null),
         }}
         className={`rounded-[3px] text-[13px] leading-relaxed select-none ${inColumn ? "relative" : ""} ${shell} ${pickable} ${editable && !arrowMode ? "cursor-grab active:cursor-grabbing" : ""}`}
         onPointerDown={(e) => startDrag(e, it)}
@@ -1642,14 +1678,36 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           <div>
             {it.src ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={it.src}
-                alt={it.data.caption || ""}
-                draggable={false}
-                onLoad={() => setTick((t) => t + 1)}
-                className="block w-full h-auto pointer-events-none"
-                style={{ aspectRatio: `${it.data.width ?? 4} / ${it.data.height ?? 3}` }}
-              />
+              it.data.crop ? (
+                // Image rognée : seule la zone choisie est visible (le fichier d'origine reste entier).
+                <div
+                  className="relative overflow-hidden"
+                  style={{ aspectRatio: `${(it.data.width ?? 4) * it.data.crop.w} / ${(it.data.height ?? 3) * it.data.crop.h}` }}
+                >
+                  <img
+                    src={it.src}
+                    alt={it.data.caption || ""}
+                    draggable={false}
+                    onLoad={() => setTick((t) => t + 1)}
+                    className="absolute max-w-none pointer-events-none"
+                    style={{
+                      width: `${100 / it.data.crop.w}%`,
+                      left: `${(-it.data.crop.x / it.data.crop.w) * 100}%`,
+                      top: `${(-it.data.crop.y / it.data.crop.h) * 100}%`,
+                      aspectRatio: `${it.data.width ?? 4} / ${it.data.height ?? 3}`,
+                    }}
+                  />
+                </div>
+              ) : (
+                <img
+                  src={it.src}
+                  alt={it.data.caption || ""}
+                  draggable={false}
+                  onLoad={() => setTick((t) => t + 1)}
+                  className="block w-full h-auto pointer-events-none"
+                  style={{ aspectRatio: `${it.data.width ?? 4} / ${it.data.height ?? 3}` }}
+                />
+              )
             ) : (
               <button
                 data-nodrag
@@ -1904,7 +1962,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
             {it.data.title}
           </p>
         )}
-        <table className="w-full table-fixed border-collapse text-[12px] leading-snug">
+        <table className="w-full table-fixed border-collapse text-[0.92em] leading-snug">
           <tbody>
             {cells.map((row, r) => (
               <tr key={r}>
@@ -1962,7 +2020,6 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
                               }
                             }
                           }}
-                          className="text-[12px]"
                         />
                       ) : cell ? (
                         <span className="block whitespace-pre-wrap break-words">
@@ -2276,6 +2333,89 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     for (const it of list) update(it.id, { z: ++z });
   };
 
+  /** Taille du texte d'une ou plusieurs cartes. */
+  const applyFontSize = (ids: string[], size: number) => {
+    for (const id of ids) {
+      const it = itemsRef.current[id];
+      if (!it || it.kind === "image" || it.kind === "arrow" || !canEdit(it)) continue;
+      update(id, { data: { ...it.data, fontSize: size === 1 ? undefined : size } });
+    }
+  };
+
+  /** Flèche : glisser la poignée du milieu la courbe ; revenue près de la ligne droite, elle se redresse. */
+  const startBend = (e: React.PointerEvent, a: ArrowGeom) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const o = rootRef.current!.getBoundingClientRect();
+    const at = (ev: PointerEvent) => {
+      const v = viewRef.current;
+      const x = (ev.clientX - o.left - v.x) / v.k;
+      const y = (ev.clientY - o.top - v.y) / v.k;
+      const bend = Math.round((x - a.cx) * a.nx + (y - a.cy) * a.ny);
+      return Math.abs(bend) < 10 ? 0 : bend;
+    };
+    const move = (ev: PointerEvent) => {
+      const it = itemsRef.current[a.id];
+      if (it) update(a.id, { data: { ...it.data, bend: at(ev) || undefined } }, false);
+    };
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      const it = itemsRef.current[a.id];
+      if (it) update(a.id, { data: { ...it.data, bend: at(ev) || undefined } });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
+  /**
+   * Capture du tableau entier, bien cadrée, en haute définition (PNG) : toutes les cartes,
+   * sans les barres d'outils, à la plus grande résolution que le navigateur accepte.
+   */
+  const capture = async () => {
+    const world = worldRef.current;
+    const tops = Object.values(itemsRef.current).filter((i) => i.kind !== "arrow" && !i.parentId);
+    const boxes = tops.map((i) => boxOf(i.id)).filter((b): b is Box => Boolean(b));
+    if (!world || !boxes.length) return;
+    setCapturing(true);
+    setSelected(null);
+    setGroup([]);
+    setEditing(null);
+    setMenu(null);
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    try {
+      const pad = 48;
+      const x0 = Math.min(...boxes.map((b) => b.x)) - pad;
+      const y0 = Math.min(...boxes.map((b) => b.y)) - pad;
+      const w = Math.ceil(Math.max(...boxes.map((b) => b.x + b.w)) + pad - x0);
+      const h = Math.ceil(Math.max(...boxes.map((b) => b.y + b.h)) + pad - y0);
+      // Le plus de détails possible, sans dépasser la taille d'image que gèrent les navigateurs (~16 millions de pixels).
+      const ratio = Math.max(1, Math.min(4, Math.sqrt(16_000_000 / (w * h))));
+      const { toBlob } = await import("html-to-image");
+      const bg = getComputedStyle(rootRef.current!).backgroundColor;
+      const blob = await toBlob(world, {
+        width: w,
+        height: h,
+        pixelRatio: ratio,
+        backgroundColor: bg,
+        style: { transform: `translate(${-x0}px, ${-y0}px)`, transformOrigin: "0 0" },
+        filter: (n) => !(n instanceof HTMLElement && n.dataset.ui !== undefined),
+        imagePlaceholder: "data:image/gif;base64,R0lGODlhAQABAIAAAMLCwgAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==",
+      });
+      if (!blob) throw new Error("Image vide");
+      const name = (document.title.split(/\s[—|-]\s/)[0] || "Tableau").replace(/[\\/:*?"<>|]+/g, " ").trim();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${name} - capture.png`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    } catch (e) {
+      alert(`Capture impossible : ${e instanceof Error ? e.message : e}`);
+    } finally {
+      setCapturing(false);
+    }
+  };
+
   const menuEntries = (): MenuEntry[] => {
     if (!menu) return [];
     const ids = menuIds();
@@ -2294,6 +2434,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         { sep: true },
         { label: "Tout sélectionner", hint: "⌘A", run: close(() => setGroup(Object.values(itemsRef.current).filter((i) => i.kind !== "arrow" && !i.parentId && canEdit(i)).map((i) => i.id))) },
         { label: "Tout voir", run: close(() => fit()) },
+        { label: "Capture du tableau (PNG)", run: close(() => void capture()) },
         { sep: true },
         { label: "Annuler", hint: "⌘Z", run: close(undo) },
         { label: "Rétablir", hint: "⇧⌘Z", run: close(redo) },
@@ -2304,6 +2445,8 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       { label: "Ouvrir le lien", hidden: !(one?.kind === "link" && one.data.url), run: close(() => window.open(one!.data.url, "_blank", "noopener")) },
       { label: "Voir l'image en grand", hidden: !(one?.kind === "image" && one.src), run: close(() => window.open(one!.src!, "_blank", "noopener")) },
       { label: "Modifier", hidden: !one || one.kind === "arrow" || !canEdit(one), run: close(() => one && startEdit(one)) },
+      { label: "Rogner l'image", hidden: !(one?.kind === "image" && one.src && canEdit(one)), run: close(() => one && setCropping(one.id)) },
+      { label: "Redresser la flèche", hidden: !(one?.kind === "arrow" && one.data.bend && canEdit(one)), run: close(() => one && update(one.id, { data: { ...one.data, bend: undefined } })) },
       { sep: true },
       { label: "Copier", hint: "⌘C", run: close(() => void copySelection()) },
       {
@@ -2449,7 +2592,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       data-tick={tick}
     >
       {/* Le tableau : coordonnées libres, déplacé et zoomé d'un bloc */}
-      <div className="absolute left-0 top-0 origin-top-left" style={{ transform: `translate(${v.x}px, ${v.y}px) scale(${v.k})` }}>
+      <div ref={worldRef} className="absolute left-0 top-0 origin-top-left" style={{ transform: `translate(${v.x}px, ${v.y}px) scale(${v.k})` }}>
         <svg className="absolute left-0 top-0 overflow-visible pointer-events-none text-muted" width="1" height="1" style={{ zIndex: 0 }}>
           <defs>
             <marker id="board-arrow" viewBox="0 0 10 10" markerWidth="9" markerHeight="9" refX="8" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
@@ -2491,11 +2634,44 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           onEdit={sel.kind !== "arrow" ? () => startEdit(sel) : undefined}
           onOpen={sel.kind === "board" ? () => openBoard(sel) : undefined}
           onIcon={sel.kind === "board" && role === "admin" ? (icon) => update(sel.id, { data: { ...sel.data, icon } }) : undefined}
+          onFontSize={sel.kind !== "arrow" && sel.kind !== "image" ? (size) => applyFontSize([sel.id], size) : undefined}
+          onCrop={sel.kind === "image" && sel.src ? () => setCropping(sel.id) : undefined}
           onDelete={() => remove(sel.id)}
         />
       )}
 
       {menu && <ContextMenu left={menu.left} top={menu.top} entries={menuEntries()} onClose={() => setMenu(null)} />}
+
+      {/* Poignée de courbure de la flèche sélectionnée */}
+      {sel?.kind === "arrow" && selEditable && !arrowMode && geomArrow(sel.id) && (
+        <button
+          data-ui
+          aria-label="Courber la flèche"
+          title="Glisser pour courber · double-clic pour redresser"
+          onPointerDown={(e) => startBend(e, geomArrow(sel.id)!)}
+          onDoubleClick={() => update(sel.id, { data: { ...sel.data, bend: undefined } })}
+          className="absolute z-[200000] w-4 h-4 -ml-2 -mt-2 rounded-full bg-bg border-2 border-emerald-500 shadow cursor-grab touch-none"
+          style={{ left: geomArrow(sel.id)!.mx * v.k + v.x, top: geomArrow(sel.id)!.my * v.k + v.y }}
+        />
+      )}
+
+      {cropping && items[cropping]?.src && (
+        <CropEditor
+          item={items[cropping]}
+          onCancel={() => setCropping(null)}
+          onDone={(crop) => {
+            const it = itemsRef.current[cropping];
+            if (it) update(cropping, { data: { ...it.data, crop } });
+            setCropping(null);
+          }}
+        />
+      )}
+
+      {capturing && (
+        <div data-ui className="absolute inset-0 z-[300002] flex items-center justify-center bg-black/30 pointer-events-none">
+          <p className="bg-bg text-sm px-4 py-2.5 rounded-full shadow-lg">Capture en cours…</p>
+        </div>
+      )}
 
       {/* Cadre de sélection (souris) */}
       {marquee && (
@@ -2654,6 +2830,15 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           <button className="w-10 h-10 flex items-center justify-center hover:text-ink border-line sm:border-l border-b sm:border-b-0" onClick={fit} aria-label="Tout voir" title="Tout voir">
             <FitIcon className="w-4 h-4" />
           </button>
+          <button
+            className="w-10 h-10 flex items-center justify-center hover:text-ink border-line sm:border-l border-b sm:border-b-0 disabled:opacity-40"
+            onClick={() => void capture()}
+            disabled={capturing}
+            aria-label="Capture du tableau"
+            title="Capture du tableau (image PNG en haute définition)"
+          >
+            <CameraIcon className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -2712,6 +2897,148 @@ function NoteText({ text }: { text: string }) {
           <Linkified text={rest.join("\n")} />
         </p>
       )}
+    </div>
+  );
+}
+
+function CropIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M6 2.5V17a1 1 0 0 0 1 1h14.5M2.5 6H17a1 1 0 0 1 1 1v14.5" />
+    </svg>
+  );
+}
+
+type Crop = { x: number; y: number; w: number; h: number };
+const CROP_RATIOS = [
+  ["Libre", 0],
+  ["1:1", 1],
+  ["4:5", 4 / 5],
+  ["3:2", 3 / 2],
+  ["16:9", 16 / 9],
+  ["9:16", 9 / 16],
+] as const;
+
+/**
+ * Recadrage d'une image du tableau : on déplace et redimensionne le cadre (coins), formats photo au choix.
+ * Rien n'est découpé dans le fichier : la carte n'affiche que la zone choisie, modifiable à tout moment.
+ */
+function CropEditor({ item, onCancel, onDone }: { item: BoardItem; onCancel: () => void; onDone: (crop: Crop | undefined) => void }) {
+  const W = item.data.width ?? 4;
+  const H = item.data.height ?? 3;
+  const [crop, setCrop] = useState<Crop>(item.data.crop ?? { x: 0, y: 0, w: 1, h: 1 });
+  const [ratio, setRatio] = useState(0);
+  const box = useRef<HTMLDivElement>(null);
+
+  /** Plus grand cadre au format voulu, centré sur le cadre actuel. */
+  const applyRatio = (r: number) => {
+    setRatio(r);
+    if (!r) return;
+    let w = 1;
+    let h = (W * w) / (H * r);
+    if (h > 1) {
+      h = 1;
+      w = (H * h * r) / W;
+    }
+    const cx = crop.x + crop.w / 2;
+    const cy = crop.y + crop.h / 2;
+    setCrop({ x: clamp(cx - w / 2, 0, 1 - w), y: clamp(cy - h / 2, 0, 1 - h), w, h });
+  };
+
+  const drag = (e: React.PointerEvent, mode: "move" | "nw" | "ne" | "sw" | "se") => {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = box.current!.getBoundingClientRect();
+    const start = { px: e.clientX, py: e.clientY, ...crop };
+    const min = 0.04;
+    const move = (ev: PointerEvent) => {
+      const dx = (ev.clientX - start.px) / rect.width;
+      const dy = (ev.clientY - start.py) / rect.height;
+      if (mode === "move") {
+        setCrop({ ...crop, x: clamp(start.x + dx, 0, 1 - start.w), y: clamp(start.y + dy, 0, 1 - start.h), w: start.w, h: start.h });
+        return;
+      }
+      const left = mode === "nw" || mode === "sw";
+      const topSide = mode === "nw" || mode === "ne";
+      let x0 = start.x;
+      let y0 = start.y;
+      let x1 = start.x + start.w;
+      let y1 = start.y + start.h;
+      if (left) x0 = clamp(x0 + dx, 0, x1 - min);
+      else x1 = clamp(x1 + dx, x0 + min, 1);
+      if (topSide) y0 = clamp(y0 + dy, 0, y1 - min);
+      else y1 = clamp(y1 + dy, y0 + min, 1);
+      if (ratio) {
+        // Format imposé : la hauteur suit la largeur (et reste dans l'image).
+        let w = x1 - x0;
+        let h = (W * w) / (H * ratio);
+        const maxH = topSide ? y1 : 1 - y0;
+        if (h > maxH) {
+          h = maxH;
+          w = (H * h * ratio) / W;
+          if (left) x0 = x1 - w;
+          else x1 = x0 + w;
+        }
+        if (topSide) y0 = y1 - h;
+        else y1 = y0 + h;
+      }
+      setCrop({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 });
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
+  const pct = (n: number) => `${n * 100}%`;
+  const corner = "absolute w-4 h-4 bg-white border border-black/40 rounded-full -ml-2 -mt-2 touch-none";
+  return (
+    <div
+      data-ui
+      className="absolute inset-0 z-[300000] flex flex-col items-center justify-center gap-4 bg-black/80 p-4"
+      onPointerDown={(e) => e.stopPropagation()}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <div ref={box} className="relative select-none touch-none" style={{ aspectRatio: `${W} / ${H}`, width: `min(88vw, calc(70vh * ${W / H}))` }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={item.src!} alt="" draggable={false} className="absolute inset-0 w-full h-full pointer-events-none" />
+        {/* Hors du cadre : assombri */}
+        <div
+          className="absolute border border-white cursor-move"
+          style={{ left: pct(crop.x), top: pct(crop.y), width: pct(crop.w), height: pct(crop.h), boxShadow: "0 0 0 9999px rgba(0,0,0,0.55)" }}
+          onPointerDown={(e) => drag(e, "move")}
+        >
+          <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: "linear-gradient(to right, transparent 33.2%, rgba(255,255,255,.35) 33.3%, transparent 33.5%, transparent 66.5%, rgba(255,255,255,.35) 66.6%, transparent 66.8%), linear-gradient(to bottom, transparent 33.2%, rgba(255,255,255,.35) 33.3%, transparent 33.5%, transparent 66.5%, rgba(255,255,255,.35) 66.6%, transparent 66.8%)" }} />
+          <span className={`${corner} cursor-nwse-resize`} style={{ left: 0, top: 0 }} onPointerDown={(e) => drag(e, "nw")} />
+          <span className={`${corner} cursor-nesw-resize`} style={{ left: "100%", top: 0 }} onPointerDown={(e) => drag(e, "ne")} />
+          <span className={`${corner} cursor-nesw-resize`} style={{ left: 0, top: "100%" }} onPointerDown={(e) => drag(e, "sw")} />
+          <span className={`${corner} cursor-nwse-resize`} style={{ left: "100%", top: "100%" }} onPointerDown={(e) => drag(e, "se")} />
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
+        {CROP_RATIOS.map(([label, r]) => (
+          <button
+            key={label}
+            onClick={() => applyRatio(r)}
+            className={`h-8 px-3 rounded-full text-[12px] ${ratio === r ? "bg-white text-black" : "bg-white/10 text-white hover:bg-white/20"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center gap-2">
+        <button onClick={onCancel} className="h-10 px-5 rounded-full bg-white/10 text-white text-[13px] hover:bg-white/20">
+          Annuler
+        </button>
+        <button onClick={() => onDone(undefined)} className="h-10 px-5 rounded-full bg-white/10 text-white text-[13px] hover:bg-white/20">
+          Image entière
+        </button>
+        <button onClick={() => onDone(crop.w > 0.999 && crop.h > 0.999 ? undefined : crop)} className="h-10 px-6 rounded-full bg-emerald-500 text-white text-[13px] font-medium">
+          Rogner
+        </button>
+      </div>
     </div>
   );
 }
@@ -2791,6 +3118,8 @@ function SelectionBar({
   onEdit,
   onOpen,
   onIcon,
+  onFontSize,
+  onCrop,
   onDelete,
 }: {
   pos: { left: number; top: number };
@@ -2801,10 +3130,13 @@ function SelectionBar({
   onOpen?: () => void;
   /** Planche (studio seulement) : choisir son pictogramme ; `undefined` = aperçu des images. */
   onIcon?: (icon: string | undefined) => void;
+  onFontSize?: (size: number) => void;
+  onCrop?: () => void;
   onDelete: () => void;
 }) {
   const [palette, setPalette] = useState(false);
   const [icons, setIcons] = useState(false);
+  const [sizes, setSizes] = useState(false);
   return (
     <div
       data-ui
@@ -2813,7 +3145,7 @@ function SelectionBar({
       // La palette est plus large que la barre : on la garde entière à l'écran.
       style={{
         left: Math.min(Math.max(pos.left, palette ? 330 : 130), (typeof window !== "undefined" ? window.innerWidth : 1200) - (palette ? 330 : 130)),
-        top: Math.max(8, palette ? pos.top - 84 : icons ? pos.top - 52 : pos.top),
+        top: Math.max(8, palette ? pos.top - 84 : icons || sizes ? pos.top - 52 : pos.top),
       }}
     >
       {icons && onIcon && (
@@ -2839,12 +3171,27 @@ function SelectionBar({
         </div>
       )}
       {palette && onColor && <Palette current={item.data} onColor={onColor} onInk={item.kind !== "color" ? onInk : undefined} />}
+      {sizes && onFontSize && (
+        <div className="flex items-center gap-1 bg-bg border border-line shadow-lg rounded-full px-1.5 h-10">
+          {FONT_SIZES.map(([label, size]) => (
+            <button
+              key={label}
+              onClick={() => onFontSize(size)}
+              className={`h-7 px-2.5 rounded-full hover:bg-bg-soft ${(item.data.fontSize ?? 1) === size ? "bg-bg-soft text-ink ring-2 ring-emerald-500" : "text-muted"}`}
+              style={{ fontSize: Math.round(9 + size * 3.5) }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="flex items-center gap-1 bg-bg border border-line shadow-lg rounded-full px-2 h-10">
         {onColor && (
           <button
             onClick={() => {
               setPalette((o) => !o);
               setIcons(false);
+              setSizes(false);
             }}
             className="h-8 pl-1.5 pr-3 rounded-full flex items-center gap-2 text-[11px] text-muted hover:text-ink"
             title="Couleur"
@@ -2854,11 +3201,32 @@ function SelectionBar({
           </button>
         )}
         {onColor && <span className="w-px h-5 bg-line mx-1" />}
+        {onFontSize && (
+          <button
+            onClick={() => {
+              setSizes((o) => !o);
+              setPalette(false);
+              setIcons(false);
+            }}
+            className={`w-8 h-8 flex items-center justify-center hover:text-ink font-serif ${sizes ? "text-ink" : "text-muted"}`}
+            aria-label="Taille du texte"
+            title="Taille du texte"
+          >
+            <span className="text-[11px]">A</span>
+            <span className="text-[15px] -ml-px">A</span>
+          </button>
+        )}
+        {onCrop && (
+          <button onClick={onCrop} className="w-8 h-8 flex items-center justify-center text-muted hover:text-ink" aria-label="Rogner" title="Rogner l'image">
+            <CropIcon className="w-4 h-4" />
+          </button>
+        )}
         {onIcon && (
           <button
             onClick={() => {
               setIcons((o) => !o);
               setPalette(false);
+              setSizes(false);
             }}
             className="w-8 h-8 flex items-center justify-center text-muted hover:text-ink"
             aria-label="Pictogramme"

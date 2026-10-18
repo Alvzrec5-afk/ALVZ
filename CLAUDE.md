@@ -127,6 +127,15 @@ Carte `table` (bouton « Tableau », = Tableau de Milanote) : `data.cells` (lign
 Tab / Entrée pour avancer, boutons + / − Ligne / Colonne ; tableaux Markdown « | a | b | » de l'import Milanote.
 Le bouton des sous-tableaux s'appelle « Planche » (comme Milanote). Pictogramme d'une planche (`data.icon`, `BOARD_ICONS`) : toujours affiché, même si elle contient des images (sinon aperçu des images) ; choisi seulement par le studio (bouton Pictogramme de la barre de la carte ; `applyBoardOps` garde l'ancien pour un client). Le canevas annule tout défilement natif
 (`onScroll`) : sinon le focus d'un champ décale la vue.
+Clic droit (aussi deux doigts au trackpad, Ctrl + clic sur Mac, `isContextClick`) : `ContextMenu` — sur une carte :
+Ouvrir / Ouvrir le lien / Voir l'image / Modifier / Rogner / Redresser la flèche, Copier, Couper, Coller, Dupliquer
+(Cmd + D, `serializeSelection` sans toucher au presse-papiers), premier / arrière-plan (`restack`), Supprimer ; sur le
+fond : Coller ici (`pasteCards(raw, at)`), nouvelle note / liste ici, tout sélectionner, tout voir, capture, annuler.
+Taille du texte : `data.fontSize` (multiplie 13 px, `FONT_SIZES`, bouton « AA » de la barre). Image rognée :
+`data.crop` (fractions, non destructif, `CropEditor` avec formats 1:1, 4:5…). Flèche courbe : `data.bend`
+(décalage perpendiculaire, poignée verte au milieu, double-clic = droite ; courbe quadratique dans `geom.arrows`).
+Capture : bouton appareil photo en bas à droite → `capture()` avec `html-to-image` (cadrage sur toutes les cartes,
+jusqu'à ~16 Mpx, sans barres d'outils). Au doigt, glisser sur une case de grille / case à cocher fait défiler.
 Liste des tableaux (`boards-list.tsx`) : grille ou liste à petites vignettes (choix mémorisé, `boards-view`) ;
 vignette = couverture choisie (`boards.cover_key`, envoi via `/api/admin/boards/[id]/cover`, `setBoardCover`) sinon
 le nom du projet en grand. Menu ⋯ (`board-card-menu.tsx`) Renommer / Dupliquer / Choisir ou retirer la couverture / Supprimer ; « Dupliquer le tableau »

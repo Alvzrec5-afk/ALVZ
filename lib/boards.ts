@@ -199,8 +199,22 @@ function cleanData(kind: BoardKind, raw: BoardData): BoardData {
     hex: isHex(d.hex) ? d.hex.toLowerCase() : undefined,
     ink: d.ink === "dark" || d.ink === "light" ? d.ink : undefined,
   };
-  const withTint = (data: BoardData): BoardData => ({ ...data, ...(kind === "color" || kind === "arrow" ? {} : tint) });
+  const fs = Number(d.fontSize);
+  const fontSize = kind !== "image" && kind !== "arrow" && fs >= 0.6 && fs <= 4 && fs !== 1 ? Math.round(fs * 100) / 100 : undefined;
+  const withTint = (data: BoardData): BoardData => ({ ...data, ...(kind === "color" || kind === "arrow" ? {} : tint), ...(fontSize ? { fontSize } : {}) });
   return withTint(cleanKind(kind, d));
+}
+
+/** Zone de recadrage valide (dans l'image, au moins 2 % de côté), sinon aucune. */
+function cleanCrop(c: BoardData["crop"]): BoardData["crop"] {
+  if (!c || typeof c !== "object" || ![c.x, c.y, c.w, c.h].every((n) => Number.isFinite(Number(n)))) return undefined;
+  const x = num(c.x, 0, 0.98);
+  const y = num(c.y, 0, 0.98);
+  const w = num(c.w, 0.02, 1 - x);
+  const h = num(c.h, 0.02, 1 - y);
+  if (x === 0 && y === 0 && w >= 0.999 && h >= 0.999) return undefined;
+  const r = (n: number) => Math.round(n * 10000) / 10000;
+  return { x: r(x), y: r(y), w: r(w), h: r(h) };
 }
 
 /** Champs propres à chaque type (la couleur de fond est ajoutée par `cleanData`). */
@@ -213,6 +227,7 @@ function cleanKind(kind: BoardKind, d: BoardData): BoardData {
         caption: text(d.caption, 300) ?? "",
         width: Math.round(num(d.width, 1, 10000, 4)),
         height: Math.round(num(d.height, 1, 10000, 3)),
+        crop: cleanCrop(d.crop),
       };
     case "todo":
       return {
@@ -230,7 +245,11 @@ function cleanKind(kind: BoardKind, d: BoardData): BoardData {
     case "column":
       return { title: text(d.title, 200) ?? "", color: d.color && d.color in NOTE_COLORS ? d.color : "blanc", hex: isHex(d.hex) ? d.hex.toLowerCase() : undefined };
     case "arrow":
-      return { from: isUuid(d.from) ? d.from : undefined, to: isUuid(d.to) ? d.to : undefined };
+      return {
+        from: isUuid(d.from) ? d.from : undefined,
+        to: isUuid(d.to) ? d.to : undefined,
+        bend: Math.abs(Number(d.bend)) >= 1 ? Math.round(num(d.bend, -5000, 5000)) : undefined,
+      };
     case "color":
       return { hex: isHex(d.hex) ? d.hex.toLowerCase() : "#c8a27a", title: text(d.title, 100) ?? "" };
     case "link": {
