@@ -7,6 +7,8 @@ import {
   MAX_WIDTH,
   MIN_WIDTH,
   NOTE_COLORS,
+  SOLID_COLORS,
+  inkOn,
   type BoardData,
   type BoardItem,
   type BoardItemInput,
@@ -75,8 +77,11 @@ const toInput = (it: BoardItem): BoardItemInput => ({
   data: it.data,
 });
 
-const noteBg = (color: NoteColor | undefined) =>
-  !color || color === "blanc" ? "var(--bg)" : `color-mix(in srgb, ${NOTE_COLORS[color]} 30%, var(--bg))`;
+const noteBg = (color: NoteColor | undefined, hex?: string) =>
+  hex ? hex : !color || color === "blanc" ? "var(--bg)" : `color-mix(in srgb, ${NOTE_COLORS[color]} 30%, var(--bg))`;
+
+/** Choix d'une couleur : teinte douce (`color`) ou couleur pleine / libre (`hex`). */
+type ColorChoice = { color: NoteColor; hex?: undefined } | { color?: undefined; hex: string };
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
@@ -209,6 +214,9 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
   );
   const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
+  const [groupPalette, setGroupPalette] = useState(false);
+  const [toolGhost, setToolGhost] = useState<{ label: string; Icon: typeof NoteIcon; x: number; y: number } | null>(null);
+  const suppressToolClick = useRef(false);
   const [editing, setEditing] = useState<Editing>(null);
   const [arrowMode, setArrowMode] = useState<{ from: string | null } | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -330,6 +338,21 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     setSelected(null);
   }, [boxOf, canEdit, role, setGroup, setItems, setSelected, sync]);
 
+  /** Couleur appliquée à une carte ou à toute la sélection (notes et colonnes). */
+  const applyColor = useCallback(
+    (ids: string[], c: ColorChoice) => {
+      for (const id of ids) {
+        const it = itemsRef.current[id];
+        if (!it || it.kind === "arrow" || !canEdit(it)) continue;
+        // Carte « couleur » : la palette change la teinte affichée ; les autres : le fond de la carte.
+        if (it.kind === "color") {
+          if (c.hex) update(id, { data: { ...it.data, hex: c.hex } });
+        } else update(id, { data: { ...it.data, color: c.color ?? it.data.color ?? "blanc", hex: c.hex } });
+      }
+    },
+    [canEdit, update],
+  );
+
   /** Entrer dans un sous-tableau (les modifications en attente partent avant). */
   const openBoard = useCallback(
     (it: BoardItem) => {
@@ -385,33 +408,36 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     [persist, role, setItems, setSelected],
   );
 
-  const addNote = (at?: { x: number; y: number }) =>
+  type At = { x: number; y: number };
+  type Extra = Partial<BoardItem>;
+  const addNote = (at?: At, extra?: Extra) =>
     ensureName(() => {
-      const it = create("note", { text: "", color: "blanc" }, at);
+      const it = create("note", { text: "", color: "blanc" }, at, extra);
       setEditing({ id: it.id });
     });
-  const addTodo = () =>
+  const addTodo = (at?: At, extra?: Extra) =>
     ensureName(() => {
-      const it = create("todo", { title: "", items: [{ id: crypto.randomUUID(), text: "", done: false }] });
+      const it = create("todo", { title: "", items: [{ id: crypto.randomUUID(), text: "", done: false }] }, at, extra);
       setEditing({ id: it.id, field: "title" });
     });
-  const addLink = (url = "") =>
+  const addLink = (url = "", at?: At, extra?: Extra) =>
     ensureName(() => {
-      const it = create("link", { url, title: "" });
+      const it = create("link", { url, title: "" }, at, extra);
       if (!url) setEditing({ id: it.id });
     });
-  const addColor = () => {
-    const it = create("color", { hex: "#c8a27a", title: "" });
+  const addColor = (at?: At, extra?: Extra) => {
+    const it = create("color", { hex: "#c8a27a", title: "" }, at, extra);
     setEditing({ id: it.id, field: "title" });
   };
-  const addBoard = () => {
-    const it = create("board", { title: "", boardId: crypto.randomUUID() }, undefined, { sub: { title: "", count: 0, covers: [] } });
+  const addBoard = (at?: At, extra?: Extra) => {
+    const it = create("board", { title: "", boardId: crypto.randomUUID() }, at, { sub: { title: "", count: 0, covers: [] }, ...extra });
     setEditing({ id: it.id, field: "title" });
   };
-  const addColumn = () => {
-    const it = create("column", { title: "", color: "blanc" });
+  const addColumn = (at?: At) => {
+    const it = create("column", { title: "", color: "blanc" }, at);
     setEditing({ id: it.id, field: "title" });
   };
+  const imageDrop = useRef<{ at: At; extra?: Extra } | null>(null);
 
   /**
    * Prépare et envoie des images, une par une. `place` décide où va chaque image (ex. dans une colonne,
@@ -1128,7 +1154,14 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         data-child-of={inColumn ? it.parentId ?? undefined : undefined}
         style={{
           ...style,
-          background: it.kind === "column" ? "color-mix(in srgb, var(--ink) 4%, var(--bg-soft))" : it.kind === "note" ? noteBg(it.data.color) : "var(--bg)",
+          background:
+            it.kind === "column"
+              ? it.data.hex ??
+                (it.data.color && it.data.color !== "blanc" ? noteBg(it.data.color) : "color-mix(in srgb, var(--ink) 4%, var(--bg-soft))")
+              : it.kind === "color"
+                ? "var(--bg)"
+                : noteBg(it.data.color, it.data.hex),
+          color: it.kind !== "color" && it.data.hex ? inkOn(it.data.hex) : undefined,
           outline: isSel || firstPick || inGroup ? "2px solid #10b981" : undefined,
           outlineOffset: 1,
         }}
@@ -1361,10 +1394,13 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
             <span className="text-xs text-muted">Écouter sur la carte</span>
           </button>
         )}
-        <a data-nodrag href={url} target="_blank" rel="noreferrer noopener" className="block px-3.5 py-2.5 hover:opacity-80">
-          <span className="block text-[10px] uppercase tracking-widest text-muted">{e?.label ?? "Lien"}</span>
-          <span className="block text-xs truncate underline underline-offset-2">{it.data.title || url.replace(/^https?:\/\/(www\.)?/, "")}</span>
-        </a>
+        {/* Seul le texte du lien l'ouvre : le reste de la carte sert à la saisir et la déplacer. */}
+        <div className="px-3.5 py-2.5">
+          <span className="block text-[10px] uppercase tracking-widest opacity-60">{e?.label ?? "Lien"}</span>
+          <a data-nodrag href={url} target="_blank" rel="noreferrer noopener" className="inline-block max-w-full align-top text-xs truncate underline underline-offset-2 hover:opacity-80">
+            {it.data.title || url.replace(/^https?:\/\/(www\.)?/, "")}
+          </a>
+        </div>
       </div>
     );
   }
@@ -1465,18 +1501,89 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
 
   const sel = selected ? items[selected] : null;
   const selEditable = sel ? canEdit(sel) : false;
-  const tools: { label: string; Icon: typeof NoteIcon; run: () => void; admin?: boolean; active?: boolean; desktop?: boolean }[] = [
-    { label: "Note", Icon: NoteIcon, run: () => addNote() },
-    { label: "Lien", Icon: LinkIcon, run: () => addLink() },
-    { label: "Image", Icon: ImageIcon, run: () => ensureName(() => fileRef.current?.click()) },
-    { label: "Liste", Icon: ChecklistIcon, run: addTodo },
-    { label: "Tableau", Icon: BoardIcon, run: addBoard, admin: true },
-    { label: "Colonne", Icon: ColumnIcon, run: addColumn, admin: true },
-    { label: "Couleur", Icon: PaletteIcon, run: addColor, admin: true },
+  type Tool = {
+    label: string;
+    Icon: typeof NoteIcon;
+    run: () => void;
+    /** Outil glissé puis lâché sur le tableau : création à cet endroit (ou dans la colonne visée). */
+    drop?: (at: At, extra?: Extra) => void;
+    admin?: boolean;
+    active?: boolean;
+    desktop?: boolean;
+  };
+  const tools: Tool[] = [
+    { label: "Note", Icon: NoteIcon, run: () => addNote(), drop: addNote },
+    { label: "Lien", Icon: LinkIcon, run: () => addLink(), drop: (at, extra) => addLink("", at, extra) },
+    {
+      label: "Image",
+      Icon: ImageIcon,
+      run: () => ensureName(() => fileRef.current?.click()),
+      drop: (at, extra) =>
+        ensureName(() => {
+          imageDrop.current = { at, extra };
+          fileRef.current?.click();
+        }),
+    },
+    { label: "Liste", Icon: ChecklistIcon, run: () => addTodo(), drop: addTodo },
+    { label: "Tableau", Icon: BoardIcon, run: () => addBoard(), drop: addBoard, admin: true },
+    { label: "Colonne", Icon: ColumnIcon, run: () => addColumn(), drop: (at) => addColumn(at), admin: true },
+    { label: "Couleur", Icon: PaletteIcon, run: () => addColor(), drop: addColor, admin: true },
     { label: "Flèche", Icon: ConnectorIcon, run: () => setArrowMode((m) => (m ? null : { from: null })), admin: true, active: Boolean(arrowMode) },
     { label: "Importer", Icon: ImportIcon, run: () => setImportOpen(true), admin: true, desktop: true },
   ];
   const visibleTools = tools.filter((t) => !t.admin || role === "admin");
+
+  /** Glisser un outil de la barre jusqu'au tableau (un simple clic marche toujours). */
+  const startToolDrag = (e: React.PointerEvent, tool: Tool) => {
+    if (!tool.drop || e.button !== 0) return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let dragging = false;
+    const move = (ev: PointerEvent) => {
+      if (!dragging) {
+        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 8) return;
+        // Au doigt sur téléphone, un geste horizontal fait défiler la barre d'outils.
+        if (ev.pointerType !== "mouse" && Math.abs(ev.clientX - startX) > Math.abs(ev.clientY - startY)) return cleanup();
+        dragging = true;
+      }
+      setToolGhost({ label: tool.label, Icon: tool.Icon, x: ev.clientX, y: ev.clientY });
+    };
+    const up = (ev: PointerEvent) => {
+      cleanup();
+      if (!dragging) return;
+      suppressToolClick.current = true;
+      setToolGhost(null);
+      const root = rootRef.current!;
+      const o = root.getBoundingClientRect();
+      const over = document.elementFromPoint(ev.clientX, ev.clientY);
+      if (ev.clientX < o.left || ev.clientX > o.right || ev.clientY < o.top || ev.clientY > o.bottom || over?.closest("[data-ui]")) return;
+      const v = viewRef.current;
+      const at = { x: Math.round((ev.clientX - o.left - v.x) / v.k), y: Math.round((ev.clientY - o.top - v.y) / v.k) };
+      // Lâché sur une colonne : la carte s'y range, à la fin (sauf colonne dans colonne).
+      const col = tool.label === "Colonne" ? null : findDrop(ev.clientX, ev.clientY, "");
+      if (col) {
+        const kids = Object.values(itemsRef.current)
+          .filter((c) => c.parentId === col.col)
+          .sort((a, b) => a.position - b.position);
+        const before = kids[col.index - 1];
+        const after = kids[col.index];
+        const position = before && after ? (before.position + after.position) / 2 : before ? before.position + 1 : after ? after.position - 1 : 0;
+        tool.drop!(at, { parentId: col.col, position, w: itemsRef.current[col.col]?.w ?? 280 });
+      } else tool.drop!(at);
+    };
+    const cleanup = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", cancel);
+    };
+    const cancel = () => {
+      cleanup();
+      setToolGhost(null);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", cancel);
+  };
   const v = view;
   const grid = 24 * v.k;
 
@@ -1531,13 +1638,14 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       {/* Barre de la carte sélectionnée */}
       {sel && selEditable && !dragId && !arrowMode && (sel.kind === "arrow" ? geomArrow(sel.id) : geom.sel) && (
         <SelectionBar
+          key={sel.id}
           pos={
             sel.kind === "arrow"
               ? { left: geomArrow(sel.id)!.mx * v.k + v.x, top: geomArrow(sel.id)!.my * v.k + v.y - 52 }
               : { left: geom.sel!.x * v.k + v.x + (geom.sel!.w * v.k) / 2, top: geom.sel!.y * v.k + v.y - 52 }
           }
           item={sel}
-          onColor={sel.kind === "note" || sel.kind === "column" ? (color) => updateData(sel.id, { color }) : undefined}
+          onColor={sel.kind !== "arrow" ? (c) => applyColor([sel.id], c) : undefined}
           onEdit={sel.kind !== "arrow" ? () => startEdit(sel) : undefined}
           onOpen={sel.kind === "board" ? () => openBoard(sel) : undefined}
           onDelete={() => remove(sel.id)}
@@ -1557,11 +1665,21 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         />
       )}
 
+      {group.length > 1 && groupPalette && !marquee && (
+        <div className="absolute z-[200001] top-16 left-1/2 -translate-x-1/2">
+          <Palette current={{}} onColor={(c) => applyColor(groupRef.current, c)} />
+        </div>
+      )}
       {/* Plusieurs cartes sélectionnées */}
       {group.length > 1 && !marquee && (
         <div data-ui className="absolute z-[200001] top-4 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-bg border border-line shadow-lg rounded-full pl-4 pr-1.5 h-10 text-xs">
           <span>{group.length} cartes sélectionnées</span>
           <span className="text-muted hidden sm:inline">· glissez l&apos;une d&apos;elles pour tout déplacer</span>
+          {group.some((id) => items[id] && items[id].kind !== "arrow") && (
+            <button onClick={() => setGroupPalette((o) => !o)} className="ml-1 h-8 px-2 rounded-full text-muted hover:text-ink" title="Couleur de la sélection">
+              Couleur
+            </button>
+          )}
           <button onClick={removeGroup} className="ml-1 w-8 h-8 flex items-center justify-center text-muted hover:text-danger" aria-label="Supprimer la sélection" title="Supprimer">
             <TrashIcon className="w-4 h-4" />
           </button>
@@ -1575,19 +1693,41 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       {canAdd && (
         <div
           data-ui
+          style={{ touchAction: "pan-x" }}
           className="absolute z-[200000] bg-bg border border-line shadow-lg flex rounded-[4px] left-3 max-w-[calc(100%-76px)] overflow-x-auto no-scrollbar bottom-[max(env(safe-area-inset-bottom),12px)] sm:left-4 sm:top-4 sm:bottom-auto sm:flex-col sm:max-w-none sm:max-h-[calc(100%-32px)] sm:overflow-x-hidden sm:overflow-y-auto"
         >
-          {visibleTools.map(({ label, Icon, run, active, desktop }) => (
+          {visibleTools.map((tool) => {
+            const { label, Icon, run, active, desktop } = tool;
+            return (
             <button
               key={label}
-              onClick={run}
-              title={desktop ? "Importer un tableau Milanote" : undefined}
+              onPointerDown={(e) => startToolDrag(e, tool)}
+              onClick={() => {
+                if (suppressToolClick.current) {
+                  suppressToolClick.current = false;
+                  return;
+                }
+                run();
+              }}
+              title={tool.drop ? `${label} : cliquez, ou glissez sur le tableau` : desktop ? "Importer un tableau Milanote" : undefined}
               className={`${desktop ? "hidden sm:flex" : "flex"} shrink-0 flex-col items-center justify-center gap-1 w-[60px] h-[58px] text-[10px] tracking-wide transition-colors ${active ? "bg-emerald-500/15 text-emerald-600" : "text-muted hover:text-ink hover:bg-bg-soft"}`}
             >
               <Icon className="w-5 h-5" />
               {label}
             </button>
-          ))}
+            );
+          })}
+        </div>
+      )}
+
+      {/* Outil en cours de glisser-déposer */}
+      {toolGhost && (
+        <div
+          className="fixed z-[300000] pointer-events-none -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-1 w-[70px] py-2.5 bg-bg border-2 border-emerald-500 shadow-2xl rounded-[4px] text-[10px] text-ink"
+          style={{ left: toolGhost.x, top: toolGhost.y }}
+        >
+          <toolGhost.Icon className="w-5 h-5" />
+          {toolGhost.label}
         </div>
       )}
       <input
@@ -1597,8 +1737,17 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         multiple
         hidden
         onChange={(e) => {
-          addImages([...(e.target.files ?? [])]);
+          const files = [...(e.target.files ?? [])];
+          const drop = imageDrop.current;
+          imageDrop.current = null;
           e.target.value = "";
+          if (!drop) addImages(files);
+          // Outil Image lâché sur le tableau : les images arrivent à cet endroit (ou dans la colonne).
+          else if (drop.extra?.parentId) {
+            const col = drop.extra.parentId;
+            const start = (drop.extra.position as number) ?? 0;
+            void uploadImages(files, undefined, (i) => ({ parentId: col, position: start + i * 0.001, w: drop.extra?.w ?? 280 }));
+          } else addImages(files, drop.at);
         }}
       />
 
@@ -1707,30 +1856,32 @@ function SelectionBar({
 }: {
   pos: { left: number; top: number };
   item: BoardItem;
-  onColor?: (c: NoteColor) => void;
+  onColor?: (c: ColorChoice) => void;
   onEdit?: () => void;
   onOpen?: () => void;
   onDelete: () => void;
 }) {
+  const [palette, setPalette] = useState(false);
   return (
     <div
       data-ui
       onPointerDown={(e) => e.stopPropagation()}
-      className="absolute z-[200001] -translate-x-1/2 flex items-center gap-1 bg-bg border border-line shadow-lg rounded-full px-2 h-10"
-      style={{ left: pos.left, top: Math.max(8, pos.top) }}
+      className="absolute z-[200001] -translate-x-1/2 flex flex-col items-center gap-1"
+      style={{ left: pos.left, top: Math.max(8, palette ? pos.top - 48 : pos.top) }}
     >
-      {onColor &&
-        (Object.keys(NOTE_COLORS) as NoteColor[]).map((c) => (
+      {palette && onColor && <Palette current={item.data} onColor={onColor} />}
+      <div className="flex items-center gap-1 bg-bg border border-line shadow-lg rounded-full px-2 h-10">
+        {onColor && (
           <button
-            key={c}
-            onClick={() => onColor(c)}
-            title={c}
-            aria-label={`Couleur ${c}`}
-            className={`w-5 h-5 rounded-full border ${(item.data.color ?? "blanc") === c ? "border-ink border-2" : "border-line"}`}
-            style={{ background: noteBg(c) }}
-          />
-        ))}
-      {onColor && <span className="w-px h-5 bg-line mx-1" />}
+            onClick={() => setPalette((o) => !o)}
+            className="h-8 pl-1.5 pr-3 rounded-full flex items-center gap-2 text-[11px] text-muted hover:text-ink"
+            title="Couleur"
+          >
+            <span className="w-5 h-5 rounded-full border border-line" style={{ background: noteBg(item.data.color, item.data.hex) }} />
+            Couleur
+          </button>
+        )}
+        {onColor && <span className="w-px h-5 bg-line mx-1" />}
       {onOpen && (
         <button onClick={onOpen} className="h-8 px-3 rounded-full bg-ink text-bg text-[11px] tracking-wider uppercase mr-1">
           Ouvrir
@@ -1744,6 +1895,48 @@ function SelectionBar({
       <button onClick={onDelete} className="w-8 h-8 flex items-center justify-center text-muted hover:text-danger" aria-label="Supprimer" title="Supprimer">
         <TrashIcon className="w-4 h-4" />
       </button>
+      </div>
+    </div>
+  );
+}
+
+/** Palette : teintes douces, couleurs pleines, et couleur libre. */
+function Palette({ current, onColor }: { current: BoardData; onColor: (c: ColorChoice) => void }) {
+  const ring = (on: boolean) => (on ? "ring-2 ring-offset-2 ring-offset-[var(--bg)] ring-emerald-500" : "");
+  return (
+    <div data-ui className="flex flex-wrap items-center justify-center gap-1.5 bg-bg border border-line shadow-lg rounded-2xl px-3 py-2 max-w-[92vw]">
+      {(Object.keys(NOTE_COLORS) as NoteColor[]).map((c) => (
+        <button
+          key={c}
+          onClick={() => onColor({ color: c })}
+          title={c}
+          aria-label={`Couleur ${c}`}
+          className={`w-6 h-6 rounded-full border border-line ${ring(!current.hex && (current.color ?? "blanc") === c)}`}
+          style={{ background: noteBg(c) }}
+        />
+      ))}
+      <span className="w-px h-5 bg-line mx-0.5" />
+      {SOLID_COLORS.map((hex) => (
+        <button
+          key={hex}
+          onClick={() => onColor({ hex })}
+          aria-label={`Couleur ${hex}`}
+          className={`w-6 h-6 rounded-full ${ring(current.hex === hex)}`}
+          style={{ background: hex }}
+        />
+      ))}
+      <label
+        title="Autre couleur"
+        className={`relative w-6 h-6 rounded-full cursor-pointer overflow-hidden border border-line ${ring(Boolean(current.hex && !(SOLID_COLORS as readonly string[]).includes(current.hex)))}`}
+        style={{ background: "conic-gradient(#e74c3c, #f1c40f, #2ecc71, #3498db, #9b59b6, #e74c3c)" }}
+      >
+        <input
+          type="color"
+          value={current.hex ?? "#d98b5f"}
+          onChange={(e) => onColor({ hex: e.target.value })}
+          className="absolute inset-0 opacity-0 cursor-pointer"
+        />
+      </label>
     </div>
   );
 }

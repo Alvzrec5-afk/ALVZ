@@ -13,6 +13,19 @@ export const NOTE_COLORS = {
 } as const;
 export type NoteColor = keyof typeof NOTE_COLORS;
 
+/** Couleurs franches (bandeaux, titres de sections) : la carte prend la couleur pleine, texte lisible automatiquement. */
+export const SOLID_COLORS = ["#d98b5f", "#b4521c", "#c0392b", "#d4a017", "#4f7a4a", "#2f6690", "#6a4c93", "#2b2b2b"] as const;
+
+/** Texte blanc sur une couleur foncée, encre sur une couleur claire. */
+export function inkOn(hex: string) {
+  const n = parseInt(hex.slice(1), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.32 ? "#1b1a19" : "#ffffff";
+}
+
 export type TodoEntry = { id: string; text: string; done: boolean };
 
 export type BoardData = {

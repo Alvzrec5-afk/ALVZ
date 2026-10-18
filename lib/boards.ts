@@ -118,9 +118,19 @@ const text = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, ma
 /** Ne garde que les champs attendus pour chaque type de carte. */
 function cleanData(kind: BoardKind, raw: BoardData): BoardData {
   const d = raw && typeof raw === "object" ? raw : {};
+  const tint = {
+    color: d.color && d.color in NOTE_COLORS ? d.color : undefined,
+    hex: isHex(d.hex) ? d.hex.toLowerCase() : undefined,
+  };
+  const withTint = (data: BoardData): BoardData => ({ ...data, ...(kind === "color" || kind === "arrow" ? {} : tint) });
+  return withTint(cleanKind(kind, d));
+}
+
+/** Champs propres à chaque type (la couleur de fond est ajoutée par `cleanData`). */
+function cleanKind(kind: BoardKind, d: BoardData): BoardData {
   switch (kind) {
     case "note":
-      return { text: text(d.text, 5000) ?? "", color: d.color && d.color in NOTE_COLORS ? d.color : "blanc" };
+      return { text: text(d.text, 5000) ?? "", color: d.color && d.color in NOTE_COLORS ? d.color : "blanc", hex: isHex(d.hex) ? d.hex.toLowerCase() : undefined };
     case "image":
       return {
         caption: text(d.caption, 300) ?? "",
@@ -136,7 +146,7 @@ function cleanData(kind: BoardKind, raw: BoardData): BoardData {
           .map((e) => ({ id: e.id.slice(0, 64), text: text(e.text, 500) ?? "", done: Boolean(e.done) })),
       };
     case "column":
-      return { title: text(d.title, 200) ?? "", color: d.color && d.color in NOTE_COLORS ? d.color : "blanc" };
+      return { title: text(d.title, 200) ?? "", color: d.color && d.color in NOTE_COLORS ? d.color : "blanc", hex: isHex(d.hex) ? d.hex.toLowerCase() : undefined };
     case "arrow":
       return { from: isUuid(d.from) ? d.from : undefined, to: isUuid(d.to) ? d.to : undefined };
     case "color":

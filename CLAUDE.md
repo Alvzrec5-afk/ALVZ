@@ -99,6 +99,10 @@ Cartes `color` (teinte + nom) et `link` (lecteur YouTube/Vimeo/Spotify/SoundClou
 seulement au clic sur ▶ ; coller un lien crée une carte lien). Sélection multiple : glisser sur le fond à la souris
 (cadre), Maj + clic, Cmd/Ctrl + A ; le tableau se déplace alors à la molette / pavé tactile, espace + glisser ou
 bouton du milieu ; au doigt, glisser déplace toujours le tableau.
+Couleurs : toute carte (sauf flèche) a un fond `data.color` (teinte douce, `NOTE_COLORS`) ou `data.hex` (couleur
+pleine `SOLID_COLORS` ou libre) ; texte blanc/encre auto (`inkOn`) ; palette dans la barre de la carte et pour une
+sélection multiple. Outils de la barre de gauche : clic = carte au centre, glisser-déposer = carte à l'endroit
+lâché (ou rangée dans la colonne visée).
 
 **Galerie client (`/g/<lien>`)** — `components/gallery/client-gallery.tsx` : couverture animée,
 en-tête collant (Contacter, ♡ sélection, menu), grilles (`justified-grid.tsx`), visionneuse
