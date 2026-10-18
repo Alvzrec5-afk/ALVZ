@@ -139,10 +139,6 @@ images des tableaux). Schéma de référence :
 
 ## En attente / idées discutées
 
-- **Migrations à appliquer au moment de publier** (pas encore faites sur Supabase) : les deux derniers blocs de
-  `supabase/schema.sql` (« Cartes tableau… » puis « Commentaires… » : `boards.client_can_edit`, contrainte
-  `board_items_kind_check` avec `table` et `comment`, table `board_comments`). Puis retirer cette ligne.
-
 - Tableaux, idées pour la suite : annuler / rétablir, commentaires sur une carte, aperçu des liens
   (Pinterest, Instagram), cocher les listes du studio côté client, temps réel au lieu du rafraîchissement.
 
