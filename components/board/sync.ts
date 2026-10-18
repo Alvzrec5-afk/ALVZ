@@ -8,6 +8,15 @@ export type SyncStatus = { state: "saved" | "saving" | "error"; message?: string
 
 const opId = (op: BoardOp) => (op.op === "put" ? op.item.id : op.id);
 
+/**
+ * La taille d'une image n'est envoyée qu'une fois, juste après l'envoi du fichier : une modification
+ * suivante de la même carte (déplacement, clic…) qui la remplace dans la file doit la garder.
+ */
+function keepSize(before: BoardOp | undefined, next: BoardOp): BoardOp {
+  if (before?.op !== "put" || next.op !== "put" || !before.item.sizeBytes || next.item.sizeBytes) return next;
+  return { ...next, item: { ...next.item, sizeBytes: before.item.sizeBytes } };
+}
+
 export class BoardSync {
   private queue = new Map<string, BoardOp>();
   private inflight = new Map<string, BoardOp>();
@@ -20,7 +29,7 @@ export class BoardSync {
   ) {}
 
   push(op: BoardOp) {
-    this.queue.set(opId(op), op);
+    this.queue.set(opId(op), keepSize(this.queue.get(opId(op)) ?? this.inflight.get(opId(op)), op));
     this.onStatus({ state: "saving" });
     this.schedule(700);
   }
@@ -67,7 +76,7 @@ export class BoardSync {
       if (this.queue.size) this.schedule(150);
       else this.onStatus({ state: "saved" });
     } catch {
-      for (const [id, op] of this.inflight) if (!this.queue.has(id)) this.queue.set(id, op);
+      for (const [id, op] of this.inflight) this.queue.set(id, this.queue.has(id) ? keepSize(op, this.queue.get(id)!) : op);
       this.inflight.clear();
       this.retries++;
       this.onStatus({ state: "error", message: "Connexion perdue — nouvel essai…" });

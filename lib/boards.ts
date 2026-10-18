@@ -17,7 +17,7 @@ import {
   type BoardOp,
   starterKit,
 } from "@/lib/board-types";
-import { copyObject, deleteKeys, presignGet } from "@/lib/storage";
+import { copyObject, deleteKeys, objectSize, presignGet } from "@/lib/storage";
 import { createServiceClient } from "@/lib/supabase/server";
 import { newSlug, sign, unsign } from "@/lib/tokens";
 import { storageUsage } from "@/lib/usage";
@@ -55,6 +55,18 @@ export async function loadBoardItems(db: SupabaseClient, boardId: string, actor:
   const { data, error } = await db.from("board_items").select(BOARD_ITEM_FIELDS).eq("board_id", boardId).is("deleted_at", null).limit(MAX_ITEMS);
   if (error) throw new Error(`Impossible de charger le tableau : ${error.message}`);
   const rows = (data ?? []) as Row[];
+  // Image envoyée mais dont la taille n'a pas été enregistrée (ancien souci d'enregistrement) :
+  // si le fichier est bien chez Oracle, la carte le retrouve au lieu d'afficher une case vide.
+  const empty = rows.filter((r) => r.kind === "image" && !(Number(r.size_bytes) > 0)).slice(0, 40);
+  await Promise.all(
+    empty.map(async (r) => {
+      const size = await objectSize(boardImageKey(boardId, r.id));
+      if (size > 0 && size <= MAX_BOARD_IMAGE_BYTES) {
+        r.size_bytes = size;
+        await createServiceClient().from("board_items").update({ size_bytes: size }).eq("id", r.id).eq("size_bytes", 0);
+      }
+    }),
+  );
   const [subs, comments] = await Promise.all([
     subBoardPreviews(db, boardId),
     rows.some((r) => r.kind === "comment") ? loadComments(db, boardId, actor) : new Map<string, BoardComment[]>(),

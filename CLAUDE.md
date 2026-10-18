@@ -80,7 +80,9 @@ Vidéos, Coordonnées, Outils → Clients & e-mails, Déconnexion) ; sur mobile 
 `components/board/board-canvas.tsx` : grande surface (déplacer, zoom molette/pincement, double-clic = note),
 cartes note (6 couleurs, liens cliquables), image (envoi direct Oracle, 1600 px, `boards/<tableau>/<carte>.jpg`),
 liste à cocher, colonne (glisser une carte dedans), flèche (outil Flèche : carte de départ puis d'arrivée).
-Enregistrement automatique groupé (`components/board/sync.ts`), rafraîchissement toutes les 30 s seulement si la
+Enregistrement automatique groupé (`components/board/sync.ts`, une op par carte ; `keepSize` garde la taille d'image
+quand une modif suivante remplace l'op — sinon l'image « disparaissait » ; `loadBoardItems` répare les images à 0 octet
+dont le fichier existe chez Oracle, `objectSize`), rafraîchissement toutes les 30 s seulement si la
 page est visible et utilisée (crédits Netlify). Plus de choix de modèle : tout nouveau tableau (et le « Tableau de
 préparation » d'une galerie) est une **copie du « Modèle des nouveaux tableaux »** (`boards.is_template`,
 `templateBoardId` dans `lib/boards.ts`, page `/admin/boards/model`, encadré sur la liste des tableaux) : le

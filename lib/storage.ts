@@ -7,6 +7,7 @@ import {
   DeleteObjectCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   ListPartsCommand,
   PutObjectCommand,
   S3Client,
@@ -107,6 +108,16 @@ export function presignGet(key: string, opts: { downloadName?: string } = {}) {
 /** Petit fichier déjà vérifié par le serveur (ex. image ajoutée par un client sur un tableau). */
 export async function putObject(key: string, body: Uint8Array, contentType: string) {
   await s3().send(new PutObjectCommand({ Bucket: bucket(), Key: key, Body: body, ContentType: contentType }));
+}
+
+/** Taille d'un fichier (0 s'il n'existe pas). */
+export async function objectSize(key: string) {
+  try {
+    const head = await s3().send(new HeadObjectCommand({ Bucket: bucket(), Key: key }));
+    return Number(head.ContentLength ?? 0);
+  } catch {
+    return 0;
+  }
 }
 
 /** Copie un fichier dans le même bucket, sans le faire transiter par le serveur (duplication d'un tableau). */
