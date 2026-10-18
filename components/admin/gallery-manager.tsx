@@ -86,21 +86,33 @@ export function GalleryManager(raw: Props) {
     if (d.kind === "photo" && d.photo_id) acc[d.photo_id] = (acc[d.photo_id] ?? 0) + 1;
     return acc;
   }, {});
-  // Qui a téléchargé chaque photo (seule ou dans un ZIP) : visiteurs qui ont donné leur e-mail.
-  const downloadEmails: Record<string, string[]> = {};
-  for (const d of props.downloads) {
-    if (!d.email) continue;
-    const ids =
-      d.kind === "photo"
-        ? d.photo_id
-          ? [d.photo_id]
-          : []
-        : props.photos.filter((p) => !d.collection_id || p.collectionId === d.collection_id).map((p) => p.id);
-    for (const id of ids) {
-      const list = (downloadEmails[id] ??= []);
-      if (!list.includes(d.email)) list.push(d.email);
+  // Téléchargements regroupés par personne (colonne de gauche) : photos prises seules ou dans un ZIP.
+  const downloaders = (() => {
+    const map = new Map<string, { key: string; label: string; ids: Set<string>; singles: number; zips: number; last: string }>();
+    for (const d of props.downloads) {
+      const key = d.email ?? "";
+      const p = map.get(key) ?? { key, label: d.email ?? "Visiteurs non identifiés", ids: new Set<string>(), singles: 0, zips: 0, last: d.created_at };
+      if (d.kind === "photo") {
+        p.singles++;
+        if (d.photo_id) p.ids.add(d.photo_id);
+      } else {
+        p.zips++;
+        props.photos.filter((ph) => !d.collection_id || ph.collectionId === d.collection_id).forEach((ph) => p.ids.add(ph.id));
+      }
+      if (d.created_at > p.last) p.last = d.created_at;
+      map.set(key, p);
     }
-  }
+    // Personnes identifiées d'abord (la plus récente en haut), puis les visiteurs anonymes.
+    return [...map.values()].sort((a, b) => Number(a.key === "") - Number(b.key === "") || b.last.localeCompare(a.last));
+  })();
+  const favoritePeople = props.favoriteLists
+    .filter((l) => l.photoIds.length > 0)
+    .map((l) => ({ key: l.email, label: l.email, ids: new Set(l.photoIds), zips: 0 }));
+  // Personne choisie dans la colonne de gauche (« dl:e-mail » ou « fav:e-mail ») : ses photos s'affichent à droite.
+  const [downloader, setDownloader] = useState<string | null>(null);
+  const shownDownloader =
+    [...downloaders.map((p) => ({ ...p, key: `dl:${p.key}`, label: `${p.label} · téléchargées` })),
+     ...favoritePeople.map((p) => ({ ...p, key: `fav:${p.key}`, label: `${p.label} · favoris` }))].find((p) => p.key === downloader) ?? null;
   const [copied, setCopied] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -283,8 +295,44 @@ export function GalleryManager(raw: Props) {
             collections={props.collections}
             counts={collectionCounts}
             activeId={activeCollection}
-            onActive={setActiveCollection}
+            onActive={(id) => {
+              setActiveCollection(id);
+              setDownloader(null);
+            }}
           />
+        )}
+        {tab === "photos" && (downloaders.length > 0 || favoritePeople.length > 0) && (
+          <div className="border-t border-line mt-4 pb-6">
+            <p className="eyebrow text-muted px-6 h-14 flex items-center">Activité</p>
+            {([
+              ["Téléchargements", downloaders, "dl"],
+              ["Favoris", favoritePeople, "fav"],
+            ] as const).map(([title, people, kind]) =>
+              people.length ? (
+                <div key={kind} className="mb-3">
+                  <p className="px-6 pb-1 text-[11px] uppercase tracking-wider text-muted flex items-center gap-2">
+                    {kind === "dl" ? "↓" : <HeartIcon className="w-3 h-3" filled />} {title}
+                  </p>
+                  {people.map((p) => {
+                    const key = `${kind}:${p.key}`;
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => setDownloader((cur) => (cur === key ? null : key))}
+                        className={`w-full text-left px-6 py-2.5 transition-colors ${downloader === key ? "bg-bg-soft text-ink" : "text-muted hover:text-ink"}`}
+                      >
+                        <span className={`block truncate text-[15px] ${p.key ? "" : "italic"}`}>{p.label}</span>
+                        <span className="block text-xs text-muted mt-0.5">
+                          {p.ids.size} photo{p.ids.size > 1 ? "s" : ""}
+                          {p.zips ? ` · ${p.zips} ZIP` : ""}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null,
+            )}
+          </div>
         )}
         {tab === "activity" && (
           <div>
@@ -333,7 +381,7 @@ export function GalleryManager(raw: Props) {
             photos={props.photos}
             positions={props.positions}
             downloadCounts={downloadCounts}
-            downloadEmails={downloadEmails}
+            filter={shownDownloader ? { label: shownDownloader.label, ids: shownDownloader.ids, onClear: () => setDownloader(null) } : null}
             favoriteCounts={props.favoriteLists.reduce<Record<string, number>>((acc, l) => {
               l.photoIds.forEach((id) => (acc[id] = (acc[id] ?? 0) + 1));
               return acc;

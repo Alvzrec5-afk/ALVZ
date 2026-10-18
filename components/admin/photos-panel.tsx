@@ -21,8 +21,8 @@ type Props = {
   positions: Record<string, number>;
   favoriteCounts: Record<string, number>;
   downloadCounts: Record<string, number>;
-  /** E-mails des personnes qui ont téléchargé la photo (seule ou en ZIP). */
-  downloadEmails: Record<string, string[]>;
+  /** Colonne de gauche : photos téléchargées par une personne (toutes collections). */
+  filter?: { label: string; ids: Set<string>; onClear: () => void } | null;
   activeId: string;
   onActive: (id: string) => void;
 };
@@ -44,8 +44,8 @@ export function PhotosPanel(props: Props) {
 
   useEffect(() => setPositions(props.positions), [props.positions]);
   useEffect(() => {
-    setOrder(props.photos.filter((p) => p.collectionId === active?.id));
-  }, [props.photos, active?.id]);
+    setOrder(props.filter ? props.photos.filter((p) => props.filter!.ids.has(p.id)) : props.photos.filter((p) => p.collectionId === active?.id));
+  }, [props.photos, active?.id, props.filter]);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
@@ -62,7 +62,7 @@ export function PhotosPanel(props: Props) {
 
   async function onDragEnd(e: DragEndEvent) {
     endDrag();
-    if (!e.over || e.active.id === e.over.id) return;
+    if (props.filter || !e.over || e.active.id === e.over.id) return;
     const from = order.findIndex((p) => p.id === e.active.id);
     const to = order.findIndex((p) => p.id === e.over!.id);
     const next = arrayMove(order, from, to);
@@ -79,9 +79,19 @@ export function PhotosPanel(props: Props) {
   return (
     <div>
       <div className="flex items-center justify-between gap-4 mb-6 lg:mb-8">
-        <h2 className="display text-2xl sm:text-3xl min-w-0 truncate">{active?.name ?? "Photos"}</h2>
+        {props.filter ? (
+          <div className="min-w-0">
+            <p className="eyebrow text-muted text-[10px]">Activité · {order.length} photo{order.length > 1 ? "s" : ""}</p>
+            <h2 className="display text-2xl sm:text-3xl truncate mt-1">{props.filter.label}</h2>
+            <button onClick={props.filter.onClear} className="text-xs text-accent mt-2 hover:opacity-80">
+              ← Toutes les photos
+            </button>
+          </div>
+        ) : (
+          <h2 className="display text-2xl sm:text-3xl min-w-0 truncate">{active?.name ?? "Photos"}</h2>
+        )}
         <div className="shrink-0 flex items-center gap-1">
-          {active && (
+          {active && !props.filter && (
             <span className="hidden lg:contents">
               <button
                 className="w-10 h-10 flex items-center justify-center text-muted hover:text-ink"
@@ -176,7 +186,6 @@ export function PhotosPanel(props: Props) {
                   onOpen={() => !dragging.current && setViewer(order.findIndex((o) => o.id === p.id))}
                   favorites={props.favoriteCounts[p.id] ?? 0}
                   downloads={props.downloadCounts[p.id] ?? 0}
-                  emails={props.downloadEmails[p.id] ?? []}
                   onCover={() => run(() => setCover(props.galleryId, p.id))}
                   onDelete={() => {
                     if (confirm(`Supprimer ${p.filename} ?`)) {
@@ -199,7 +208,6 @@ export function PhotosPanel(props: Props) {
           coverId={coverId}
           favoriteCounts={props.favoriteCounts}
           downloadCounts={props.downloadCounts}
-          downloadEmails={props.downloadEmails}
           onCover={async (p) => {
             await setCover(props.galleryId, p.id);
             setCoverId(p.id);
@@ -225,7 +233,6 @@ function SortablePhoto({
   onOpen,
   favorites,
   downloads,
-  emails,
   onCover,
   onDelete,
 }: {
@@ -234,7 +241,6 @@ function SortablePhoto({
   onOpen: () => void;
   favorites: number;
   downloads: number;
-  emails: string[];
   onCover: () => void;
   onDelete: () => void;
 }) {
@@ -251,18 +257,14 @@ function SortablePhoto({
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={photo.thumb} alt={photo.filename} loading="lazy" draggable={false} className="w-full h-full object-cover lg:object-contain lg:p-[7%]" />
       {isCover && <span className="absolute top-1.5 left-1.5 bg-black/60 text-white text-[10px] tracking-widest uppercase px-1.5 py-0.5">Couverture</span>}
-      {(favorites > 0 || downloads > 0 || emails.length > 0) && (
-        <span
-          className="absolute bottom-1.5 left-1.5 flex items-center gap-2 text-white text-[11px] drop-shadow"
-          title={emails.length ? `Téléchargée par : ${emails.join(", ")}` : undefined}
-        >
+      {(favorites > 0 || downloads > 0) && (
+        <span className="absolute bottom-1.5 left-1.5 flex items-center gap-2 text-white text-[11px] drop-shadow">
           {favorites > 0 && (
             <span className="flex items-center gap-1">
               <HeartIcon className="w-3.5 h-3.5" filled /> {favorites}
             </span>
           )}
           {downloads > 0 && <span>↓ {downloads}</span>}
-          {emails.length > 0 && <span>@ {emails.length}</span>}
         </span>
       )}
       <div className="absolute inset-x-0 top-0 flex justify-end gap-1 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
