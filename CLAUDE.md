@@ -124,10 +124,6 @@ images des tableaux). Schéma de référence :
 
 ## En attente / idées discutées
 
-- **Migration à appliquer au moment de publier** (pas encore faite sur Supabase) : le dernier bloc de
-  `supabase/schema.sql` (« Sous-tableaux… » : `boards.parent_id`, nouvelle contrainte `board_items_kind_check`
-  avec board/color/link, index). Vérifier d'abord le nom de la contrainte existante. Puis retirer cette ligne.
-
 - Tableaux, idées pour la suite : annuler / rétablir, commentaires sur une carte, aperçu des liens
   (Pinterest, Instagram), cocher les listes du studio côté client, temps réel au lieu du rafraîchissement.
 
