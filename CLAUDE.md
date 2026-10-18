@@ -116,10 +116,6 @@ images des tableaux). Schéma de référence :
 
 ## En attente / idées discutées
 
-- **Migration à appliquer au moment de publier les Tableaux** (pas encore faite sur Supabase) : le bloc
-  « Tableaux (façon Milanote) » à la fin de `supabase/schema.sql` (tables `boards`, `board_items` + nouvelle
-  version de `storage_usage()`), via l'outil MCP Supabase `apply_migration` (nom : `boards`), juste avant le push.
-  Puis retirer cette ligne.
 - Tableaux, idées pour la suite : annuler / rétablir, commentaires sur une carte, aperçu des liens
   (Pinterest, Instagram), cocher les listes du studio côté client, temps réel au lieu du rafraîchissement.
 
