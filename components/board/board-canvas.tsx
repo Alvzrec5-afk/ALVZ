@@ -96,6 +96,10 @@ const toInput = (it: BoardItem): BoardItemInput => ({
   ...(it.copyOf ? { copyOf: it.copyOf } : {}),
 });
 
+/** Clic droit, clic à deux doigts du trackpad, ou Ctrl + clic (Mac) : ouvre le menu, ne déplace rien. */
+const isContextClick = (e: { button: number; ctrlKey: boolean; pointerType?: string }) =>
+  e.button === 2 || (e.button === 0 && e.ctrlKey && e.pointerType === "mouse");
+
 /** Marque des cartes copiées (Cmd + C) dans le presse-papiers, reconnue au collage, même dans un autre tableau. */
 const CLIP = "ALVZ-BOARD:";
 
@@ -272,6 +276,8 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     },
     [setGroup],
   );
+  // Menu du clic droit : position à l'écran (dans le tableau), point du tableau visé, carte visée.
+  const [menu, setMenu] = useState<{ left: number; top: number; at: { x: number; y: number }; target: string | null } | null>(null);
   const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
   const [replies, setReplies] = useState<Record<string, string>>({});
@@ -536,18 +542,24 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
   const clipboard = useRef<string | null>(null); // secours si le presse-papiers est refusé
   const copyPending = useRef(0); // moment du dernier Cmd + C / X sur des cartes
 
-  /** Copie la sélection : cartes, contenu de leurs colonnes, et flèches entre elles. */
-  const copySelection = useCallback(() => {
+  /** Sélection prête à coller : cartes, contenu de leurs colonnes, et flèches entre elles. */
+  const serializeSelection = useCallback(() => {
     const roots = (groupRef.current.length ? groupRef.current : selected ? [selected] : []).filter((id) => itemsRef.current[id]);
-    if (!roots.length) return false;
+    if (!roots.length) return "";
     const all = itemsRef.current;
     const ids = new Set(roots.filter((id) => all[id].kind !== "arrow"));
     for (const it of Object.values(all)) if (it.parentId && ids.has(it.parentId)) ids.add(it.id);
     for (const it of Object.values(all)) {
       if (it.kind === "arrow" && it.data.from && it.data.to && ids.has(it.data.from) && ids.has(it.data.to)) ids.add(it.id);
     }
-    if (!ids.size) return false;
-    const payload = CLIP + JSON.stringify({ v: 1, from: endpoint, items: [...ids].map((id) => ({ ...all[id], comments: undefined })) });
+    if (!ids.size) return "";
+    return CLIP + JSON.stringify({ v: 1, from: endpoint, items: [...ids].map((id) => ({ ...all[id], comments: undefined })) });
+  }, [endpoint, selected]);
+
+  /** Copie la sélection dans le presse-papiers (et pour les autres onglets). */
+  const copySelection = useCallback(() => {
+    const payload = serializeSelection();
+    if (!payload) return false;
     clipboard.current = payload;
     // Aussi pour les autres onglets du même navigateur (si le presse-papiers est refusé).
     try {
@@ -555,11 +567,11 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     } catch {}
     navigator.clipboard?.writeText(payload).catch(() => undefined);
     return true;
-  }, [endpoint, selected]);
+  }, [serializeSelection]);
 
   /** Colle des cartes copiées : nouveaux identifiants, colonnes et flèches reliées, images et planches dupliquées. */
   const pasteCards = useCallback(
-    (raw: string) => {
+    (raw: string, at?: { x: number; y: number }) => {
       let parsed: { from?: string; items?: BoardItem[] };
       try {
         parsed = JSON.parse(raw.slice(CLIP.length));
@@ -574,7 +586,11 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       // Même tableau : juste à côté de l'original. Autre tableau : au centre de l'écran.
       let dx = 40;
       let dy = 40;
-      if (parsed.from !== endpoint && tops.length) {
+      if (at && tops.length) {
+        // Clic droit → « Coller ici » : le coin haut-gauche des cartes arrive sous la souris.
+        dx = Math.round(at.x - Math.min(...tops.map((t) => t.x)));
+        dy = Math.round(at.y - Math.min(...tops.map((t) => t.y)));
+      } else if (parsed.from !== endpoint && tops.length) {
         const c = viewCenter();
         dx = Math.round(c.x - Math.min(...tops.map((t) => t.x)) - 120);
         dy = Math.round(c.y - Math.min(...tops.map((t) => t.y)) - 80);
@@ -1005,7 +1021,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
   // ——— Déplacement des cartes ———
 
   const startDrag = (e: React.PointerEvent, it: BoardItem) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0 || isContextClick(e)) return;
     const target = e.target as HTMLElement;
     if (target.closest("input, textarea, button, a, [data-nodrag]")) return;
     if (arrowMode) {
@@ -1183,7 +1199,9 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
   const pinch = useRef<{ dist: number; cx: number; cy: number } | null>(null);
 
   const onBackgroundDown = (e: React.PointerEvent) => {
+    if (isContextClick(e)) return; // clic droit / deux doigts / Ctrl + clic : menu (onContextMenu)
     if ((e.target as HTMLElement).closest("[data-ui], input, textarea, button, a, [data-nodrag]")) return;
+    setMenu(null);
     lastActivity.current = Date.now();
     if (arrowMode && e.pointerType === "mouse") setArrowMode(null);
     setSelected(null);
@@ -1387,6 +1405,14 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         }
         return;
       }
+      if ((e.metaKey || e.ctrlKey) && (e.key === "d" || e.key === "D") && canAdd) {
+        // Cmd + D : dupliquer la sélection juste à côté (sans toucher au presse-papiers).
+        const payload = serializeSelection();
+        if (!payload) return;
+        e.preventDefault();
+        ensureName(() => pasteCards(payload));
+        return;
+      }
       if ((e.metaKey || e.ctrlKey) && (e.key === "z" || e.key === "Z" || e.key === "y")) {
         e.preventDefault();
         if (e.key === "y" || e.shiftKey) redo();
@@ -1405,6 +1431,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         e.preventDefault();
         remove(selected);
       } else if (e.key === "Escape") {
+        setMenu(null);
         setSelected(null);
         setGroup([]);
         setArrowMode(null);
@@ -1463,7 +1490,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       window.removeEventListener("keydown", key);
       window.removeEventListener("paste", paste);
     };
-  }, [addImages, canAdd, canEdit, copySelection, create, ensureName, pasteCards, redo, remove, removeGroup, selected, setGroup, setSelected, undo]);
+  }, [addImages, canAdd, canEdit, copySelection, create, ensureName, pasteCards, redo, remove, removeGroup, selected, serializeSelection, setGroup, setSelected, undo]);
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -2199,6 +2226,111 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
 
   const sel = selected ? items[selected] : null;
   const selEditable = sel ? canEdit(sel) : false;
+
+  // ——— Menu du clic droit ———
+
+  const openMenu = (e: React.MouseEvent) => {
+    const t = e.target as HTMLElement;
+    // Dans un champ de texte : le menu habituel du navigateur (copier / coller du texte, correcteur).
+    if (t.closest("input, textarea, [contenteditable], [data-ui]")) return;
+    e.preventDefault();
+    const o = rootRef.current!.getBoundingClientRect();
+    const v = viewRef.current;
+    const card = t.closest<HTMLElement>("[data-item]")?.dataset.item ?? null;
+    if (card && !groupRef.current.includes(card)) setSelected(card);
+    if (!card) setSelected(null);
+    setEditing(null);
+    setArrowMode(null);
+    setMenu({
+      left: e.clientX - o.left,
+      top: e.clientY - o.top,
+      at: { x: (e.clientX - o.left - v.x) / v.k, y: (e.clientY - o.top - v.y) / v.k },
+      target: card,
+    });
+  };
+
+  /** Cartes visées par le menu : la sélection multiple si la carte en fait partie, sinon la carte seule. */
+  const menuIds = () => (menu?.target ? (groupRef.current.includes(menu.target) ? [...groupRef.current] : [menu.target]) : []);
+
+  /** « Coller » du menu : le presse-papiers du système si le navigateur le permet, sinon la dernière copie. */
+  const pasteFromMenu = async (at: { x: number; y: number }) => {
+    let text = "";
+    try {
+      text = (await navigator.clipboard?.readText()) ?? "";
+    } catch {}
+    let stored: string | null = null;
+    try {
+      stored = localStorage.getItem("alvz-board-clip");
+    } catch {}
+    const cards = text.startsWith(CLIP) ? text : !text ? clipboard.current ?? stored : null;
+    if (cards) return ensureName(() => pasteCards(cards, at));
+    if (/^https?:\/\/\S+$/.test(text.trim())) return addLink(text.trim(), at);
+    if (text.trim()) ensureName(() => create("note", { text: text.trim().slice(0, 5000), color: "blanc" }, at));
+  };
+
+  /** Premier plan / arrière-plan : les cartes gardent leur ordre entre elles. */
+  const restack = (ids: string[], front: boolean) => {
+    const list = ids.map((id) => itemsRef.current[id]).filter((i): i is BoardItem => Boolean(i) && canEdit(i)).sort((a, b) => a.z - b.z);
+    const all = Object.values(itemsRef.current);
+    let z = front ? maxZ() : Math.min(...all.map((i) => i.z)) - list.length - 1;
+    for (const it of list) update(it.id, { z: ++z });
+  };
+
+  const menuEntries = (): MenuEntry[] => {
+    if (!menu) return [];
+    const ids = menuIds();
+    const one = ids.length === 1 ? itemsRef.current[ids[0]] : null;
+    const editableIds = ids.filter((id) => itemsRef.current[id] && canEdit(itemsRef.current[id]));
+    const close = (fn: () => void) => () => {
+      setMenu(null);
+      fn();
+    };
+    if (!menu.target) {
+      return [
+        { label: "Coller ici", hint: "⌘V", hidden: !canAdd, run: close(() => void pasteFromMenu(menu.at)) },
+        { sep: true },
+        { label: "Nouvelle note ici", hidden: !canAdd, run: close(() => addNote(menu.at)) },
+        { label: "Nouvelle liste ici", hidden: !canAdd, run: close(() => addTodo(menu.at)) },
+        { sep: true },
+        { label: "Tout sélectionner", hint: "⌘A", run: close(() => setGroup(Object.values(itemsRef.current).filter((i) => i.kind !== "arrow" && !i.parentId && canEdit(i)).map((i) => i.id))) },
+        { label: "Tout voir", run: close(() => fit()) },
+        { sep: true },
+        { label: "Annuler", hint: "⌘Z", run: close(undo) },
+        { label: "Rétablir", hint: "⇧⌘Z", run: close(redo) },
+      ];
+    }
+    return [
+      { label: "Ouvrir", hidden: one?.kind !== "board", run: close(() => one && openBoard(one)) },
+      { label: "Ouvrir le lien", hidden: !(one?.kind === "link" && one.data.url), run: close(() => window.open(one!.data.url, "_blank", "noopener")) },
+      { label: "Voir l'image en grand", hidden: !(one?.kind === "image" && one.src), run: close(() => window.open(one!.src!, "_blank", "noopener")) },
+      { label: "Modifier", hidden: !one || one.kind === "arrow" || !canEdit(one), run: close(() => one && startEdit(one)) },
+      { sep: true },
+      { label: "Copier", hint: "⌘C", run: close(() => void copySelection()) },
+      {
+        label: "Couper",
+        hint: "⌘X",
+        hidden: !editableIds.length,
+        run: close(() => {
+          if (!copySelection()) return;
+          if (groupRef.current.length > 1) removeGroup(false);
+          else remove(ids[0]);
+        }),
+      },
+      { label: "Coller", hint: "⌘V", hidden: !canAdd, run: close(() => void pasteFromMenu({ x: menu.at.x + 20, y: menu.at.y + 20 })) },
+      { label: "Dupliquer", hint: "⌘D", hidden: !canAdd, run: close(() => { const p = serializeSelection(); if (p) ensureName(() => pasteCards(p)); }) },
+      { sep: true },
+      { label: "Mettre au premier plan", hidden: !editableIds.length, run: close(() => restack(editableIds, true)) },
+      { label: "Mettre à l'arrière-plan", hidden: !editableIds.length, run: close(() => restack(editableIds, false)) },
+      { sep: true },
+      {
+        label: ids.length > 1 ? `Supprimer les ${ids.length} cartes` : "Supprimer",
+        hint: "⌫",
+        danger: true,
+        hidden: !editableIds.length,
+        run: close(() => (groupRef.current.length > 1 ? removeGroup() : remove(ids[0]))),
+      },
+    ];
+  };
   type Tool = {
     label: string;
     Icon: typeof NoteIcon;
@@ -2300,6 +2432,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         backgroundPosition: `${v.x}px ${v.y}px`,
       }}
       onPointerDown={onBackgroundDown}
+      onContextMenu={openMenu}
       onDoubleClick={(e) => {
         if ((e.target as HTMLElement).closest("[data-item], [data-ui]") || !canAdd) return;
         const o = rootRef.current!.getBoundingClientRect();
@@ -2361,6 +2494,8 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           onDelete={() => remove(sel.id)}
         />
       )}
+
+      {menu && <ContextMenu left={menu.left} top={menu.top} entries={menuEntries()} onClose={() => setMenu(null)} />}
 
       {/* Cadre de sélection (souris) */}
       {marquee && (
@@ -2576,6 +2711,69 @@ function NoteText({ text }: { text: string }) {
         <p>
           <Linkified text={rest.join("\n")} />
         </p>
+      )}
+    </div>
+  );
+}
+
+type MenuEntry = { sep: true } | { sep?: false; label: string; hint?: string; danger?: boolean; hidden?: boolean; run: () => void };
+
+/** Menu du clic droit (souris, trackpad à deux doigts, Ctrl + clic). Se ferme au clic ailleurs, à la molette ou avec Échap. */
+function ContextMenu({ left, top, entries, onClose }: { left: number; top: number; entries: MenuEntry[]; onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ left, top });
+  // Pas de séparateur en double, ni au début ou à la fin, quand des options sont masquées.
+  const shown = entries
+    .filter((e) => e.sep || !e.hidden)
+    .filter((e, i, arr) => !e.sep || (i > 0 && i < arr.length - 1 && !arr[i - 1].sep));
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const box = el?.parentElement?.getBoundingClientRect();
+    if (!el || !box) return;
+    // Toujours entier à l'écran : ouvert vers la gauche / le haut près des bords.
+    setPos({
+      left: left + el.offsetWidth > box.width - 8 ? Math.max(8, left - el.offsetWidth) : left,
+      top: top + el.offsetHeight > box.height - 8 ? Math.max(8, top - el.offsetHeight) : top,
+    });
+  }, [left, top]);
+  useEffect(() => {
+    const away = (e: Event) => {
+      if (!ref.current?.contains(e.target as Node)) onClose();
+    };
+    window.addEventListener("pointerdown", away, true);
+    window.addEventListener("wheel", onClose, { passive: true });
+    window.addEventListener("blur", onClose);
+    return () => {
+      window.removeEventListener("pointerdown", away, true);
+      window.removeEventListener("wheel", onClose);
+      window.removeEventListener("blur", onClose);
+    };
+  }, [onClose]);
+  if (!shown.length) return null;
+  return (
+    <div
+      ref={ref}
+      data-ui
+      role="menu"
+      onContextMenu={(e) => e.preventDefault()}
+      onPointerDown={(e) => e.stopPropagation()}
+      className="absolute z-[300001] min-w-[220px] bg-bg border border-line shadow-xl rounded-lg py-1.5 text-[13px] animate-[fadeIn_0.1s_ease-out_both]"
+      style={pos}
+    >
+      {shown.map((e, i) =>
+        e.sep ? (
+          <div key={i} className="h-px bg-line my-1.5 mx-2" />
+        ) : (
+          <button
+            key={i}
+            role="menuitem"
+            onClick={e.run}
+            className={`w-full flex items-center justify-between gap-6 px-3.5 h-8 text-left hover:bg-bg-soft ${e.danger ? "text-danger" : "text-ink"}`}
+          >
+            {e.label}
+            {e.hint && <span className="text-[11px] text-muted">{e.hint}</span>}
+          </button>
+        ),
       )}
     </div>
   );
