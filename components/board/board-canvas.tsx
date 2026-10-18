@@ -534,6 +534,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
   // ——— Copier / coller (Cmd + C, Cmd + X, Cmd + V) ———
 
   const clipboard = useRef<string | null>(null); // secours si le presse-papiers est refusé
+  const copyPending = useRef(0); // moment du dernier Cmd + C / X sur des cartes
 
   /** Copie la sélection : cartes, contenu de leurs colonnes, et flèches entre elles. */
   const copySelection = useCallback(() => {
@@ -548,6 +549,10 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     if (!ids.size) return false;
     const payload = CLIP + JSON.stringify({ v: 1, from: endpoint, items: [...ids].map((id) => ({ ...all[id], comments: undefined })) });
     clipboard.current = payload;
+    // Aussi pour les autres onglets du même navigateur (si le presse-papiers est refusé).
+    try {
+      localStorage.setItem("alvz-board-clip", payload);
+    } catch {}
     navigator.clipboard?.writeText(payload).catch(() => undefined);
     return true;
   }, [endpoint, selected]);
@@ -1373,7 +1378,8 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       if (e.key === " ") spaceDown.current = true;
       if ((e.metaKey || e.ctrlKey) && (e.key === "c" || e.key === "x") && !e.shiftKey) {
         if (!copySelection()) return;
-        e.preventDefault();
+        copyPending.current = Date.now();
+        // Pas de preventDefault : l'événement « copy » natif suit et remplit le presse-papiers (plus sûr que writeText).
         if (e.key === "x") {
           // Couper : copier puis retirer (Cmd + Z les fait revenir).
           if (groupRef.current.length > 1) removeGroup(false);
@@ -1408,7 +1414,11 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       const t = e.target as HTMLElement;
       if (t.closest?.("input, textarea") || !canAdd) return;
       const pasted = e.clipboardData?.getData("text/plain") ?? "";
-      const cards = pasted.startsWith(CLIP) ? pasted : !pasted && clipboard.current ? clipboard.current : null;
+      let stored: string | null = null;
+      try {
+        stored = localStorage.getItem("alvz-board-clip");
+      } catch {}
+      const cards = pasted.startsWith(CLIP) ? pasted : !pasted ? clipboard.current ?? stored : null;
       if (cards) {
         e.preventDefault();
         ensureName(() => pasteCards(cards));
@@ -1429,13 +1439,26 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         ensureName(() => create("note", { text: text.slice(0, 5000), color: "blanc" }));
       }
     };
+    // Cmd + C / X : les cartes copiées vont dans le vrai presse-papiers (collables dans un autre onglet).
+    const copy = (e: ClipboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.closest?.("input, textarea") || !clipboard.current || !e.clipboardData) return;
+      if (Date.now() - copyPending.current > 1000) return; // copie qui ne vient pas de Cmd + C sur des cartes
+      copyPending.current = 0;
+      e.clipboardData.setData("text/plain", clipboard.current);
+      e.preventDefault();
+    };
     const keyUp = (e: KeyboardEvent) => {
       if (e.key === " ") spaceDown.current = false;
     };
     window.addEventListener("keydown", key);
     window.addEventListener("keyup", keyUp);
     window.addEventListener("paste", paste);
+    window.addEventListener("copy", copy);
+    window.addEventListener("cut", copy);
     return () => {
+      window.removeEventListener("copy", copy);
+      window.removeEventListener("cut", copy);
       window.removeEventListener("keyup", keyUp);
       window.removeEventListener("keydown", key);
       window.removeEventListener("paste", paste);
