@@ -25,6 +25,16 @@ async function getAdmin() {
   return { supabase, user, isAdmin: user ? await isAdmin(user.id) : false };
 }
 
+/** Le visiteur est-il le studio connecté ? (sans redirection, pour les pages publiques) */
+export async function isStudioSession() {
+  try {
+    const { user, isAdmin } = await getAdmin();
+    return Boolean(user && isAdmin);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Pour les pages admin : il faut être connecté. Le contrôle « est bien l'admin »
  * est fait par la mise en page (requireAdminLayout), rendue en même temps que la page :

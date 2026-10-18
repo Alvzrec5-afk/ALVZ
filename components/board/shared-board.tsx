@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { isStudioSession } from "@/lib/auth";
 import { boardVisitor, clientActor, loadBoardItems, resolveSharedBoard } from "@/lib/boards";
 import { createServiceClient } from "@/lib/supabase/server";
 import { BoardCanvas } from "@/components/board/board-canvas";
@@ -10,16 +11,23 @@ export async function SharedBoard({ slug, subId }: { slug: string; subId?: strin
   const shared = await resolveSharedBoard(slug, subId);
   if (!shared) notFound();
   const { root, board, path } = shared;
-  const [items, visitor] = await Promise.all([
+  const [items, visitor, studio] = await Promise.all([
     loadBoardItems(createServiceClient(), board.id, await clientActor(root)),
     boardVisitor(root),
+    isStudioSession(), // c'est le studio qui regarde « comme le client » : chemin de retour
   ]);
   const query = board.id === root.id ? "" : `?board=${board.id}`;
 
   return (
     <div className="h-svh flex flex-col">
       <header className="shrink-0 flex items-center gap-4 h-14 sm:h-16 px-4 sm:px-6 border-b border-line bg-bg pt-[env(safe-area-inset-top)] box-content">
-        <Wordmark height={24} />
+        {studio ? (
+          <Link href="/admin" aria-label="Studio">
+            <Wordmark height={24} />
+          </Link>
+        ) : (
+          <Wordmark height={24} />
+        )}
         <span className="w-px h-6 bg-line" />
         <div className="min-w-0 flex-1">
           <h1 className="text-[15px] sm:text-base truncate leading-tight">{board.title}</h1>
@@ -44,6 +52,12 @@ export async function SharedBoard({ slug, subId }: { slug: string; subId?: strin
             </p>
           )}
         </div>
+        {studio && (
+          <Link href={`/admin/boards/${board.id}`} className="btn btn-ghost shrink-0" title="Vous voyez le tableau comme votre client">
+            <span className="hidden sm:inline">Retour au studio</span>
+            <span className="sm:hidden">Studio</span>
+          </Link>
+        )}
       </header>
       <div className="flex-1 min-h-0">
         <BoardCanvas

@@ -4,7 +4,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { deleteBoard, duplicateBoard, regenerateBoardLink, updateBoard } from "@/app/admin/board-actions";
-import { ArrowLeft, ChevronDown, CloseIcon } from "@/components/icons";
+import { ArrowLeft, BoardIcon, CardIcon, ChevronDown, CloseIcon, FilmIcon, ImageIcon, MegaphoneIcon, MenuIcon, TrashIcon } from "@/components/icons";
+
+/** Raccourcis vers le reste du studio (un tableau s'ouvre en plein écran, sans le menu de gauche). */
+const STUDIO = [
+  { href: "/admin", label: "Galeries", Icon: ImageIcon },
+  { href: "/admin/videos", label: "Vidéos", Icon: FilmIcon },
+  { href: "/admin/boards", label: "Tableaux", Icon: BoardIcon },
+  { href: "/admin/settings", label: "Coordonnées", Icon: CardIcon },
+  { href: "/admin/clients", label: "Clients & e-mails", Icon: MegaphoneIcon },
+  { href: "/admin/trash", label: "Corbeille", Icon: TrashIcon },
+];
 import { Toggle } from "./ui";
 
 type Board = {
@@ -39,6 +49,7 @@ export function BoardHeader({
   const [title, setTitle] = useState(board.title);
   const [share, setShare] = useState(false);
   const [plus, setPlus] = useState(false);
+  const [nav, setNav] = useState(false);
   const [opts, setOpts] = useState({ share_enabled: root.share_enabled, client_can_add: root.client_can_add, client_can_edit: root.client_can_edit });
   const [slug, setSlug] = useState(root.share_slug);
   const clientPath = isSub ? `/t/${slug}/b/${board.id}` : `/t/${slug}`;
@@ -64,7 +75,25 @@ export function BoardHeader({
 
   return (
     <div className="shrink-0 flex items-center gap-2 sm:gap-3 h-14 sm:h-[64px] px-2 sm:px-4 border-b border-line bg-bg relative z-10 pt-[env(safe-area-inset-top)] box-content">
-      <Link href={parent ? `/admin/boards/${parent.id}` : "/admin/boards"} className="icon-btn" aria-label="Retour">
+      <div className="relative">
+        <button onClick={() => setNav((o) => !o)} className="icon-btn" aria-label="Menu du studio" title="Studio">
+          <MenuIcon />
+        </button>
+        {nav && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setNav(false)} />
+            <nav className="absolute left-0 mt-1 z-20 w-60 bg-bg-soft border border-line py-1 shadow-xl text-sm">
+              <p className="eyebrow text-muted px-4 pt-3 pb-2">Studio</p>
+              {STUDIO.map(({ href, label, Icon }) => (
+                <Link key={href} href={href} onClick={() => setNav(false)} className="flex items-center gap-3 px-4 py-3 hover:bg-bg">
+                  <Icon className="w-4 h-4 text-muted" /> {label}
+                </Link>
+              ))}
+            </nav>
+          </>
+        )}
+      </div>
+      <Link href={parent ? `/admin/boards/${parent.id}` : "/admin/boards"} className="icon-btn -ml-2 sm:-ml-3" aria-label="Retour">
         <ArrowLeft />
       </Link>
       <div className="min-w-0 flex-1">
