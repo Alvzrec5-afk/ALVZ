@@ -119,10 +119,15 @@ create policy "admin full access" on public.favorites
 create or replace function public.storage_usage()
 returns table (gallery_id uuid, bytes bigint)
 language sql stable security invoker set search_path = '' as $$
-  select p.gallery_id,
-         sum(p.size_bytes + case when p.variants_bytes > 0 then p.variants_bytes else 1000000 end)::bigint
-  from public.photos p
-  group by p.gallery_id;
+  select t.gallery_id, sum(t.bytes)::bigint
+  from (
+    select p.gallery_id, p.size_bytes + case when p.variants_bytes > 0 then p.variants_bytes else 1000000 end as bytes
+    from public.photos p
+    union all
+    select v.gallery_id, v.size_bytes + v.extra_bytes
+    from public.videos v
+  ) t
+  group by t.gallery_id;
 $$;
 revoke execute on function public.storage_usage() from public, anon;
 grant execute on function public.storage_usage() to authenticated;
@@ -177,4 +182,59 @@ create table public.mail_campaigns (
 );
 alter table public.mail_campaigns enable row level security;
 create policy "admin full access" on public.mail_campaigns
+  for all to authenticated using ((select private.is_admin())) with check ((select private.is_admin()));
+
+-- Vidéos : original + versions 1080p / 720p / 480p préparées dans le navigateur.
+create table public.videos (
+  id uuid primary key default gen_random_uuid(),
+  gallery_id uuid not null references public.galleries(id) on delete cascade,
+  title text not null,
+  filename text not null,
+  original_ext text not null,
+  original_type text not null default 'video/mp4',
+  size_bytes bigint not null default 0,
+  extra_bytes bigint not null default 0,       -- versions + image d'aperçu
+  renditions jsonb not null default '[]'::jsonb, -- [{ "h": 720, "w": 1280, "bytes": 123 }]
+  duration real not null default 0,
+  width integer not null default 0,
+  height integer not null default 0,
+  watermarked boolean not null default false,  -- filigrane incrusté dans les versions
+  downloads_enabled boolean not null default true,
+  status text not null default 'uploading' check (status in ('uploading', 'ready')),
+  multipart_upload_id text,
+  position double precision not null default 0,
+  created_at timestamptz not null default now()
+);
+create index videos_gallery_idx on public.videos (gallery_id, position);
+alter table public.videos enable row level security;
+create policy "admin full access" on public.videos
+  for all to authenticated using ((select private.is_admin())) with check ((select private.is_admin()));
+
+-- Commentaires des clients sur la timeline (prénom seulement, pas d'e-mail).
+create table public.video_comments (
+  id uuid primary key default gen_random_uuid(),
+  video_id uuid not null references public.videos(id) on delete cascade,
+  time_sec real not null default 0,
+  author text not null,
+  body text not null,
+  resolved boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index video_comments_video_idx on public.video_comments (video_id, time_sec);
+alter table public.video_comments enable row level security;
+create policy "admin full access" on public.video_comments
+  for all to authenticated using ((select private.is_admin())) with check ((select private.is_admin()));
+
+-- Activité anonyme : lectures (avec la part regardée) et téléchargements.
+create table public.video_events (
+  id uuid primary key default gen_random_uuid(),
+  video_id uuid not null references public.videos(id) on delete cascade,
+  kind text not null check (kind in ('view', 'download')),
+  watched_pct smallint not null default 0,
+  quality text,
+  created_at timestamptz not null default now()
+);
+create index video_events_video_idx on public.video_events (video_id, created_at desc);
+alter table public.video_events enable row level security;
+create policy "admin full access" on public.video_events
   for all to authenticated using ((select private.is_admin())) with check ((select private.is_admin()));

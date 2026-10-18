@@ -27,8 +27,8 @@ export function ExpiredScreen({ theme }: { theme: string }) {
   );
 }
 
-export function LockScreen({ slug, title, theme, fontStyle }: { slug: string; title: string; theme: string; fontStyle: FontStyle }) {
-  const [state, action, pending] = useActionState(unlockGallery.bind(null, slug), null);
+export function LockScreen({ slug, title, theme, fontStyle, next }: { slug: string; title: string; theme: string; fontStyle: FontStyle; next?: string }) {
+  const [state, action, pending] = useActionState(unlockGallery.bind(null, slug, next), null);
   return (
     <Shell theme={theme}>
       <LockIcon className="w-5 h-5 text-muted mb-8" />

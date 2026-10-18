@@ -6,7 +6,8 @@ import { useState } from "react";
 import type { GalleryDesign } from "@/lib/design";
 import type { Collection, PhotoView } from "@/lib/types";
 import { formatLongDate } from "@/lib/dates";
-import { ArrowLeft, BrushIcon, ChevronDown, CloseIcon, DotsIcon, GearIcon, HeartIcon, ImageIcon, MenuIcon, PencilIcon } from "@/components/icons";
+import { ArrowLeft, BrushIcon, ChevronDown, CloseIcon, DotsIcon, FilmIcon, GearIcon, HeartIcon, ImageIcon, MenuIcon, PencilIcon } from "@/components/icons";
+import { VideosPanel, type AdminVideo } from "./videos-panel";
 import { CollectionsSidebar } from "./collections-sidebar";
 import { PhotosPanel } from "./photos-panel";
 import { DesignPanel } from "./design-panel";
@@ -38,10 +39,12 @@ type Props = {
   positions: Record<string, number>;
   favoriteLists: { id: string; email: string; photoIds: string[] }[];
   downloads: DownloadRow[];
+  videos: AdminVideo[];
 };
 
 const TABS = [
   { id: "photos", label: "Photos", Icon: ImageIcon },
+  { id: "videos", label: "Vidéos", Icon: FilmIcon },
   { id: "design", label: "Design", Icon: BrushIcon },
   { id: "settings", label: "Paramètres", Icon: GearIcon },
   { id: "activity", label: "Activité", Icon: HeartIcon },
@@ -171,6 +174,7 @@ export function GalleryManager(props: Props) {
 
       <p className="text-xs text-muted mt-2">
         {props.photos.length} photos · {props.collections.length} collection{props.collections.length > 1 ? "s" : ""}
+        {props.videos.length > 0 && ` · ${props.videos.length} vidéo${props.videos.length > 1 ? "s" : ""}`}
       </p>
 
       {/* Menu latéral : sections de la galerie */}
@@ -221,7 +225,7 @@ export function GalleryManager(props: Props) {
             <span className="eyebrow text-muted">Aucune couverture</span>
           )}
         </button>
-        <div className="grid grid-cols-4 border-b border-line">
+        <div className="grid grid-cols-5 border-b border-line">
           {TABS.map(({ id, label, Icon }) => (
             <button
               key={id}
@@ -257,6 +261,15 @@ export function GalleryManager(props: Props) {
             ))}
           </div>
         )}
+        {tab === "videos" && (
+          <div className="px-6 py-5">
+            <p className="eyebrow text-muted">Vidéos</p>
+            <p className="text-sm text-muted mt-3 leading-relaxed">
+              {props.videos.length} vidéo{props.videos.length > 1 ? "s" : ""}. Chaque clip a son propre lien : le client arrive
+              directement sur le lecteur, peut commenter sur la timeline et télécharger si vous l&apos;autorisez.
+            </p>
+          </div>
+        )}
         {(tab === "design" || tab === "settings") && (
           <div className="px-6 py-5">
             <p className="eyebrow text-muted">{tab === "design" ? "Design" : "Paramètres"}</p>
@@ -270,7 +283,7 @@ export function GalleryManager(props: Props) {
       </aside>
 
       <div className="pt-6 lg:pt-8 lg:flex-1 lg:overflow-y-auto lg:px-10 lg:pb-16">
-      <div className={tab === "photos" ? "" : "lg:max-w-2xl"}>
+      <div className={tab === "photos" || tab === "videos" ? "" : "lg:max-w-2xl"}>
         {tab === "photos" && (
           <PhotosPanel
             activeId={activeCollection}
@@ -287,6 +300,7 @@ export function GalleryManager(props: Props) {
             }, {})}
           />
         )}
+        {tab === "videos" && <VideosPanel galleryId={gallery.id} slug={gallery.slug} watermark={gallery.watermark} videos={props.videos} />}
         {tab === "design" && <DesignPanel gallery={gallery} photos={props.photos} />}
         {tab === "settings" && <SettingsPanel gallery={gallery} onDelete={remove} />}
         {tab === "activity" && (

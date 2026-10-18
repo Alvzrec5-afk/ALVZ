@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { apiError, requireAdminApi } from "@/lib/auth";
 import { PURGE_FIELDS, purgeRows } from "@/lib/purge";
+import { VIDEO_PURGE_FIELDS, purgeVideos } from "@/lib/videos";
 
 const BATCH = 150;
 
@@ -21,6 +22,13 @@ export async function POST(req: Request) {
     if (error) throw new Error(error.message);
     await purgeRows(supabase, data ?? []);
     if ((data?.length ?? 0) === BATCH) return Response.json({ done: false });
+
+    if (kind === "gallery") {
+      const { data: videos, error: vError } = await supabase.from("videos").select(VIDEO_PURGE_FIELDS).eq("gallery_id", id).limit(20);
+      if (vError) throw new Error(vError.message);
+      await purgeVideos(supabase, videos ?? []);
+      if ((videos?.length ?? 0) === 20) return Response.json({ done: false });
+    }
 
     const table = kind === "gallery" ? "galleries" : "collections";
     const { error: delError } = await supabase.from(table).delete().eq("id", id);

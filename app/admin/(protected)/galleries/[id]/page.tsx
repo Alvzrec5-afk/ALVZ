@@ -3,7 +3,9 @@ import { requireAdminPage } from "@/lib/auth";
 import { toParisDateInput } from "@/lib/dates";
 import { DESIGN_FIELDS, readDesign } from "@/lib/design";
 import { PHOTO_FIELDS, toPhotoViews } from "@/lib/photos";
-import type { Collection, PhotoRow } from "@/lib/types";
+import type { Collection, PhotoRow, VideoComment, VideoRow } from "@/lib/types";
+import { VIDEO_FIELDS, toVideoView } from "@/lib/videos";
+import type { AdminVideo } from "@/components/admin/videos-panel";
 import { GalleryManager, type ManagedGallery } from "@/components/admin/gallery-manager";
 import type { DownloadRow } from "@/components/admin/downloads-panel";
 
@@ -15,7 +17,7 @@ export default async function GalleryPage({ params }: { params: Promise<{ id: st
   const { supabase } = await requireAdminPage();
 
   // Toutes les requêtes partent en même temps (une seule attente au lieu de deux).
-  const [{ data: g }, { data: collections }, { data: photos }, { data: lists }, { data: downloads }] = await Promise.all([
+  const [{ data: g }, { data: collections }, { data: photos }, { data: lists }, { data: downloads }, { data: videoRows }] = await Promise.all([
     supabase
       .from("galleries")
       .select(
@@ -36,8 +38,30 @@ export default async function GalleryPage({ params }: { params: Promise<{ id: st
       .eq("gallery_id", id)
       .order("created_at", { ascending: false })
       .limit(1000),
+    supabase
+      .from("videos")
+      .select(`${VIDEO_FIELDS}, video_comments(id, time_sec, author, body, resolved, created_at), video_events(kind, watched_pct)`)
+      .eq("gallery_id", id)
+      .eq("status", "ready")
+      .order("position"),
   ]);
   if (!g) notFound();
+
+  type VideoWithActivity = VideoRow & { video_comments: VideoComment[]; video_events: { kind: string; watched_pct: number }[] };
+  const videos: AdminVideo[] = await Promise.all(
+    ((videoRows ?? []) as VideoWithActivity[]).map(async (v) => {
+      const plays = v.video_events.filter((e) => e.kind === "view");
+      return {
+        ...(await toVideoView(v, { watermark: g.watermark, downloads_enabled: true })),
+        sizeBytes: Number(v.size_bytes),
+        createdAt: v.created_at,
+        comments: v.video_comments,
+        views: plays.length,
+        avgWatched: plays.length ? Math.round(plays.reduce((s, e) => s + e.watched_pct, 0) / plays.length) : 0,
+        downloadCount: v.video_events.filter((e) => e.kind === "download").length,
+      };
+    }),
+  );
 
   const views = await toPhotoViews((photos ?? []) as PhotoRow[], false);
   const positions = Object.fromEntries((photos ?? []).map((p) => [p.id, p.position as number]));
@@ -65,6 +89,7 @@ export default async function GalleryPage({ params }: { params: Promise<{ id: st
       collections={(collections ?? []) as Collection[]}
       photos={views}
       positions={positions}
+      videos={videos}
       downloads={(downloads ?? []) as DownloadRow[]}
       favoriteLists={(lists ?? []).map((l) => ({
         id: l.id,

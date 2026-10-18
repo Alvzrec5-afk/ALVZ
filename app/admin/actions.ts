@@ -9,6 +9,7 @@ import { sanitizeContact } from "@/lib/contact";
 import { pickDesign, sanitizeSettingsPatch } from "@/lib/design";
 import { createSessionClient } from "@/lib/supabase/server";
 import { newSlug } from "@/lib/tokens";
+import { VIDEO_PURGE_FIELDS, purgeVideos } from "@/lib/videos";
 
 export type FormState = { error?: string; ok?: string } | null;
 
@@ -167,4 +168,46 @@ export async function saveContact(_: FormState, form: FormData): Promise<FormSta
   if (error) return { error: error.message };
   revalidatePath("/admin/settings");
   return { ok: "Coordonnées enregistrées." };
+}
+
+/** Vidéo : titre et autorisation de téléchargement. */
+export async function updateVideo(galleryId: string, videoId: string, patch: { title?: string; downloads_enabled?: boolean }) {
+  const { supabase } = await requireAdminApi();
+  const update: Record<string, unknown> = {};
+  if (typeof patch.title === "string") {
+    const title = patch.title.trim().slice(0, 200);
+    if (!title) return { error: "Titre vide" };
+    update.title = title;
+  }
+  if (typeof patch.downloads_enabled === "boolean") update.downloads_enabled = patch.downloads_enabled;
+  const { error } = await supabase.from("videos").update(update).eq("id", videoId).eq("gallery_id", galleryId);
+  if (error) return { error: error.message };
+  revalidatePath(`/admin/galleries/${galleryId}`);
+  return {};
+}
+
+export async function deleteVideo(galleryId: string, videoId: string) {
+  const { supabase } = await requireAdminApi();
+  const { data } = await supabase.from("videos").select(VIDEO_PURGE_FIELDS).eq("id", videoId).eq("gallery_id", galleryId);
+  await purgeVideos(supabase, data ?? []);
+  revalidatePath(`/admin/galleries/${galleryId}`);
+  return {};
+}
+
+export async function reorderVideos(galleryId: string, orderedIds: string[]) {
+  const { supabase } = await requireAdminApi();
+  await Promise.all(orderedIds.map((id, i) => supabase.from("videos").update({ position: (i + 1) * 1000 }).eq("id", id).eq("gallery_id", galleryId)));
+  revalidatePath(`/admin/galleries/${galleryId}`);
+}
+
+export async function setVideoCommentResolved(galleryId: string, commentId: string, resolved: boolean) {
+  const { supabase } = await requireAdminApi();
+  await supabase.from("video_comments").update({ resolved }).eq("id", commentId);
+  revalidatePath(`/admin/galleries/${galleryId}`);
+}
+
+export async function deleteVideoComment(galleryId: string, commentId: string) {
+  const { supabase } = await requireAdminApi();
+  await supabase.from("video_comments").delete().eq("id", commentId);
+  revalidatePath(`/admin/galleries/${galleryId}`);
 }

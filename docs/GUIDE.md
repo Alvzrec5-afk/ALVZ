@@ -59,6 +59,21 @@ Le message doit indiquer « Connexion Oracle opérationnelle ». Sinon, le messa
 
 ## 2. Utilisation au quotidien
 
+### Vidéos (clips)
+
+Dans une galerie : onglet **Vidéos** (icône ▶) → **Ajouter des vidéos**. Faites-le depuis votre Mac (Chrome ou Safari à jour) :
+votre ordinateur prépare automatiquement trois qualités (1080p, 720p, 480p) puis envoie tout, original compris.
+Gardez la page ouverte pendant la préparation.
+
+- Chaque client reçoit la qualité adaptée à sa connexion et à son écran (il peut aussi la choisir).
+- **Copier le lien de la vidéo** : le client arrive directement sur le lecteur.
+- Le client peut laisser des **commentaires sur la timeline** (prénom seulement) ; vous les voyez dans la fiche de la vidéo,
+  un clic sur l'heure vous amène au bon moment.
+- **Autoriser le téléchargement** se règle vidéo par vidéo.
+- **Filigrane** : si le filigrane de la galerie est activé au moment de l'envoi, il est incrusté dans la vidéo.
+  Activé plus tard, il s'affiche par-dessus le lecteur et l'original n'est plus téléchargeable.
+- Activité : lectures, part regardée en moyenne, téléchargements (sans demander d'e-mail).
+
 ### E-mails aux clients
 
 Le studio → **Clients** liste toutes les adresses laissées par vos clients (sélection de favoris, téléchargements).

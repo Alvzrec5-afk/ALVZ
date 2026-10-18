@@ -10,7 +10,7 @@ export const WEB_SIZE = 2000;
 export const THUMB_SIZE = 640;
 const WEB_TARGET_BYTES = 420_000;
 
-function makeCanvas(w: number, h: number): AnyCanvas {
+export function makeCanvas(w: number, h: number): AnyCanvas {
   if (typeof OffscreenCanvas !== "undefined") return new OffscreenCanvas(w, h);
   const c = document.createElement("canvas");
   c.width = w;
@@ -18,7 +18,7 @@ function makeCanvas(w: number, h: number): AnyCanvas {
   return c;
 }
 
-function ctx2d(c: AnyCanvas): Ctx {
+export function ctx2d(c: AnyCanvas): Ctx {
   const ctx = c.getContext("2d") as Ctx | null;
   if (!ctx) throw new Error("Canvas indisponible");
   ctx.imageSmoothingEnabled = true;
@@ -26,7 +26,7 @@ function ctx2d(c: AnyCanvas): Ctx {
   return ctx;
 }
 
-function toJpeg(c: AnyCanvas, quality: number): Promise<Blob> {
+export function toJpeg(c: AnyCanvas, quality: number): Promise<Blob> {
   if ("convertToBlob" in c) return c.convertToBlob({ type: "image/jpeg", quality });
   return new Promise((resolve, reject) =>
     (c as HTMLCanvasElement).toBlob((b) => (b ? resolve(b) : reject(new Error("Encodage impossible"))), "image/jpeg", quality),
@@ -53,20 +53,18 @@ function scaleDown(source: CanvasImageSource, sw: number, sh: number, maxEdge: n
   return out;
 }
 
-function withWatermark(source: AnyCanvas, text: string): AnyCanvas {
-  const c = makeCanvas(source.width, source.height);
-  const ctx = ctx2d(c);
-  ctx.drawImage(source, 0, 0);
-  const size = Math.max(14, Math.round(Math.max(c.width, c.height) / 26));
+/** Motif de filigrane en diagonale (texte répété), dessiné par-dessus ce qui est déjà sur le canvas. */
+export function drawWatermark(ctx: Ctx, width: number, height: number, text = "ALVZ.REC") {
+  const size = Math.max(14, Math.round(Math.max(width, height) / 26));
   ctx.font = `300 ${size}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   const spaced = text.split("").join(String.fromCharCode(8202)); // espacement fin entre les lettres
   const stepX = size * 9;
   const stepY = size * 5;
-  const diag = Math.hypot(c.width, c.height);
+  const diag = Math.hypot(width, height);
   ctx.save();
-  ctx.translate(c.width / 2, c.height / 2);
+  ctx.translate(width / 2, height / 2);
   ctx.rotate(-Math.PI / 7);
   for (let y = -diag / 2, row = 0; y < diag / 2; y += stepY, row++) {
     for (let x = -diag / 2 + (row % 2) * (stepX / 2); x < diag / 2; x += stepX) {
@@ -77,6 +75,13 @@ function withWatermark(source: AnyCanvas, text: string): AnyCanvas {
     }
   }
   ctx.restore();
+}
+
+function withWatermark(source: AnyCanvas, text: string): AnyCanvas {
+  const c = makeCanvas(source.width, source.height);
+  const ctx = ctx2d(c);
+  ctx.drawImage(source, 0, 0);
+  drawWatermark(ctx, c.width, c.height, text);
   return c;
 }
 

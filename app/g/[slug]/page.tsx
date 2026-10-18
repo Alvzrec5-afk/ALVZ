@@ -5,6 +5,7 @@ import type { Contact } from "@/lib/contact";
 import { readDesign, themeAttr } from "@/lib/design";
 import { findGalleryBySlug, getFavoriteListId, hasAccess, isExpired } from "@/lib/gallery-access";
 import { PHOTO_FIELDS, toPhotoViews } from "@/lib/photos";
+import { presignGet, videoKey } from "@/lib/storage";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { Collection, PhotoRow } from "@/lib/types";
 import { ClientGallery } from "@/components/gallery/client-gallery";
@@ -27,14 +28,23 @@ export default async function GalleryPage({ params }: { params: Promise<{ slug: 
 
   const db = createServiceClient();
   const listId = await getFavoriteListId(gallery);
-  const [{ data: collections }, { data: photos }, list, { data: studio }] = await Promise.all([
+  const [{ data: collections }, { data: photos }, list, { data: studio }, { data: videoRows }] = await Promise.all([
     db.from("collections").select("id, name, position").eq("gallery_id", gallery.id).order("position"),
     db.from("photos").select(PHOTO_FIELDS).eq("gallery_id", gallery.id).eq("status", "ready").order("position"),
     listId
       ? db.from("favorite_lists").select("email, favorites(photo_id)").eq("id", listId).maybeSingle()
       : Promise.resolve({ data: null }),
     db.from("studio_settings").select("contact").eq("id", 1).maybeSingle(),
+    db.from("videos").select("id, gallery_id, title, duration").eq("gallery_id", gallery.id).eq("status", "ready").order("position"),
   ]);
+  const videos = await Promise.all(
+    (videoRows ?? []).map(async (v) => ({
+      id: v.id as string,
+      title: v.title as string,
+      duration: Number(v.duration),
+      poster: await presignGet(videoKey(v.gallery_id as string, v.id as string, "poster.jpg")),
+    })),
+  );
 
   const views = await toPhotoViews((photos ?? []) as PhotoRow[], gallery.watermark);
   const visibleCollections = ((collections ?? []) as Collection[]).filter((c) => views.some((p) => p.collectionId === c.id));
@@ -51,11 +61,12 @@ export default async function GalleryPage({ params }: { params: Promise<{ slug: 
       downloadsEnabled={gallery.downloads_enabled}
       downloadWebEnabled={gallery.download_web_enabled}
       favoritesEnabled={gallery.favorites_enabled}
-      cover={cover ? { src: cover.web, width: cover.width, height: cover.height } : null}
+      cover={cover ? { src: cover.web, width: cover.width, height: cover.height } : videos[0] ? { src: videos[0].poster, width: 16, height: 9 } : null}
       coverAlt={views.find((p) => p.id !== cover?.id)?.web ?? null}
       contact={(studio?.contact as Contact | undefined) ?? null}
       collections={visibleCollections}
       photos={views}
+      videos={videos}
       favorites={{ email: favData?.email ?? null, photoIds: favData?.favorites.map((f) => f.photo_id) ?? [] }}
     />
   );

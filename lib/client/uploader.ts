@@ -31,7 +31,7 @@ type Prepared =
 
 const CONCURRENCY = 4;
 
-class PermanentError extends Error {}
+export class PermanentError extends Error {}
 
 function waitOnline() {
   if (typeof navigator === "undefined" || navigator.onLine) return Promise.resolve();
@@ -41,7 +41,7 @@ function waitOnline() {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Réessaie avec un délai croissant ; attend le retour du réseau si la connexion est coupée. */
-async function withRetry<T>(fn: () => Promise<T>, attempts = 7): Promise<T> {
+export async function withRetry<T>(fn: () => Promise<T>, attempts = 7): Promise<T> {
   let lastError: unknown;
   for (let i = 0; i < attempts; i++) {
     try {
@@ -56,7 +56,7 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 7): Promise<T> {
   throw lastError instanceof Error ? lastError : new Error("Échec de l'envoi");
 }
 
-async function api<T>(path: string, body: unknown): Promise<T> {
+export async function api<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -72,7 +72,7 @@ async function api<T>(path: string, body: unknown): Promise<T> {
   return json as T;
 }
 
-function put(url: string, body: Blob, contentType: string | null, onProgress: (loaded: number) => void) {
+export function put(url: string, body: Blob, contentType: string | null, onProgress: (loaded: number) => void) {
   return new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url);

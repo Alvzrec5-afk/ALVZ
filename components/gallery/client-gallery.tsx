@@ -11,6 +11,7 @@ import { ContactCard, ContactSheet } from "./contact-card";
 import { contactLinks } from "@/lib/contact";
 import type { Contact } from "@/lib/contact";
 import { downloadArchive } from "./zip";
+import { VideoCards, type VideoCard } from "./video-cards";
 
 type Props = {
   slug: string;
@@ -27,14 +28,16 @@ type Props = {
   contact: Contact | null;
   collections: Collection[];
   photos: PhotoView[];
+  videos: VideoCard[];
   favorites: { email: string | null; photoIds: string[] };
 };
 
 const FAVORITES_TAB = "__favorites";
+const VIDEOS_TAB = "__videos";
 
 export function ClientGallery(props: Props) {
   const { design } = props;
-  const [tab, setTab] = useState(props.collections[0]?.id ?? "");
+  const [tab, setTab] = useState(props.collections[0]?.id ?? (props.videos.length ? VIDEOS_TAB : ""));
   const [favorites, setFavorites] = useState(() => new Set(props.favorites.photoIds));
   const [email, setEmail] = useState(props.favorites.email);
   const [askEmailFor, setAskEmailFor] = useState<string | null | undefined>(undefined);
@@ -149,7 +152,7 @@ export function ClientGallery(props: Props) {
             <p className="gallery-title text-xl sm:text-2xl truncate">{props.title}</p>
             <p className="eyebrow text-muted text-[9px] mt-1">ALVZ.REC{props.date ? ` · ${props.date}` : ""}</p>
           </button>
-          {(props.collections.length > 1 || tab === FAVORITES_TAB) && (
+          {(props.collections.length + (props.videos.length ? 1 : 0) > 1 || tab === FAVORITES_TAB) && (
             <nav ref={navRef} className="relative order-last md:order-2 w-[calc(100%+2.5rem)] sm:w-full md:w-auto md:flex-1 min-w-0 flex md:justify-center gap-6 overflow-x-auto no-scrollbar -mx-5 px-5 sm:mx-0 sm:px-0 md:h-full md:items-center border-t border-line md:border-0">
               {indicator && (
                 <span
@@ -168,6 +171,15 @@ export function ClientGallery(props: Props) {
                   {c.name}
                 </button>
               ))}
+              {props.videos.length > 0 && (
+                <button
+                  data-tab={VIDEOS_TAB}
+                  onClick={() => selectTab(VIDEOS_TAB)}
+                  className={`eyebrow whitespace-nowrap py-3 transition-colors duration-300 ${tab === VIDEOS_TAB ? "text-ink" : "text-muted hover:text-ink"}`}
+                >
+                  Vidéos
+                </button>
+              )}
               {tab === FAVORITES_TAB && (
                 <button data-tab={FAVORITES_TAB} className="eyebrow whitespace-nowrap py-3 text-ink flex items-center gap-1.5">
                   <HeartIcon className="w-3.5 h-3.5" filled /> Ma sélection
@@ -264,7 +276,11 @@ export function ClientGallery(props: Props) {
             Sélection enregistrée pour {email}. Elle est automatiquement transmise à ALVZ.REC.
           </p>
         )}
-        {visible.length === 0 ? (
+        {tab === VIDEOS_TAB ? (
+          <div key={tab} className="animate-[gridIn_0.6s_ease-out_both] px-3 sm:px-0 pt-4">
+            <VideoCards slug={props.slug} videos={props.videos} />
+          </div>
+        ) : visible.length === 0 ? (
           tab === FAVORITES_TAB ? (
             <div className="py-28 text-center px-8">
               <HeartIcon className="w-6 h-6 mx-auto text-muted" />

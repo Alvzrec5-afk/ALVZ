@@ -299,3 +299,9 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .cover-parallax, .cover-fade { animation: none !important; }
 }
+
+/* Filigrane posé sur le lecteur vidéo quand il n'est pas incrusté dans la vidéo */
+.video-watermark {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='180'%3E%3Ctext x='160' y='90' text-anchor='middle' dominant-baseline='middle' transform='rotate(-26 160 90)' font-family='Helvetica Neue,Helvetica,Arial,sans-serif' font-weight='300' font-size='22' letter-spacing='4' fill='rgba(255,255,255,0.32)'%3EALVZ.REC%3C/text%3E%3C/svg%3E");
+  background-size: clamp(180px, 26%, 360px) auto;
+}

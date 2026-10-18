@@ -156,3 +156,9 @@ export const DragIcon = ({ className = "w-5 h-5" }: P) => (
     <path d="M6 9.5h12M6 14.5h12" />
   </svg>
 );
+export const FilmIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <rect x="3.5" y="5.5" width="17" height="13" rx="1.5" />
+    <path d="M10 9.5v5l4.5-2.5L10 9.5Z" />
+  </svg>
+);

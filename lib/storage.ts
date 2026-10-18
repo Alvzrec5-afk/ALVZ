@@ -62,6 +62,17 @@ export function allKeys(galleryId: string, photoId: string, ext: string) {
   return [...VARIANTS.map((v) => variantKey(galleryId, photoId, v)), originalKey(galleryId, photoId, ext)];
 }
 
+/** Vidéos : galleries/<galerie>/videos/<vidéo>/{original.ext, 1080.mp4, 720.mp4, 480.mp4, poster.jpg} */
+export const RENDITION_HEIGHTS = [1080, 720, 480] as const;
+
+export function videoKey(galleryId: string, videoId: string, name: string) {
+  return `galleries/${galleryId}/videos/${videoId}/${name}`;
+}
+
+export function videoKeys(galleryId: string, videoId: string, ext: string) {
+  return [`original.${ext}`, "poster.jpg", ...RENDITION_HEIGHTS.map((h) => `${h}.mp4`)].map((n) => videoKey(galleryId, videoId, n));
+}
+
 const UPLOAD_TTL = 60 * 60 * 2; // 2 h pour envoyer un fichier
 
 export function presignPut(key: string, contentType: string) {
