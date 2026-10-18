@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_WIDTH,
@@ -11,10 +12,12 @@ import {
   type BoardItemInput,
   type BoardKind,
   type NoteColor,
+  linkEmbed,
 } from "@/lib/board-types";
 import { makeBoardImage } from "@/lib/client/image";
 import { groupZipImages, isImageName, isTextName, parseMilanoteText, readZip } from "@/lib/client/milanote";
 import {
+  BoardIcon,
   ChecklistIcon,
   CloseIcon,
   ColumnIcon,
@@ -23,7 +26,9 @@ import {
   ImageIcon,
   ImportIcon,
   MinusIcon,
+  LinkIcon,
   NoteIcon,
+  PaletteIcon,
   PencilIcon,
   PlusIcon,
   TrashIcon,
@@ -49,6 +54,8 @@ type Props = {
   joinEndpoint?: string;
   /** Ouvre la fenêtre d'import Milanote dès l'arrivée (tableau créé « Depuis Milanote »). */
   openImport?: boolean;
+  /** Début de l'adresse d'un sous-tableau (carte « Tableau »), suivi de son identifiant. */
+  boardBase: string;
 };
 
 const MIN_ZOOM = 0.15;
@@ -177,14 +184,31 @@ function InlineInput({
   );
 }
 
-export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAdd, visitorName, joinEndpoint, openImport }: Props) {
+export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAdd, visitorName, joinEndpoint, openImport, boardBase }: Props) {
+  const router = useRouter();
   const rootRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [items, setItemsState] = useState<Items>(() => Object.fromEntries(initialItems.map((i) => [i.id, i])));
   const itemsRef = useRef(items);
   const [view, setViewState] = useState<View>({ x: 60, y: 60, k: 1 });
   const viewRef = useRef(view);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelectedState] = useState<string | null>(null);
+  // Sélection de plusieurs cartes (cadre tracé à la souris, ou Maj + clic).
+  const [group, setGroupState] = useState<string[]>([]);
+  const groupRef = useRef<string[]>([]);
+  const setGroup = useCallback((ids: string[]) => {
+    groupRef.current = ids;
+    setGroupState(ids);
+  }, []);
+  const setSelected = useCallback(
+    (id: string | null) => {
+      setSelectedState(id);
+      if (groupRef.current.length) setGroup([]);
+    },
+    [setGroup],
+  );
+  const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const [playing, setPlaying] = useState<string | null>(null);
   const [editing, setEditing] = useState<Editing>(null);
   const [arrowMode, setArrowMode] = useState<{ from: string | null } | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -261,6 +285,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       const all = { ...itemsRef.current };
       const it = all[id];
       if (!it || !canEdit(it)) return;
+      if (it.kind === "board" && !confirm(`Supprimer le tableau « ${it.sub?.title || it.data.title || "Sans titre"} » et tout ce qu'il contient ?`)) return;
       // Une colonne supprimée libère ses cartes sur le tableau, à leur place.
       for (const child of Object.values(all).filter((c) => c.parentId === id)) {
         const b = boxOf(child.id);
@@ -279,7 +304,40 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       setSelected(null);
       setEditing(null);
     },
-    [boxOf, canEdit, role, setItems, sync],
+    [boxOf, canEdit, role, setItems, setSelected, sync],
+  );
+
+  /** Supprime toutes les cartes sélectionnées (une seule confirmation). */
+  const removeGroup = useCallback(() => {
+    const ids = groupRef.current.filter((id) => itemsRef.current[id] && canEdit(itemsRef.current[id]));
+    if (!ids.length || !confirm(`Supprimer ${ids.length} carte${ids.length > 1 ? "s" : ""} ?`)) return;
+    const all = { ...itemsRef.current };
+    const gone = new Set(ids);
+    for (const id of ids) {
+      for (const child of Object.values(all).filter((c) => c.parentId === id && !gone.has(c.id))) {
+        const b = boxOf(child.id);
+        all[child.id] = { ...child, parentId: null, x: b?.x ?? all[id].x, y: b?.y ?? all[id].y };
+        sync.push({ op: "put", item: toInput(all[child.id]) });
+      }
+    }
+    if (role === "admin") for (const a of Object.values(all)) if (a.kind === "arrow" && (gone.has(a.data.from ?? "") || gone.has(a.data.to ?? ""))) gone.add(a.id);
+    for (const g of gone) {
+      delete all[g];
+      sync.push({ op: "delete", id: g });
+    }
+    setItems(all);
+    setGroup([]);
+    setSelected(null);
+  }, [boxOf, canEdit, role, setGroup, setItems, setSelected, sync]);
+
+  /** Entrer dans un sous-tableau (les modifications en attente partent avant). */
+  const openBoard = useCallback(
+    (it: BoardItem) => {
+      if (!it.data.boardId) return;
+      void sync.flush(true);
+      router.push(`${boardBase}${it.data.boardId}`);
+    },
+    [boardBase, router, sync],
   );
 
   // ——— Ajout de cartes ———
@@ -324,7 +382,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       lastActivity.current = Date.now();
       return it;
     },
-    [persist, role, setItems],
+    [persist, role, setItems, setSelected],
   );
 
   const addNote = (at?: { x: number; y: number }) =>
@@ -337,6 +395,19 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       const it = create("todo", { title: "", items: [{ id: crypto.randomUUID(), text: "", done: false }] });
       setEditing({ id: it.id, field: "title" });
     });
+  const addLink = (url = "") =>
+    ensureName(() => {
+      const it = create("link", { url, title: "" });
+      if (!url) setEditing({ id: it.id });
+    });
+  const addColor = () => {
+    const it = create("color", { hex: "#c8a27a", title: "" });
+    setEditing({ id: it.id, field: "title" });
+  };
+  const addBoard = () => {
+    const it = create("board", { title: "", boardId: crypto.randomUUID() }, undefined, { sub: { title: "", count: 0, covers: [] } });
+    setEditing({ id: it.id, field: "title" });
+  };
   const addColumn = () => {
     const it = create("column", { title: "", color: "blanc" });
     setEditing({ id: it.id, field: "title" });
@@ -482,7 +553,12 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
                 z: ++z,
                 parentId: parent.id,
                 position: i,
-                data: card.kind === "note" ? { text: card.text, color: "blanc" } : { title: card.title, items: card.items },
+                data:
+                  card.kind === "note"
+                    ? { text: card.text, color: "blanc" }
+                    : card.kind === "link"
+                      ? { url: card.url, title: card.title }
+                      : { title: card.title, items: card.items },
               }),
             );
           }
@@ -572,6 +648,18 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     if (!canEdit(it)) return; // carte du studio côté client : le geste déplace le tableau
     e.stopPropagation();
     if (editing?.id !== it.id) setEditing(null);
+    // Maj + clic : ajoute ou retire la carte de la sélection.
+    if (e.shiftKey && !it.parentId) {
+      const cur = groupRef.current.length ? groupRef.current : selected && selected !== it.id && !itemsRef.current[selected]?.parentId ? [selected] : [];
+      const next = cur.includes(it.id) ? cur.filter((x) => x !== it.id) : [...cur, it.id];
+      setSelectedState(null);
+      setGroup(next);
+      return;
+    }
+    if (groupRef.current.length > 1 && groupRef.current.includes(it.id)) {
+      startGroupDrag(e);
+      return;
+    }
     setSelected(it.id);
     const startX = e.clientX;
     const startY = e.clientY;
@@ -614,6 +702,34 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       }
       setDragId(null);
       setDropTarget(null);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  };
+
+  /** Déplace toutes les cartes sélectionnées ensemble. */
+  const startGroupDrag = (e: React.PointerEvent) => {
+    const ids = groupRef.current.filter((id) => itemsRef.current[id] && !itemsRef.current[id].parentId);
+    const origins = new Map(ids.map((id) => [id, { x: itemsRef.current[id].x, y: itemsRef.current[id].y }]));
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const k = viewRef.current.k;
+    let moved = false;
+    const move = (ev: PointerEvent) => {
+      if (!moved && Math.hypot(ev.clientX - startX, ev.clientY - startY) < 4) return;
+      moved = true;
+      const dx = (ev.clientX - startX) / k;
+      const dy = (ev.clientY - startY) / k;
+      const all = { ...itemsRef.current };
+      for (const [id, o] of origins) if (all[id]) all[id] = { ...all[id], x: Math.round(o.x + dx), y: Math.round(o.y + dy) };
+      setItems(all);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      if (moved) for (const id of ids) if (itemsRef.current[id]) persist(itemsRef.current[id]);
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
@@ -669,6 +785,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
   );
 
   const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const spaceDown = useRef(false);
   const pinch = useRef<{ dist: number; cx: number; cy: number } | null>(null);
 
   const onBackgroundDown = (e: React.PointerEvent) => {
@@ -679,6 +796,43 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     setEditing(null);
     const root = rootRef.current!;
     const o = root.getBoundingClientRect();
+    // Souris : glisser sur le fond trace un cadre de sélection (comme Milanote).
+    // Le tableau se déplace avec la molette / le pavé tactile, ou espace + glisser, ou le bouton du milieu.
+    if (e.pointerType === "mouse" && e.button === 0 && !spaceDown.current && !arrowMode) {
+      const x0 = e.clientX - o.left;
+      const y0 = e.clientY - o.top;
+      const additive = e.shiftKey ? [...groupRef.current] : [];
+      const move = (ev: PointerEvent) => {
+        const m = { x0, y0, x1: ev.clientX - o.left, y1: ev.clientY - o.top };
+        setMarquee(m);
+        const v = viewRef.current;
+        const wx0 = (Math.min(m.x0, m.x1) - v.x) / v.k;
+        const wx1 = (Math.max(m.x0, m.x1) - v.x) / v.k;
+        const wy0 = (Math.min(m.y0, m.y1) - v.y) / v.k;
+        const wy1 = (Math.max(m.y0, m.y1) - v.y) / v.k;
+        const hit = Object.values(itemsRef.current)
+          .filter((i) => i.kind !== "arrow" && !i.parentId && canEdit(i))
+          .filter((i) => {
+            const b = boxOf(i.id);
+            return b && b.x < wx1 && b.x + b.w > wx0 && b.y < wy1 && b.y + b.h > wy0;
+          })
+          .map((i) => i.id);
+        setGroup([...new Set([...additive, ...hit])]);
+      };
+      const up = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        setMarquee(null);
+        if (groupRef.current.length === 1) {
+          const only = groupRef.current[0];
+          setGroup([]);
+          setSelectedState(only);
+        }
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+      return;
+    }
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.current.size === 2) {
       const [a, b] = [...pointers.current.values()];
@@ -827,11 +981,21 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     const key = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t.closest("input, textarea")) return;
-      if ((e.key === "Delete" || e.key === "Backspace") && selected) {
+      if (e.key === " ") spaceDown.current = true;
+      if ((e.key === "Delete" || e.key === "Backspace") && groupRef.current.length > 1) {
+        e.preventDefault();
+        removeGroup();
+      } else if ((e.key === "a" || e.key === "A") && (e.metaKey || e.ctrlKey)) {
+        // Cmd/Ctrl + A : tout sélectionner.
+        e.preventDefault();
+        setSelectedState(null);
+        setGroup(Object.values(itemsRef.current).filter((i) => i.kind !== "arrow" && !i.parentId && canEdit(i)).map((i) => i.id));
+      } else if ((e.key === "Delete" || e.key === "Backspace") && selected) {
         e.preventDefault();
         remove(selected);
       } else if (e.key === "Escape") {
         setSelected(null);
+        setGroup([]);
         setArrowMode(null);
       }
     };
@@ -845,18 +1009,26 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         return;
       }
       const text = e.clipboardData?.getData("text/plain")?.trim();
-      if (text) {
+      if (text && /^https?:\/\/\S+$/.test(text)) {
+        e.preventDefault();
+        addLink(text);
+      } else if (text) {
         e.preventDefault();
         ensureName(() => create("note", { text: text.slice(0, 5000), color: "blanc" }));
       }
     };
+    const keyUp = (e: KeyboardEvent) => {
+      if (e.key === " ") spaceDown.current = false;
+    };
     window.addEventListener("keydown", key);
+    window.addEventListener("keyup", keyUp);
     window.addEventListener("paste", paste);
     return () => {
+      window.removeEventListener("keyup", keyUp);
       window.removeEventListener("keydown", key);
       window.removeEventListener("paste", paste);
     };
-  }, [addImages, canAdd, create, ensureName, remove, selected]);
+  }, [addImages, canAdd, canEdit, create, ensureName, remove, removeGroup, selected, setGroup, setSelected]);
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -921,17 +1093,22 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     setEditing((cur) => (cur?.id === it.id ? null : cur));
     const cur = itemsRef.current[it.id];
     if (cur?.kind === "note" && !cur.data.text?.trim()) remove(it.id);
+    if (cur?.kind === "link" && !cur.data.url?.trim()) remove(it.id);
   };
 
   const startEdit = (it: BoardItem) => {
     if (!canEdit(it)) return;
     setSelected(it.id);
-    setEditing({ id: it.id, field: it.kind === "todo" || it.kind === "column" ? "title" : it.kind === "image" ? "caption" : undefined });
+    setEditing({
+      id: it.id,
+      field: it.kind === "todo" || it.kind === "column" || it.kind === "board" || it.kind === "color" ? "title" : it.kind === "image" ? "caption" : undefined,
+    });
   };
 
   function renderCard(it: BoardItem, inColumn = false) {
     const editable = canEdit(it);
     const isSel = selected === it.id;
+    const inGroup = group.includes(it.id);
     const isDrag = dragId === it.id;
     const ed = editing?.id === it.id ? editing : null;
     const style: React.CSSProperties = inColumn
@@ -952,7 +1129,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         style={{
           ...style,
           background: it.kind === "column" ? "color-mix(in srgb, var(--ink) 4%, var(--bg-soft))" : it.kind === "note" ? noteBg(it.data.color) : "var(--bg)",
-          outline: isSel || firstPick ? "2px solid #10b981" : undefined,
+          outline: isSel || firstPick || inGroup ? "2px solid #10b981" : undefined,
           outlineOffset: 1,
         }}
         className={`rounded-[3px] text-[13px] leading-relaxed select-none ${inColumn ? "relative" : ""} ${shell} ${pickable} ${editable && !arrowMode ? "cursor-grab active:cursor-grabbing" : ""}`}
@@ -960,7 +1137,8 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         onDoubleClick={(e) => {
           if ((e.target as HTMLElement).closest("input, textarea, button, a")) return;
           e.stopPropagation();
-          if (it.kind !== "column" || (e.target as HTMLElement).closest("[data-col-head]")) startEdit(it);
+          if (it.kind === "board") openBoard(it);
+          else if (it.kind !== "column" || (e.target as HTMLElement).closest("[data-col-head]")) startEdit(it);
         }}
       >
         {it.kind === "note" && (
@@ -1002,6 +1180,9 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         )}
 
         {it.kind === "todo" && renderTodo(it, editable, ed)}
+        {it.kind === "board" && renderBoardCard(it, ed)}
+        {it.kind === "color" && renderColor(it, ed)}
+        {it.kind === "link" && renderLink(it, ed)}
 
         {it.kind === "column" && (
           <div>
@@ -1040,6 +1221,150 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
             title="Largeur"
           />
         )}
+      </div>
+    );
+  }
+
+  /** Carte « tableau » : aperçu de ce qu'il contient ; double-clic (ou « Ouvrir ») pour y entrer. */
+  function renderBoardCard(it: BoardItem, ed: Editing) {
+    const covers = it.sub?.covers ?? [];
+    const title = it.sub?.title ?? it.data.title ?? "";
+    return (
+      <div className="p-2">
+        <div className="aspect-[4/3] bg-bg-soft overflow-hidden grid grid-cols-2 grid-rows-2 gap-px">
+          {covers.length ? (
+            covers.map((src, i) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={i}
+                src={src}
+                alt=""
+                draggable={false}
+                className={`w-full h-full object-cover pointer-events-none ${covers.length === 1 ? "col-span-2 row-span-2" : covers.length === 2 ? "row-span-2" : covers.length === 3 && i === 0 ? "row-span-2" : ""}`}
+              />
+            ))
+          ) : (
+            <span className="col-span-2 row-span-2 flex items-center justify-center text-muted">
+              <BoardIcon className="w-7 h-7" />
+            </span>
+          )}
+        </div>
+        <div className="px-1 pt-2">
+          {ed?.field === "title" ? (
+            <InlineInput
+              value={title}
+              onChange={(t) => update(it.id, { data: { ...it.data, title: t }, sub: { title: t, count: it.sub?.count ?? 0, covers: it.sub?.covers ?? [] } })}
+              onDone={() => finishEdit(it)}
+              placeholder="Nom du tableau"
+              className="font-medium"
+            />
+          ) : (
+            <p className="font-medium truncate">{title || <span className="text-muted">Sans titre</span>}</p>
+          )}
+          <p className="text-[11px] text-muted">
+            {it.sub ? `${it.sub.count} carte${it.sub.count > 1 ? "s" : ""}` : "Tableau"} · double-clic pour ouvrir
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  /** Carte « couleur » (palette, étalonnage) : teinte, nom et code. */
+  function renderColor(it: BoardItem, ed: Editing) {
+    const hex = it.data.hex ?? "#c8a27a";
+    return (
+      <div>
+        <div className="relative w-full rounded-t-[2px]" style={{ background: hex, aspectRatio: "16 / 10" }}>
+          {ed && (
+            <input
+              type="color"
+              value={hex}
+              onChange={(e) => updateData(it.id, { hex: e.target.value })}
+              className="absolute right-2 bottom-2 w-9 h-9 cursor-pointer bg-transparent"
+              aria-label="Choisir la couleur"
+            />
+          )}
+        </div>
+        <div className="px-3 py-2">
+          {ed?.field === "title" ? (
+            <InlineInput value={it.data.title ?? ""} onChange={(t) => updateData(it.id, { title: t })} onDone={() => finishEdit(it)} placeholder="Nom de la couleur" />
+          ) : (
+            <p className="truncate">{it.data.title || <span className="text-muted">Couleur</span>}</p>
+          )}
+          <p className="text-[11px] text-muted uppercase tracking-wider">{hex}</p>
+        </div>
+      </div>
+    );
+  }
+
+  /** Carte « lien » : lecteur YouTube / Vimeo / Spotify / SoundCloud / Deezer, ou simple lien. */
+  function renderLink(it: BoardItem, ed: Editing) {
+    const url = it.data.url ?? "";
+    if (ed || !url) {
+      return (
+        <div className="px-3.5 py-3">
+          {ed ? (
+            <InlineInput
+              value={url}
+              onChange={(v) => updateData(it.id, { url: v.trim() })}
+              onDone={() => finishEdit(it)}
+              placeholder="Collez un lien YouTube, Vimeo, Spotify…"
+              className="text-xs"
+            />
+          ) : (
+            <p className="text-xs text-muted">Lien vide</p>
+          )}
+        </div>
+      );
+    }
+    const e = linkEmbed(url);
+    const video = e?.provider === "youtube" || e?.provider === "vimeo";
+    if (e?.embed && playing === it.id) {
+      return (
+        <div data-nodrag>
+          <iframe
+            src={e.embed}
+            title={e.label}
+            allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write"
+            allowFullScreen
+            className="block w-full border-0 rounded-t-[2px]"
+            style={video ? { aspectRatio: "16 / 9" } : { height: e.height ?? 152 }}
+          />
+          <button data-nodrag onClick={() => setPlaying(null)} className="w-full text-left px-3.5 py-2 text-[11px] text-muted hover:text-ink">
+            ■ Arrêter · {e.label}
+          </button>
+        </div>
+      );
+    }
+    return (
+      <div>
+        {video && (
+          <button data-nodrag onClick={() => setPlaying(it.id)} className="relative block w-full aspect-video bg-black overflow-hidden rounded-t-[2px]" aria-label="Lire">
+            {e.thumb && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={e.thumb}
+                alt=""
+                draggable={false}
+                onError={(ev) => (ev.currentTarget.style.display = "none")}
+                className="absolute inset-0 w-full h-full object-cover opacity-90"
+              />
+            )}
+            <span className="absolute inset-0 flex items-center justify-center">
+              <span className="w-12 h-12 rounded-full bg-black/60 text-white flex items-center justify-center text-lg pl-1">▶</span>
+            </span>
+          </button>
+        )}
+        {!video && e?.embed && (
+          <button data-nodrag onClick={() => setPlaying(it.id)} className="w-full flex items-center gap-3 px-3.5 pt-3 text-left">
+            <span className="w-9 h-9 shrink-0 rounded-full bg-ink text-bg flex items-center justify-center text-sm pl-0.5">▶</span>
+            <span className="text-xs text-muted">Écouter sur la carte</span>
+          </button>
+        )}
+        <a data-nodrag href={url} target="_blank" rel="noreferrer noopener" className="block px-3.5 py-2.5 hover:opacity-80">
+          <span className="block text-[10px] uppercase tracking-widest text-muted">{e?.label ?? "Lien"}</span>
+          <span className="block text-xs truncate underline underline-offset-2">{it.data.title || url.replace(/^https?:\/\/(www\.)?/, "")}</span>
+        </a>
       </div>
     );
   }
@@ -1142,9 +1467,12 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
   const selEditable = sel ? canEdit(sel) : false;
   const tools: { label: string; Icon: typeof NoteIcon; run: () => void; admin?: boolean; active?: boolean; desktop?: boolean }[] = [
     { label: "Note", Icon: NoteIcon, run: () => addNote() },
+    { label: "Lien", Icon: LinkIcon, run: () => addLink() },
     { label: "Image", Icon: ImageIcon, run: () => ensureName(() => fileRef.current?.click()) },
     { label: "Liste", Icon: ChecklistIcon, run: addTodo },
+    { label: "Tableau", Icon: BoardIcon, run: addBoard, admin: true },
     { label: "Colonne", Icon: ColumnIcon, run: addColumn, admin: true },
+    { label: "Couleur", Icon: PaletteIcon, run: addColor, admin: true },
     { label: "Flèche", Icon: ConnectorIcon, run: () => setArrowMode((m) => (m ? null : { from: null })), admin: true, active: Boolean(arrowMode) },
     { label: "Importer", Icon: ImportIcon, run: () => setImportOpen(true), admin: true, desktop: true },
   ];
@@ -1211,22 +1539,50 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           item={sel}
           onColor={sel.kind === "note" || sel.kind === "column" ? (color) => updateData(sel.id, { color }) : undefined}
           onEdit={sel.kind !== "arrow" ? () => startEdit(sel) : undefined}
+          onOpen={sel.kind === "board" ? () => openBoard(sel) : undefined}
           onDelete={() => remove(sel.id)}
         />
+      )}
+
+      {/* Cadre de sélection (souris) */}
+      {marquee && (
+        <div
+          className="absolute z-[200000] border border-emerald-500 bg-emerald-500/10 pointer-events-none"
+          style={{
+            left: Math.min(marquee.x0, marquee.x1),
+            top: Math.min(marquee.y0, marquee.y1),
+            width: Math.abs(marquee.x1 - marquee.x0),
+            height: Math.abs(marquee.y1 - marquee.y0),
+          }}
+        />
+      )}
+
+      {/* Plusieurs cartes sélectionnées */}
+      {group.length > 1 && !marquee && (
+        <div data-ui className="absolute z-[200001] top-4 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-bg border border-line shadow-lg rounded-full pl-4 pr-1.5 h-10 text-xs">
+          <span>{group.length} cartes sélectionnées</span>
+          <span className="text-muted hidden sm:inline">· glissez l&apos;une d&apos;elles pour tout déplacer</span>
+          <button onClick={removeGroup} className="ml-1 w-8 h-8 flex items-center justify-center text-muted hover:text-danger" aria-label="Supprimer la sélection" title="Supprimer">
+            <TrashIcon className="w-4 h-4" />
+          </button>
+          <button onClick={() => setGroup([])} className="w-8 h-8 flex items-center justify-center text-muted hover:text-ink" aria-label="Désélectionner" title="Désélectionner">
+            <CloseIcon className="w-4 h-4" />
+          </button>
+        </div>
       )}
 
       {/* Outils : à gauche sur ordinateur, en bas sur téléphone */}
       {canAdd && (
         <div
           data-ui
-          className="absolute z-[200000] bg-bg border border-line shadow-lg flex rounded-[4px] left-1/2 -translate-x-1/2 bottom-[max(env(safe-area-inset-bottom),12px)] sm:left-4 sm:translate-x-0 sm:top-4 sm:bottom-auto sm:flex-col"
+          className="absolute z-[200000] bg-bg border border-line shadow-lg flex rounded-[4px] left-3 max-w-[calc(100%-76px)] overflow-x-auto no-scrollbar bottom-[max(env(safe-area-inset-bottom),12px)] sm:left-4 sm:top-4 sm:bottom-auto sm:flex-col sm:max-w-none sm:max-h-[calc(100%-32px)] sm:overflow-x-hidden sm:overflow-y-auto"
         >
           {visibleTools.map(({ label, Icon, run, active, desktop }) => (
             <button
               key={label}
               onClick={run}
               title={desktop ? "Importer un tableau Milanote" : undefined}
-              className={`${desktop ? "hidden sm:flex" : "flex"} flex-col items-center justify-center gap-1 w-[60px] h-[58px] text-[10px] tracking-wide transition-colors ${active ? "bg-emerald-500/15 text-emerald-600" : "text-muted hover:text-ink hover:bg-bg-soft"}`}
+              className={`${desktop ? "hidden sm:flex" : "flex"} shrink-0 flex-col items-center justify-center gap-1 w-[60px] h-[58px] text-[10px] tracking-wide transition-colors ${active ? "bg-emerald-500/15 text-emerald-600" : "text-muted hover:text-ink hover:bg-bg-soft"}`}
             >
               <Icon className="w-5 h-5" />
               {label}
@@ -1346,12 +1702,14 @@ function SelectionBar({
   item,
   onColor,
   onEdit,
+  onOpen,
   onDelete,
 }: {
   pos: { left: number; top: number };
   item: BoardItem;
   onColor?: (c: NoteColor) => void;
   onEdit?: () => void;
+  onOpen?: () => void;
   onDelete: () => void;
 }) {
   return (
@@ -1373,6 +1731,11 @@ function SelectionBar({
           />
         ))}
       {onColor && <span className="w-px h-5 bg-line mx-1" />}
+      {onOpen && (
+        <button onClick={onOpen} className="h-8 px-3 rounded-full bg-ink text-bg text-[11px] tracking-wider uppercase mr-1">
+          Ouvrir
+        </button>
+      )}
       {onEdit && (
         <button onClick={onEdit} className="w-8 h-8 flex items-center justify-center text-muted hover:text-ink" aria-label="Modifier" title="Modifier">
           <PencilIcon className="w-4 h-4" />

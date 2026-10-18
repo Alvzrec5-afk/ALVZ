@@ -1,6 +1,6 @@
 /** Tableaux façon Milanote : types partagés entre le navigateur et le serveur. */
 
-export type BoardKind = "note" | "image" | "todo" | "column" | "arrow";
+export type BoardKind = "note" | "image" | "todo" | "column" | "arrow" | "board" | "color" | "link";
 
 /** Teintes des notes : mélangées au fond, elles restent douces en mode clair comme en mode sombre. */
 export const NOTE_COLORS = {
@@ -27,6 +27,12 @@ export type BoardData = {
   /** Flèche : cartes reliées. */
   from?: string;
   to?: string;
+  /** Couleur : teinte libre « #rrggbb » (nom dans `title`). */
+  hex?: string;
+  /** Lien : adresse (YouTube, Vimeo, Spotify, SoundCloud… ou n'importe quel site). */
+  url?: string;
+  /** Sous-tableau : identifiant du tableau ouvert par la carte (nom dans `title`). */
+  boardId?: string;
 };
 
 /** Ce que le navigateur envoie pour créer ou modifier une carte. */
@@ -50,11 +56,61 @@ export type BoardItem = BoardItemInput & {
   mine: boolean;
   /** Image : URL de lecture temporaire. */
   src: string | null;
+  /** Sous-tableau : nom, nombre de cartes et quelques images pour l'aperçu. */
+  sub?: { title: string; count: number; covers: string[] } | null;
 };
 
 export type BoardOp = { op: "put"; item: BoardItemInput } | { op: "delete"; id: string };
 
-export const DEFAULT_WIDTH: Record<BoardKind, number> = { note: 240, image: 280, todo: 260, column: 280, arrow: 0 };
+export const DEFAULT_WIDTH: Record<BoardKind, number> = { note: 240, image: 280, todo: 260, column: 280, arrow: 0, board: 200, color: 160, link: 300 };
+
+export const isHex = (v: unknown): v is string => typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v);
+
+export type LinkEmbed = {
+  provider: "youtube" | "vimeo" | "spotify" | "soundcloud" | "deezer" | "web";
+  label: string;
+  /** Lecteur intégré (iframe), chargé seulement quand on appuie sur ▶. */
+  embed: string | null;
+  /** Hauteur du lecteur audio (les vidéos sont en 16/9). */
+  height?: number;
+  thumb: string | null;
+  host: string;
+};
+
+/** Reconnaît les liens vidéo et musique pour afficher un lecteur dans la carte. */
+export function linkEmbed(raw: string): LinkEmbed | null {
+  let u: URL;
+  try {
+    u = new URL(raw.trim());
+  } catch {
+    return null;
+  }
+  if (!/^https?:$/.test(u.protocol)) return null;
+  const host = u.hostname.replace(/^www\.|^m\./, "");
+  const yt =
+    host === "youtu.be"
+      ? u.pathname.slice(1)
+      : /(^|\.)youtube\.com$/.test(host)
+        ? u.searchParams.get("v") ?? /^\/(?:shorts|embed|live)\/([\w-]{6,})/.exec(u.pathname)?.[1] ?? null
+        : null;
+  if (yt && /^[\w-]{6,20}$/.test(yt)) {
+    return { provider: "youtube", label: "YouTube", host, embed: `https://www.youtube-nocookie.com/embed/${yt}?autoplay=1`, thumb: `https://i.ytimg.com/vi/${yt}/hqdefault.jpg` };
+  }
+  const vimeo = host.endsWith("vimeo.com") ? /\/(\d{5,})/.exec(u.pathname)?.[1] : null;
+  if (vimeo) return { provider: "vimeo", label: "Vimeo", host, embed: `https://player.vimeo.com/video/${vimeo}?autoplay=1`, thumb: null };
+  if (host === "open.spotify.com") {
+    const m = /^\/(?:intl-\w+\/)?(track|album|playlist|episode|show|artist)\/(\w+)/.exec(u.pathname);
+    if (m) return { provider: "spotify", label: "Spotify", host, embed: `https://open.spotify.com/embed/${m[1]}/${m[2]}`, height: m[1] === "track" || m[1] === "episode" ? 152 : 352, thumb: null };
+  }
+  if (host === "soundcloud.com") {
+    return { provider: "soundcloud", label: "SoundCloud", host, embed: `https://w.soundcloud.com/player/?url=${encodeURIComponent(u.href)}&auto_play=true&visual=false`, height: 166, thumb: null };
+  }
+  if (host.endsWith("deezer.com")) {
+    const m = /\/(track|album|playlist)\/(\d+)/.exec(u.pathname);
+    if (m) return { provider: "deezer", label: "Deezer", host, embed: `https://widget.deezer.com/widget/auto/${m[1]}/${m[2]}`, height: m[1] === "track" ? 152 : 300, thumb: null };
+  }
+  return { provider: "web", label: host, host, embed: null, thumb: null };
+}
 export const MIN_WIDTH = 140;
 export const MAX_WIDTH = 1200;
 

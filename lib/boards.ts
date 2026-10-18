@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { cache } from "react";
 import {
+  isHex,
   MAX_WIDTH,
   MIN_WIDTH,
   NOTE_COLORS,
@@ -14,7 +15,7 @@ import {
 } from "@/lib/board-types";
 import { deleteKeys, presignGet } from "@/lib/storage";
 import { createServiceClient } from "@/lib/supabase/server";
-import { sign, unsign } from "@/lib/tokens";
+import { newSlug, sign, unsign } from "@/lib/tokens";
 
 export const BOARD_ITEM_FIELDS = "id, kind, x, y, w, z, parent_id, position, data, size_bytes, author, client_id";
 export const MAX_BOARD_IMAGE_BYTES = 4 * 1024 * 1024;
@@ -48,8 +49,10 @@ export const isUuid = (v: unknown): v is string => typeof v === "string" && UUID
 export async function loadBoardItems(db: SupabaseClient, boardId: string, actor: Actor): Promise<BoardItem[]> {
   const { data, error } = await db.from("board_items").select(BOARD_ITEM_FIELDS).eq("board_id", boardId).limit(MAX_ITEMS);
   if (error) throw new Error(`Impossible de charger le tableau : ${error.message}`);
+  const rows = (data ?? []) as Row[];
+  const subs = await subBoardPreviews(db, boardId);
   return Promise.all(
-    ((data ?? []) as Row[]).map(async (r) => ({
+    rows.map(async (r) => ({
       id: r.id,
       kind: r.kind,
       x: r.x,
@@ -62,8 +65,48 @@ export async function loadBoardItems(db: SupabaseClient, boardId: string, actor:
       author: r.author,
       mine: actor.role === "admin" || (r.client_id !== null && r.client_id === actor.clientId),
       src: r.kind === "image" && r.size_bytes > 0 ? await presignGet(boardImageKey(boardId, r.id)) : null,
+      sub: r.kind === "board" && r.data?.boardId ? subs.get(r.data.boardId) ?? null : undefined,
     })),
   );
+}
+
+/** Aperçu des sous-tableaux d'un tableau : nom, nombre de cartes, 4 images au plus. */
+async function subBoardPreviews(db: SupabaseClient, boardId: string) {
+  const out = new Map<string, { title: string; count: number; covers: string[] }>();
+  const { data: boards } = await db.from("boards").select("id, title").eq("parent_id", boardId);
+  if (!boards?.length) return out;
+  const { data: items } = await db
+    .from("board_items")
+    .select("id, board_id, kind, size_bytes, z")
+    .in("board_id", boards.map((b) => b.id as string))
+    .neq("kind", "arrow");
+  for (const b of boards) {
+    const mine = (items ?? []).filter((i) => i.board_id === b.id);
+    const images = mine.filter((i) => i.kind === "image" && Number(i.size_bytes) > 0).sort((x, y) => Number(y.z) - Number(x.z));
+    out.set(b.id as string, {
+      title: b.title as string,
+      count: mine.length,
+      covers: await Promise.all(images.slice(0, 4).map((i) => presignGet(boardImageKey(b.id as string, i.id as string)))),
+    });
+  }
+  return out;
+}
+
+/** Chemin depuis le tableau principal jusqu'à ce tableau (fil d'Ariane), du haut vers le bas. */
+export async function boardAncestors(db: SupabaseClient, boardId: string) {
+  const chain: { id: string; title: string; parent_id: string | null }[] = [];
+  let id: string | null = boardId;
+  for (let depth = 0; id && depth < 25; depth++) {
+    const { data }: { data: { id: string; title: string; parent_id: string | null } | null } = await db
+      .from("boards")
+      .select("id, title, parent_id")
+      .eq("id", id)
+      .maybeSingle();
+    if (!data) break;
+    chain.unshift(data);
+    id = data.parent_id;
+  }
+  return chain;
 }
 
 const num = (v: unknown, min: number, max: number, fallback = 0) => {
@@ -96,11 +139,19 @@ function cleanData(kind: BoardKind, raw: BoardData): BoardData {
       return { title: text(d.title, 200) ?? "", color: d.color && d.color in NOTE_COLORS ? d.color : "blanc" };
     case "arrow":
       return { from: isUuid(d.from) ? d.from : undefined, to: isUuid(d.to) ? d.to : undefined };
+    case "color":
+      return { hex: isHex(d.hex) ? d.hex.toLowerCase() : "#c8a27a", title: text(d.title, 100) ?? "" };
+    case "link": {
+      const url = text(d.url, 2000)?.trim() ?? "";
+      return { url: /^https?:\/\//i.test(url) ? url : "", title: text(d.title, 200) ?? "" };
+    }
+    case "board":
+      return { boardId: isUuid(d.boardId) ? d.boardId : undefined, title: text(d.title, 200) ?? "" };
   }
 }
 
-const KINDS: BoardKind[] = ["note", "image", "todo", "column", "arrow"];
-const CLIENT_KINDS: BoardKind[] = ["note", "todo"];
+const KINDS: BoardKind[] = ["note", "image", "todo", "column", "arrow", "board", "color", "link"];
+const CLIENT_KINDS: BoardKind[] = ["note", "todo", "link"];
 
 /**
  * Applique une série de modifications. Toutes les cartes visées doivent appartenir au tableau ;
@@ -122,7 +173,7 @@ export async function applyBoardOps(
   ];
   const lookup = [...new Set([...ids, ...parentIds])];
   const { data: existing, error } = lookup.length
-    ? await db.from("board_items").select("id, board_id, kind, client_id, author, size_bytes").in("id", lookup)
+    ? await db.from("board_items").select("id, board_id, kind, client_id, author, size_bytes, data").in("id", lookup)
     : { data: [], error: null };
   if (error) throw new Error(error.message);
   const known = new Map((existing ?? []).map((r) => [r.id as string, r]));
@@ -136,6 +187,8 @@ export async function applyBoardOps(
   );
   const puts: Record<string, unknown>[] = [];
   const deletes: string[] = [];
+  const subBoards: { id: string; title: string }[] = []; // cartes « tableau » créées ou renommées
+  const deletedSubBoards: string[] = [];
   const freedKeys: string[] = [];
   const now = new Date().toISOString();
 
@@ -146,6 +199,7 @@ export async function applyBoardOps(
       if (!owns(row)) throw new Error("Carte non modifiable");
       deletes.push(o.id);
       if (row.kind === "image") freedKeys.push(boardImageKey(boardId, o.id));
+      if (row.kind === "board" && isUuid((row.data as BoardData | null)?.boardId)) deletedSubBoards.push((row.data as BoardData).boardId!);
       continue;
     }
     const it = o.item as BoardItemInput;
@@ -161,6 +215,14 @@ export async function applyBoardOps(
       it.kind !== "column" &&
       it.kind !== "arrow" &&
       ((parent && parent.board_id === boardId && parent.kind === "column") || (it.parentId && newColumns.has(it.parentId)));
+    const data = cleanData(it.kind, it.data);
+    if (it.kind === "board") {
+      // La carte garde toujours le même sous-tableau ; à la création, il en faut un nouveau.
+      const before = row?.data as BoardData | null;
+      data.boardId = before?.boardId ?? data.boardId ?? crypto.randomUUID();
+      // Nom du sous-tableau : seulement à la création ou si la carte a vraiment été renommée.
+      if (!row || (before?.title ?? "") !== (data.title ?? "")) subBoards.push({ id: data.boardId, title: data.title || "Sans titre" });
+    }
     puts.push({
       id: it.id,
       board_id: boardId,
@@ -171,7 +233,7 @@ export async function applyBoardOps(
       z: num(it.z, -1e9, 1e9),
       parent_id: parentOk ? it.parentId : null,
       position: num(it.position, -1e12, 1e12),
-      data: cleanData(it.kind, it.data),
+      data,
       // La taille de l'image n'est enregistrée qu'à la création (après l'envoi du fichier).
       size_bytes: row ? row.size_bytes : it.kind === "image" ? Math.round(num(it.sizeBytes, 0, MAX_BOARD_IMAGE_BYTES)) : 0,
       // Toujours explicites : dans un envoi groupé, un champ absent serait remis à vide.
@@ -188,6 +250,22 @@ export async function applyBoardOps(
     const { count } = await db.from("board_items").select("id", { count: "exact", head: true }).eq("board_id", boardId);
     if ((count ?? 0) + puts.length > MAX_ITEMS) throw new Error("Tableau plein (2000 cartes maximum)");
   }
+  if (subBoards.length) {
+    // Sous-tableaux : créés au premier envoi de leur carte, renommés ensuite avec elle.
+    const { data: known } = await db.from("boards").select("id, parent_id").in("id", subBoards.map((b) => b.id));
+    const existing = new Map((known ?? []).map((b) => [b.id as string, b.parent_id as string | null]));
+    if ([...existing.values()].some((parent) => parent !== boardId)) throw new Error("Tableau invalide");
+    const fresh = subBoards.filter((b) => !existing.has(b.id));
+    if (fresh.length) {
+      const { error: subError } = await db
+        .from("boards")
+        .insert(fresh.map((b) => ({ id: b.id, title: b.title, parent_id: boardId, share_slug: newSlug() })));
+      if (subError) throw new Error(subError.message);
+    }
+    await Promise.all(
+      subBoards.filter((b) => existing.has(b.id)).map((b) => db.from("boards").update({ title: b.title }).eq("id", b.id).eq("parent_id", boardId)),
+    );
+  }
   // Colonnes d'abord : les cartes du même envoi peuvent y être rangées.
   for (const group of [puts.filter((p) => p.kind === "column"), puts.filter((p) => p.kind !== "column")]) {
     if (!group.length) continue;
@@ -198,14 +276,27 @@ export async function applyBoardOps(
     const { error: delError } = await db.from("board_items").delete().eq("board_id", boardId).in("id", deletes);
     if (delError) throw new Error(delError.message);
     if (freedKeys.length) await deleteKeys(freedKeys);
+    for (const sub of deletedSubBoards) await purgeBoard(db, sub, boardId);
   }
   await db.from("boards").update({ updated_at: now }).eq("id", boardId);
 }
 
-/** Supprime un tableau, ses cartes et ses images. */
-export async function purgeBoard(db: SupabaseClient, boardId: string) {
-  const { data } = await db.from("board_items").select("id").eq("board_id", boardId).eq("kind", "image");
-  if (data?.length) await deleteKeys(data.map((r) => boardImageKey(boardId, r.id as string)));
+/** Supprime un tableau, ses sous-tableaux, leurs cartes et leurs images. */
+export async function purgeBoard(db: SupabaseClient, boardId: string, expectedParent?: string) {
+  if (expectedParent) {
+    const { data } = await db.from("boards").select("parent_id").eq("id", boardId).maybeSingle();
+    if (!data || data.parent_id !== expectedParent) return;
+  }
+  // Tous les tableaux contenus, à n'importe quelle profondeur.
+  const all = [boardId];
+  for (let level = [boardId], depth = 0; level.length && depth < 25; depth++) {
+    const { data } = await db.from("boards").select("id").in("parent_id", level);
+    level = (data ?? []).map((b) => b.id as string);
+    all.push(...level);
+  }
+  const { data: images } = await db.from("board_items").select("id, board_id").in("board_id", all).eq("kind", "image");
+  if (images?.length) await deleteKeys(images.map((r) => boardImageKey(r.board_id as string, r.id as string)));
+  // Les sous-tableaux disparaissent avec le tableau (suppression en cascade).
   const { error } = await db.from("boards").delete().eq("id", boardId);
   if (error) throw new Error(error.message);
 }
@@ -251,4 +342,20 @@ export async function setBoardVisitor(board: PublicBoard, clientId: string, name
 export async function clientActor(board: PublicBoard): Promise<Actor> {
   const visitor = await boardVisitor(board);
   return visitor ? { role: "client", ...visitor } : { role: "client", clientId: "", name: "" };
+}
+
+/**
+ * Tableau partagé ou l'un de ses sous-tableaux (`/t/<lien>/b/<id>`) : le sous-tableau doit se trouver
+ * sous le tableau partagé. Le prénom du visiteur et l'option « ajouter ses idées » viennent du tableau partagé.
+ */
+export async function resolveSharedBoard(slug: string, subId?: string | null) {
+  const root = await findSharedBoard(slug);
+  if (!root) return null;
+  if (!subId || subId === root.id) return { root, board: { id: root.id, title: root.title }, path: [{ id: root.id, title: root.title }] };
+  if (!isUuid(subId)) return null;
+  const chain = await boardAncestors(createServiceClient(), subId);
+  const at = chain.findIndex((b) => b.id === root.id);
+  if (at < 0) return null;
+  const path = chain.slice(at).map((b) => ({ id: b.id, title: b.title }));
+  return { root, board: path[path.length - 1], path };
 }

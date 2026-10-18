@@ -218,3 +218,8 @@ export const ImportIcon = ({ className = "w-5 h-5" }: P) => (
     <path d="M12 3.5v10m0 0-4-4m4 4 4-4M4.5 14v5.5h15V14" />
   </svg>
 );
+export const LinkIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <path d="M10 14a4 4 0 0 0 5.66 0l3.17-3.17a4 4 0 0 0-5.66-5.66L12 6.34M14 10a4 4 0 0 0-5.66 0l-3.17 3.17a4 4 0 0 0 5.66 5.66L12 17.66" />
+  </svg>
+);

@@ -9,20 +9,37 @@ import { Toggle } from "./ui";
 
 type Board = { id: string; title: string; gallery_id: string | null; share_slug: string; share_enabled: boolean; client_can_add: boolean };
 
-/** Barre du haut d'un tableau : nom, galerie reliée, partage client. */
-export function BoardHeader({ board, galleries }: { board: Board; galleries: { id: string; title: string; kind: string }[] }) {
+/**
+ * Barre du haut d'un tableau : nom, galerie reliée, partage client.
+ * Dans un sous-tableau : chemin depuis le tableau principal ; le partage est celui du tableau principal (`root`).
+ */
+export function BoardHeader({
+  board,
+  root,
+  path,
+  galleries,
+}: {
+  board: Board;
+  root: Board;
+  path: { id: string; title: string }[];
+  galleries: { id: string; title: string; kind: string }[];
+}) {
+  const isSub = path.length > 1;
+  const parent = isSub ? path[path.length - 2] : null;
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [title, setTitle] = useState(board.title);
   const [share, setShare] = useState(false);
   const [plus, setPlus] = useState(false);
-  const [opts, setOpts] = useState({ share_enabled: board.share_enabled, client_can_add: board.client_can_add });
-  const [slug, setSlug] = useState(board.share_slug);
+  const [opts, setOpts] = useState({ share_enabled: root.share_enabled, client_can_add: root.client_can_add });
+  const [slug, setSlug] = useState(root.share_slug);
+  const clientPath = isSub ? `/t/${slug}/b/${board.id}` : `/t/${slug}`;
   const [copied, setCopied] = useState(false);
-  const gallery = galleries.find((g) => g.id === board.gallery_id);
+  const gallery = galleries.find((g) => g.id === root.gallery_id);
 
+  /** Le nom concerne ce tableau ; partage et galerie reliée, le tableau principal. */
   async function save(patch: Parameters<typeof updateBoard>[1]) {
-    const res = await updateBoard(board.id, patch);
+    const res = await updateBoard(patch.title !== undefined ? board.id : root.id, patch);
     if (res.error) alert(res.error);
     else startTransition(() => router.refresh());
   }
@@ -32,14 +49,14 @@ export function BoardHeader({ board, galleries }: { board: Board; galleries: { i
       setOpts((o) => ({ ...o, share_enabled: true }));
       await save({ share_enabled: true });
     }
-    await navigator.clipboard.writeText(`${window.location.origin}/t/${slug}`);
+    await navigator.clipboard.writeText(`${window.location.origin}${clientPath}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
   return (
     <div className="shrink-0 flex items-center gap-2 sm:gap-3 h-14 sm:h-[64px] px-2 sm:px-4 border-b border-line bg-bg relative z-10 pt-[env(safe-area-inset-top)] box-content">
-      <Link href="/admin/boards" className="icon-btn" aria-label="Retour">
+      <Link href={parent ? `/admin/boards/${parent.id}` : "/admin/boards"} className="icon-btn" aria-label="Retour">
         <ArrowLeft />
       </Link>
       <div className="min-w-0 flex-1">
@@ -51,7 +68,17 @@ export function BoardHeader({ board, galleries }: { board: Board; galleries: { i
           className="w-full bg-transparent outline-none text-base sm:text-lg truncate leading-tight"
           aria-label="Nom du tableau"
         />
-        {gallery ? (
+        {isSub ? (
+          <nav className="flex items-center gap-1 text-[12px] text-muted min-w-0 overflow-hidden whitespace-nowrap">
+            <Link href="/admin/boards" className="hover:text-ink shrink-0">Tableaux</Link>
+            {path.slice(0, -1).map((b) => (
+              <span key={b.id} className="flex items-center gap-1 min-w-0">
+                <span className="opacity-50">/</span>
+                <Link href={`/admin/boards/${b.id}`} className="hover:text-ink truncate max-w-[10rem]">{b.title || "Sans titre"}</Link>
+              </span>
+            ))}
+          </nav>
+        ) : gallery ? (
           <Link href={`/admin/galleries/${gallery.id}`} className="block text-[12px] text-muted hover:text-ink truncate">
             {gallery.kind === "video" ? "Projet vidéo" : "Galerie"} · {gallery.title}
           </Link>
@@ -71,7 +98,7 @@ export function BoardHeader({ board, galleries }: { board: Board; galleries: { i
             <div className="fixed inset-0 z-10" onClick={() => setPlus(false)} />
             <div className="absolute right-0 mt-1 z-20 w-60 bg-bg-soft border border-line py-1 shadow-xl text-sm">
               {opts.share_enabled && (
-                <a className="block px-4 py-3 hover:bg-bg" href={`/t/${slug}`} target="_blank" rel="noreferrer" onClick={() => setPlus(false)}>
+                <a className="block px-4 py-3 hover:bg-bg" href={clientPath} target="_blank" rel="noreferrer" onClick={() => setPlus(false)}>
                   Voir comme le client
                 </a>
               )}
@@ -87,7 +114,7 @@ export function BoardHeader({ board, galleries }: { board: Board; galleries: { i
               <button className="block w-full text-left px-4 py-3 hover:bg-bg" onClick={() => { setShare(true); setPlus(false); }}>
                 Partage et galerie reliée
               </button>
-              <button
+              {!isSub && <button
                 className="block w-full text-left px-4 py-3 text-danger hover:bg-bg"
                 onClick={() => {
                   setPlus(false);
@@ -95,7 +122,7 @@ export function BoardHeader({ board, galleries }: { board: Board; galleries: { i
                 }}
               >
                 Supprimer le tableau
-              </button>
+              </button>}
             </div>
           </>
         )}
@@ -114,6 +141,11 @@ export function BoardHeader({ board, galleries }: { board: Board; galleries: { i
                 <CloseIcon />
               </button>
             </div>
+            {isSub && (
+              <p className="mt-3 text-xs text-muted leading-relaxed">
+                Ce tableau est rangé dans « {path[0].title} » : il suit son partage. Le lien ci-dessous ouvre directement ce tableau.
+              </p>
+            )}
             <div className="mt-4">
               <Toggle
                 checked={opts.share_enabled}
@@ -137,16 +169,16 @@ export function BoardHeader({ board, galleries }: { board: Board; galleries: { i
             {opts.share_enabled && (
               <div className="mt-8">
                 <p className="label">Lien client</p>
-                <p className="text-sm break-all mt-2 select-all">{typeof window !== "undefined" ? window.location.origin : ""}/t/{slug}</p>
+                <p className="text-sm break-all mt-2 select-all">{typeof window !== "undefined" ? window.location.origin : ""}{clientPath}</p>
                 <div className="flex gap-2 mt-4">
                   <button className="btn flex-1" onClick={copy}>{copied ? "Copié ✓" : "Copier le lien"}</button>
-                  <a className="btn btn-ghost" href={`/t/${slug}`} target="_blank" rel="noreferrer">Ouvrir</a>
+                  <a className="btn btn-ghost" href={clientPath} target="_blank" rel="noreferrer">Ouvrir</a>
                 </div>
                 <button
                   className="mt-4 text-xs text-muted hover:text-ink underline underline-offset-2"
                   onClick={async () => {
                     if (!confirm("Créer un nouveau lien ? L'ancien ne fonctionnera plus.")) return;
-                    const res = await regenerateBoardLink(board.id);
+                    const res = await regenerateBoardLink(root.id);
                     if (res.slug) setSlug(res.slug);
                     else if (res.error) alert(res.error);
                   }}

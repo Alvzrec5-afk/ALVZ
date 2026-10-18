@@ -302,3 +302,11 @@ language sql stable security invoker set search_path = '' as $$
   ) t
   group by t.gallery_id;
 $$;
+
+-- Sous-tableaux (une carte « Tableau » ouvre un tableau rangé dedans), cartes couleur et lien.
+alter table public.boards add column parent_id uuid references public.boards(id) on delete cascade;
+create index boards_parent_idx on public.boards (parent_id);
+alter table public.board_items drop constraint board_items_kind_check;
+alter table public.board_items add constraint board_items_kind_check
+  check (kind in ('note', 'image', 'todo', 'column', 'arrow', 'board', 'color', 'link'));
+create index board_items_board_ref_idx on public.board_items ((data->>'boardId')) where kind = 'board';

@@ -91,6 +91,14 @@ export Markdown → titres = colonnes, paragraphes = notes, cases à cocher = li
 dans le navigateur → un dossier d'images = une colonne (fusionnée avec la colonne du même nom). Format Milanote
 non documenté : lecture tolérante, à ajuster avec un vrai export du propriétaire si besoin. Positions et flèches
 ne sont pas dans les exports Milanote.
+Sous-tableaux (« Planche » chez Milanote) : carte `board` (`data.boardId`) → tableau enfant (`boards.parent_id`),
+créé par `applyBoardOps` au premier envoi de la carte, supprimé avec elle (`purgeBoard` récursif) ; double-clic
+ou « Ouvrir » pour entrer, fil d'Ariane dans `board-header.tsx` ; partage et galerie = ceux du tableau principal ;
+client : `/t/<lien>/b/<id>` (`resolveSharedBoard` vérifie que le sous-tableau est bien sous le tableau partagé).
+Cartes `color` (teinte + nom) et `link` (lecteur YouTube/Vimeo/Spotify/SoundCloud/Deezer via `linkEmbed`, chargé
+seulement au clic sur ▶ ; coller un lien crée une carte lien). Sélection multiple : glisser sur le fond à la souris
+(cadre), Maj + clic, Cmd/Ctrl + A ; le tableau se déplace alors à la molette / pavé tactile, espace + glisser ou
+bouton du milieu ; au doigt, glisser déplace toujours le tableau.
 
 **Galerie client (`/g/<lien>`)** — `components/gallery/client-gallery.tsx` : couverture animée,
 en-tête collant (Contacter, ♡ sélection, menu), grilles (`justified-grid.tsx`), visionneuse
@@ -115,6 +123,10 @@ images des tableaux). Schéma de référence :
 `supabase/schema.sql` (à tenir à jour après chaque migration).
 
 ## En attente / idées discutées
+
+- **Migration à appliquer au moment de publier** (pas encore faite sur Supabase) : le dernier bloc de
+  `supabase/schema.sql` (« Sous-tableaux… » : `boards.parent_id`, nouvelle contrainte `board_items_kind_check`
+  avec board/color/link, index). Vérifier d'abord le nom de la contrainte existante. Puis retirer cette ligne.
 
 - Tableaux, idées pour la suite : annuler / rétablir, commentaires sur une carte, aperçu des liens
   (Pinterest, Instagram), cocher les listes du studio côté client, temps réel au lieu du rafraîchissement.

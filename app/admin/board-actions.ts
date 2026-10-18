@@ -40,6 +40,7 @@ export async function openGalleryBoard(galleryId: string) {
     .from("boards")
     .select("id")
     .eq("gallery_id", galleryId)
+    .is("parent_id", null)
     .order("created_at")
     .limit(1)
     .maybeSingle();
@@ -65,8 +66,20 @@ export async function updateBoard(
   if (typeof patch.share_enabled === "boolean") update.share_enabled = patch.share_enabled;
   if (typeof patch.client_can_add === "boolean") update.client_can_add = patch.client_can_add;
   if (patch.gallery_id === null || isUuid(patch.gallery_id)) update.gallery_id = patch.gallery_id;
-  const { error } = await supabase.from("boards").update(update).eq("id", boardId);
+  const { data: board, error } = await supabase.from("boards").update(update).eq("id", boardId).select("parent_id").maybeSingle();
   if (error) return { error: error.message };
+  // Sous-tableau renommé : la carte qui l'ouvre, dans le tableau parent, prend le même nom.
+  if (typeof update.title === "string" && board?.parent_id) {
+    const { data: card } = await supabase
+      .from("board_items")
+      .select("id, data")
+      .eq("board_id", board.parent_id)
+      .eq("kind", "board")
+      .eq("data->>boardId", boardId)
+      .maybeSingle();
+    if (card) await supabase.from("board_items").update({ data: { ...(card.data as object), title: update.title } }).eq("id", card.id);
+    revalidatePath(`/admin/boards/${board.parent_id}`);
+  }
   revalidatePath(`/admin/boards/${boardId}`);
   revalidatePath("/admin/boards");
   return {};

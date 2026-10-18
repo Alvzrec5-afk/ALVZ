@@ -6,7 +6,10 @@
  */
 import type { TodoEntry } from "@/lib/board-types";
 
-export type ImportCard = { kind: "note"; text: string } | { kind: "todo"; title: string; items: TodoEntry[] };
+export type ImportCard =
+  | { kind: "note"; text: string }
+  | { kind: "todo"; title: string; items: TodoEntry[] }
+  | { kind: "link"; url: string; title: string };
 export type ImportGroup = { title: string | null; cards: ImportCard[] };
 
 const CHECK = /^\s*(?:[-*+]|\d+[.)])?\s*(?:\[( |x|X)\]|(☐|☑|✓|✔|☒))\s+(.*)$/;
@@ -40,6 +43,13 @@ function blockToCard(lines: string[]): ImportCard | null {
       .trim();
     const items = checks.flatMap((m) => (m ? [{ id: uid(), text: plain(m[3]).slice(0, 500), done: Boolean(m[1]?.trim() || m[2] === "☑" || m[2] === "✓" || m[2] === "✔" || m[2] === "☒") }] : []));
     return { kind: "todo", title: title.slice(0, 200), items };
+  }
+  // Une ligne qui n'est qu'un lien (YouTube, Spotify…) → carte lien, avec son lecteur.
+  if (lines.length === 1) {
+    const one = lines[0].trim();
+    const md = /^\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)$/.exec(one);
+    if (md) return { kind: "link", url: md[2], title: md[1] === md[2] ? "" : md[1].slice(0, 200) };
+    if (/^<?https?:\/\/\S+>?$/.test(one)) return { kind: "link", url: one.replace(/^<|>$/g, ""), title: "" };
   }
   const text = lines.map(plain).join("\n").trim();
   return text ? { kind: "note", text: text.slice(0, 5000) } : null;

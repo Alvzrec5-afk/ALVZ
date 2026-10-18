@@ -1,5 +1,5 @@
 import type { BoardItemInput } from "@/lib/board-types";
-import { applyBoardOps, boardImageKey, clientActor, findSharedBoard, isUuid } from "@/lib/boards";
+import { applyBoardOps, resolveSharedBoard, boardImageKey, clientActor, isUuid } from "@/lib/boards";
 import { putObject } from "@/lib/storage";
 import { createServiceClient } from "@/lib/supabase/server";
 import { storageUsage } from "@/lib/usage";
@@ -14,10 +14,12 @@ const MAX_CLIENT_IMAGES = 150;
  * La carte est créée ici même, donc aucun fichier orphelin.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ slug: string }> }) {
-  const board = await findSharedBoard((await params).slug);
-  if (!board) return Response.json({ error: "Tableau introuvable" }, { status: 404 });
-  if (!board.client_can_add) return Response.json({ error: "Ce tableau est en lecture seule." }, { status: 403 });
-  const actor = await clientActor(board);
+  // ?board=<id> : un sous-tableau du tableau partagé ; prénom et droits viennent du tableau partagé.
+  const shared = await resolveSharedBoard((await params).slug, new URL(req.url).searchParams.get("board"));
+  if (!shared) return Response.json({ error: "Tableau introuvable" }, { status: 404 });
+  const { root, board } = shared;
+  if (!root.client_can_add) return Response.json({ error: "Ce tableau est en lecture seule." }, { status: 403 });
+  const actor = await clientActor(root);
   if (actor.role !== "client" || !actor.clientId) return Response.json({ error: "Indiquez d'abord votre prénom." }, { status: 401 });
 
   let item: BoardItemInput;
