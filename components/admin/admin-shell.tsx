@@ -4,11 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Wordmark } from "@/components/wordmark";
-import { CardIcon, CloseIcon, FilmIcon, ImageIcon, LogoutIcon, MegaphoneIcon, MenuIcon } from "@/components/icons";
+import { BoardIcon, CardIcon, CloseIcon, FilmIcon, ImageIcon, LogoutIcon, MegaphoneIcon, MenuIcon } from "@/components/icons";
 
 const NAV = [
   { href: "/admin", label: "Galeries", Icon: ImageIcon, match: (p: string) => p === "/admin" || p.startsWith("/admin/galleries") },
   { href: "/admin/videos", label: "Vidéos", Icon: FilmIcon, match: (p: string) => p.startsWith("/admin/videos") },
+  { href: "/admin/boards", label: "Tableaux", Icon: BoardIcon, match: (p: string) => p.startsWith("/admin/boards") },
   { href: "/admin/settings", label: "Coordonnées", Icon: CardIcon, match: (p: string) => p.startsWith("/admin/settings") },
 ];
 const TOOLS = [{ href: "/admin/clients", label: "Clients & e-mails", Icon: MegaphoneIcon, match: (p: string) => p.startsWith("/admin/clients") }];
@@ -20,7 +21,11 @@ const TOOLS = [{ href: "/admin/clients", label: "Clients & e-mails", Icon: Megap
 export function AdminShell({ children, signOut }: { children: React.ReactNode; signOut: () => Promise<void> }) {
   const pathname = usePathname();
   const galleryPage = /^\/admin\/galleries\/(?!new)[^/]+/.test(pathname);
+  // Un tableau occupe tout l'écran, avec sa propre barre (aussi sur téléphone).
+  const boardPage = /^\/admin\/boards\/(?!new)[^/]+/.test(pathname);
   const [menu, setMenu] = useState(false);
+
+  if (boardPage) return <main className="h-svh">{children}</main>;
 
   return (
     <div className="min-h-svh">

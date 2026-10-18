@@ -103,6 +103,11 @@ export function presignGet(key: string, opts: { downloadName?: string } = {}) {
   );
 }
 
+/** Petit fichier déjà vérifié par le serveur (ex. image ajoutée par un client sur un tableau). */
+export async function putObject(key: string, body: Uint8Array, contentType: string) {
+  await s3().send(new PutObjectCommand({ Bucket: bucket(), Key: key, Body: body, ContentType: contentType }));
+}
+
 export async function createMultipart(key: string, contentType: string) {
   const res = await s3().send(
     new CreateMultipartUploadCommand({ Bucket: bucket(), Key: key, ContentType: contentType }),

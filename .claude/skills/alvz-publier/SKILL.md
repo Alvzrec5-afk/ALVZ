@@ -13,13 +13,16 @@ Netlify sur 300 par mois). Entre-temps, les commits restent en local.
 1. Vérifier que tout est propre :
    - `git status --short` (aucun fichier `app/harness/` ni `public/hx/` qui traîne) ;
    - `npm run typecheck` puis `npm run build` : les deux doivent passer.
-2. Pousser : `git push -u origin claude/alvz-photo-gallery-platform-tig9or`
+2. Si `CLAUDE.md` liste une **migration à appliquer** : l'appliquer avec l'outil MCP Supabase `apply_migration`
+   (projet `ayootztgiuhpqgeckwfu`, additive uniquement), vérifier avec `list_tables`, puis retirer la ligne de
+   `CLAUDE.md` (dans le même commit que le reste).
+3. Pousser : `git push -u origin claude/alvz-photo-gallery-platform-tig9or`
    (en cas d'erreur réseau, réessayer jusqu'à 4 fois : 2 s, 4 s, 8 s, 16 s).
-3. Vérifier la publication avec les outils MCP Netlify (site id `16e80748-88fd-49c9-a6ae-b72b12bcfb17`) :
+4. Vérifier la publication avec les outils MCP Netlify (site id `16e80748-88fd-49c9-a6ae-b72b12bcfb17`) :
    - `netlify-project-services-reader` → `get-project` : regarder `currentDeploy.id` ;
    - `netlify-deploy-services-reader` → `get-deploy` : `commit_ref` doit être le dernier commit
      et `state` = `ready`. La construction prend 1 à 2 minutes.
-4. Dire au propriétaire, en français simple :
+5. Dire au propriétaire, en français simple :
    - si c'est en ligne : quoi tester et où (recharger avec Cmd + Maj + R) ;
    - si ce n'est pas encore le bon commit : regarder https://app.netlify.com/projects/alvzgalleries/deploys,
      ligne du haut ; « Skipped » → **Trigger deploy → Deploy project**.

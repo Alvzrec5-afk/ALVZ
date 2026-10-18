@@ -15,6 +15,7 @@ import { SettingsPanel } from "./settings-panel";
 import { FavoritesPanel } from "./favorites-panel";
 import { DownloadsPanel, type DownloadRow } from "./downloads-panel";
 import { purge } from "./purge";
+import { openGalleryBoard } from "@/app/admin/board-actions";
 
 export type ManagedGallery = {
   id: string;
@@ -86,6 +87,13 @@ export function GalleryManager(props: Props) {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  /** Moodboard / préparation du shooting ou du tournage (créé au premier clic). */
+  function openBoard() {
+    setMenu(false);
+    setPlus(false);
+    void openGalleryBoard(gallery.id);
+  }
+
   async function remove() {
     setMenu(false);
     setPlus(false);
@@ -136,6 +144,7 @@ export function GalleryManager(props: Props) {
               <div className="absolute right-0 mt-1 z-20 w-56 bg-bg-soft border border-line py-1 shadow-xl text-sm">
                 <button className="block w-full text-left px-4 py-3 hover:bg-bg" onClick={copy}>Copier le lien client</button>
                 <button className="block w-full text-left px-4 py-3 hover:bg-bg" onClick={() => { setTab("settings"); setPlus(false); }}>Paramètres de la galerie</button>
+                <button className="block w-full text-left px-4 py-3 hover:bg-bg" onClick={openBoard}>Tableau de préparation</button>
                 <button className="block w-full text-left px-4 py-3 text-danger hover:bg-bg" onClick={remove}>Supprimer la galerie</button>
               </div>
             </>
@@ -165,6 +174,7 @@ export function GalleryManager(props: Props) {
               <div className="absolute right-0 mt-1 z-20 w-56 bg-bg-soft border border-line py-1 shadow-xl text-sm">
                 <button className="block w-full text-left px-4 py-3 hover:bg-bg" onClick={copy}>Copier le lien client</button>
                 <a className="block px-4 py-3 hover:bg-bg" href={`/g/${gallery.slug}`} target="_blank" rel="noreferrer" onClick={() => setMenu(false)}>Voir la galerie</a>
+                <button className="block w-full text-left px-4 py-3 hover:bg-bg" onClick={openBoard}>Tableau de préparation</button>
                 <button className="block w-full text-left px-4 py-3 text-danger hover:bg-bg" onClick={remove}>Supprimer la galerie</button>
               </div>
             </>

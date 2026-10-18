@@ -76,6 +76,17 @@ Vidéos, Coordonnées, Outils → Clients & e-mails, Déconnexion) ; sur mobile 
 - Coordonnées : carte de visite (`studio_settings.contact`) : WhatsApp +33 6 11 32 94 06,
   Instagram et TikTok `alvz.rec`.
 
+**Tableaux façon Milanote (`/admin/boards`)** — moodboards, listes de plans, préparation de tournage.
+`components/board/board-canvas.tsx` : grande surface (déplacer, zoom molette/pincement, double-clic = note),
+cartes note (6 couleurs, liens cliquables), image (envoi direct Oracle, 1600 px, `boards/<tableau>/<carte>.jpg`),
+liste à cocher, colonne (glisser une carte dedans), flèche (outil Flèche : carte de départ puis d'arrivée).
+Enregistrement automatique groupé (`components/board/sync.ts`), rafraîchissement toutes les 30 s seulement si la
+page est visible et utilisée (crédits Netlify). Modèles : `lib/board-types.ts` (moodboard, shooting, mariage, clip).
+Serveur : `lib/boards.ts` (`applyBoardOps` valide tout ; un client ne touche qu'à ses cartes), actions
+`app/admin/board-actions.ts`, API `app/api/admin/boards/[id]` et `/image`. Relié à une galerie : menu « Plus » →
+« Tableau de préparation » (`openGalleryBoard`, créé au premier clic). Partage client : `/t/<lien>` (lien secret,
+option « le client peut ajouter ses idées », prénom demandé une fois, cookie signé `b_<tableau>`), API `app/api/b/[slug]`.
+
 **Galerie client (`/g/<lien>`)** — `components/gallery/client-gallery.tsx` : couverture animée,
 en-tête collant (Contacter, ♡ sélection, menu), grilles (`justified-grid.tsx`), visionneuse
 (`lightbox.tsx`), ZIP, favoris (e-mail demandé), onglet « Vidéos », carte de visite. Thème qui suit
@@ -94,10 +105,18 @@ Le Chromium du conteneur ne sait pas encoder/décoder le H.264 : tester la chaî
 
 **Tables Supabase** : `admins`, `galleries` (+ `design` jsonb, `kind`), `collections`, `photos`,
 `favorite_lists`, `favorites`, `downloads`, `studio_settings`, `mail_unsubscribes`, `mail_campaigns`,
-`videos`, `video_comments`, `video_events`, fonction `storage_usage()`. Schéma de référence :
+`videos`, `video_comments`, `video_events`, `boards`, `board_items`, fonction `storage_usage()` (compte aussi les
+images des tableaux). Schéma de référence :
 `supabase/schema.sql` (à tenir à jour après chaque migration).
 
 ## En attente / idées discutées
+
+- **Migration à appliquer au moment de publier les Tableaux** (pas encore faite sur Supabase) : le bloc
+  « Tableaux (façon Milanote) » à la fin de `supabase/schema.sql` (tables `boards`, `board_items` + nouvelle
+  version de `storage_usage()`), via l'outil MCP Supabase `apply_migration` (nom : `boards`), juste avant le push.
+  Puis retirer cette ligne.
+- Tableaux, idées pour la suite : annuler / rétablir, commentaires sur une carte, aperçu des liens
+  (Pinterest, Instagram), cocher les listes du studio côté client, temps réel au lieu du rafraîchissement.
 
 - Lenteur : surtout la distance Netlify (USA) ↔ Supabase (Irlande) + réveil des fonctions.
   Changer la région Netlify = offre Pro seulement. Option proposée, non décidée : déplacer la base

@@ -1,0 +1,171 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { deleteBoard, regenerateBoardLink, updateBoard } from "@/app/admin/board-actions";
+import { ArrowLeft, ChevronDown, CloseIcon } from "@/components/icons";
+import { Toggle } from "./ui";
+
+type Board = { id: string; title: string; gallery_id: string | null; share_slug: string; share_enabled: boolean; client_can_add: boolean };
+
+/** Barre du haut d'un tableau : nom, galerie reliée, partage client. */
+export function BoardHeader({ board, galleries }: { board: Board; galleries: { id: string; title: string; kind: string }[] }) {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+  const [title, setTitle] = useState(board.title);
+  const [share, setShare] = useState(false);
+  const [plus, setPlus] = useState(false);
+  const [opts, setOpts] = useState({ share_enabled: board.share_enabled, client_can_add: board.client_can_add });
+  const [slug, setSlug] = useState(board.share_slug);
+  const [copied, setCopied] = useState(false);
+  const gallery = galleries.find((g) => g.id === board.gallery_id);
+
+  async function save(patch: Parameters<typeof updateBoard>[1]) {
+    const res = await updateBoard(board.id, patch);
+    if (res.error) alert(res.error);
+    else startTransition(() => router.refresh());
+  }
+
+  async function copy() {
+    if (!opts.share_enabled) {
+      setOpts((o) => ({ ...o, share_enabled: true }));
+      await save({ share_enabled: true });
+    }
+    await navigator.clipboard.writeText(`${window.location.origin}/t/${slug}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="shrink-0 flex items-center gap-2 sm:gap-3 h-14 sm:h-[64px] px-2 sm:px-4 border-b border-line bg-bg relative z-10 pt-[env(safe-area-inset-top)] box-content">
+      <Link href="/admin/boards" className="icon-btn" aria-label="Retour">
+        <ArrowLeft />
+      </Link>
+      <div className="min-w-0 flex-1">
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onBlur={() => title.trim() && title !== board.title && save({ title })}
+          onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+          className="w-full bg-transparent outline-none text-base sm:text-lg truncate leading-tight"
+          aria-label="Nom du tableau"
+        />
+        {gallery ? (
+          <Link href={`/admin/galleries/${gallery.id}`} className="block text-[12px] text-muted hover:text-ink truncate">
+            {gallery.kind === "video" ? "Projet vidéo" : "Galerie"} · {gallery.title}
+          </Link>
+        ) : (
+          <button onClick={() => setShare(true)} className="block text-[12px] text-muted hover:text-ink">
+            Relier à une galerie
+          </button>
+        )}
+      </div>
+      {copied && <span className="hidden sm:inline text-xs text-accent">Lien copié ✓</span>}
+      <div className="relative">
+        <button onClick={() => setPlus((o) => !o)} className="flex items-center gap-1 px-2 sm:px-3 h-10 text-sm text-muted hover:text-ink">
+          <span className="hidden sm:inline">Plus</span> <ChevronDown className="w-4 h-4" />
+        </button>
+        {plus && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setPlus(false)} />
+            <div className="absolute right-0 mt-1 z-20 w-60 bg-bg-soft border border-line py-1 shadow-xl text-sm">
+              {opts.share_enabled && (
+                <a className="block px-4 py-3 hover:bg-bg" href={`/t/${slug}`} target="_blank" rel="noreferrer" onClick={() => setPlus(false)}>
+                  Voir comme le client
+                </a>
+              )}
+              <button className="block w-full text-left px-4 py-3 hover:bg-bg" onClick={() => { setShare(true); setPlus(false); }}>
+                Partage et galerie reliée
+              </button>
+              <button
+                className="block w-full text-left px-4 py-3 text-danger hover:bg-bg"
+                onClick={() => {
+                  setPlus(false);
+                  if (confirm(`Supprimer définitivement le tableau « ${board.title} » et ses images ?`)) void deleteBoard(board.id);
+                }}
+              >
+                Supprimer le tableau
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+      <button onClick={() => setShare(true)} className="btn">
+        Partager
+      </button>
+
+      {share && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/40 animate-[fadeIn_0.2s_ease-out_both]" onClick={() => setShare(false)} />
+          <aside className="relative h-full w-full max-w-sm bg-bg border-l border-line px-6 pt-[max(env(safe-area-inset-top),1rem)] overflow-y-auto animate-[slideIn_0.25s_ease-out_both]">
+            <div className="flex items-center justify-between h-12">
+              <span className="eyebrow text-muted">Partage</span>
+              <button className="icon-btn -mr-2" onClick={() => setShare(false)} aria-label="Fermer">
+                <CloseIcon />
+              </button>
+            </div>
+            <div className="mt-4">
+              <Toggle
+                checked={opts.share_enabled}
+                onChange={(v) => {
+                  setOpts((o) => ({ ...o, share_enabled: v }));
+                  void save({ share_enabled: v });
+                }}
+                label="Partager avec le client"
+                hint="Toute personne qui a le lien peut voir le tableau. Le lien est impossible à deviner."
+              />
+              <Toggle
+                checked={opts.client_can_add}
+                onChange={(v) => {
+                  setOpts((o) => ({ ...o, client_can_add: v }));
+                  void save({ client_can_add: v });
+                }}
+                label="Le client peut ajouter ses idées"
+                hint="Notes, images et listes, signées de son prénom. Il ne peut ni déplacer ni modifier vos cartes."
+              />
+            </div>
+            {opts.share_enabled && (
+              <div className="mt-8">
+                <p className="label">Lien client</p>
+                <p className="text-sm break-all mt-2 select-all">{typeof window !== "undefined" ? window.location.origin : ""}/t/{slug}</p>
+                <div className="flex gap-2 mt-4">
+                  <button className="btn flex-1" onClick={copy}>{copied ? "Copié ✓" : "Copier le lien"}</button>
+                  <a className="btn btn-ghost" href={`/t/${slug}`} target="_blank" rel="noreferrer">Ouvrir</a>
+                </div>
+                <button
+                  className="mt-4 text-xs text-muted hover:text-ink underline underline-offset-2"
+                  onClick={async () => {
+                    if (!confirm("Créer un nouveau lien ? L'ancien ne fonctionnera plus.")) return;
+                    const res = await regenerateBoardLink(board.id);
+                    if (res.slug) setSlug(res.slug);
+                    else if (res.error) alert(res.error);
+                  }}
+                >
+                  Changer le lien
+                </button>
+              </div>
+            )}
+            <div className="mt-10">
+              <label className="label" htmlFor="board-gallery">Galerie ou projet vidéo relié</label>
+              <select
+                id="board-gallery"
+                defaultValue={board.gallery_id ?? ""}
+                onChange={(e) => void save({ gallery_id: e.target.value || null })}
+                className="field"
+              >
+                <option value="">Aucun</option>
+                {galleries.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.kind === "video" ? "Vidéo · " : ""}{g.title}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted mt-2 leading-relaxed">Le tableau s&apos;ouvre aussi depuis la galerie (menu « Plus »).</p>
+            </div>
+          </aside>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -162,3 +162,54 @@ export const FilmIcon = ({ className = "w-5 h-5" }: P) => (
     <path d="M10 9.5v5l4.5-2.5L10 9.5Z" />
   </svg>
 );
+export const BoardIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <rect x="3.5" y="4.5" width="7" height="9" rx="1" />
+    <rect x="13.5" y="4.5" width="7" height="5" rx="1" />
+    <rect x="13.5" y="12.5" width="7" height="7" rx="1" />
+    <rect x="3.5" y="16.5" width="7" height="3" rx="1" />
+  </svg>
+);
+export const NoteIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <path d="M5 4.5h14v10l-5 5H5z" />
+    <path d="M14 19.5v-5h5M8.5 9h7M8.5 12h4" />
+  </svg>
+);
+export const ChecklistIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <path d="M4 6.5l1.5 1.5 3-3M4 12.5l1.5 1.5 3-3M4 18.5l1.5 1.5 3-3M11.5 7h8.5M11.5 13h8.5M11.5 19h8.5" />
+  </svg>
+);
+export const ColumnIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <rect x="6" y="3.5" width="12" height="17" rx="1" />
+    <path d="M8.5 7.5h7M8.5 11h7M8.5 14.5h7" />
+  </svg>
+);
+export const ConnectorIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <circle cx="5.5" cy="18.5" r="2" />
+    <path d="M7 17 18.5 5.5M13 5.5h5.5V11" />
+  </svg>
+);
+export const TrashIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <path d="M4.5 6.5h15M9.5 6.5V4.5h5v2M6.5 6.5l1 13h9l1-13M10 10v6.5M14 10v6.5" />
+  </svg>
+);
+export const PlusIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+);
+export const MinusIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <path d="M5 12h14" />
+  </svg>
+);
+export const FitIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <path d="M4 9V4.5h4.5M15.5 4.5H20V9M20 15v4.5h-4.5M8.5 19.5H4V15" />
+  </svg>
+);

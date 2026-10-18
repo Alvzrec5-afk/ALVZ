@@ -34,7 +34,7 @@ export function toJpeg(c: AnyCanvas, quality: number): Promise<Blob> {
 }
 
 /** Réduction par paliers (÷2) pour un rendu net, sans crénelage. */
-function scaleDown(source: CanvasImageSource, sw: number, sh: number, maxEdge: number): AnyCanvas {
+export function scaleDown(source: CanvasImageSource, sw: number, sh: number, maxEdge: number): AnyCanvas {
   const ratio = Math.min(1, maxEdge / Math.max(sw, sh));
   const tw = Math.max(1, Math.round(sw * ratio));
   const th = Math.max(1, Math.round(sh * ratio));
@@ -85,7 +85,7 @@ function withWatermark(source: AnyCanvas, text: string): AnyCanvas {
   return c;
 }
 
-async function encodeUnder(c: AnyCanvas, maxBytes: number) {
+export async function encodeUnder(c: AnyCanvas, maxBytes: number) {
   let blob = await toJpeg(c, 0.84);
   for (const q of [0.76, 0.68, 0.6]) {
     if (blob.size <= maxBytes) break;
@@ -120,6 +120,22 @@ export async function makeVariants(file: File, watermarkText = "ALVZ.REC"): Prom
       toJpeg(withWatermark(thumb, watermarkText), 0.8),
     ]);
     return { width: bitmap.width, height: bitmap.height, web: webBlob, web_wm: webWm, thumb: thumbBlob, thumb_wm: thumbWm };
+  } finally {
+    bitmap.close();
+  }
+}
+
+/** Image posée sur un tableau : une seule version, 1600 px de côté au plus (~400 Ko). */
+export async function makeBoardImage(file: File) {
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  } catch {
+    throw new Error("Format d'image non lisible par ce navigateur");
+  }
+  try {
+    const c = scaleDown(bitmap, bitmap.width, bitmap.height, 1600);
+    return { blob: await encodeUnder(c, 450_000), width: c.width, height: c.height };
   } finally {
     bitmap.close();
   }

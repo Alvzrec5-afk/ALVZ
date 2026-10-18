@@ -241,3 +241,64 @@ create index video_events_video_idx on public.video_events (video_id, created_at
 alter table public.video_events enable row level security;
 create policy "admin full access" on public.video_events
   for all to authenticated using ((select private.is_admin())) with check ((select private.is_admin()));
+
+-- Tableaux (façon Milanote) : moodboards, listes de plans, préparation de tournage.
+-- Reliés ou non à une galerie ; partage client par lien secret.
+create table public.boards (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  gallery_id uuid references public.galleries(id) on delete set null,
+  share_slug text not null unique,
+  share_enabled boolean not null default false,
+  client_can_add boolean not null default true,   -- le client peut ajouter ses notes, images et listes
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index boards_gallery_idx on public.boards (gallery_id);
+alter table public.boards enable row level security;
+create policy "admin full access" on public.boards
+  for all to authenticated using ((select private.is_admin())) with check ((select private.is_admin()));
+
+-- Cartes : note, image, liste à cocher, colonne, flèche (data.from → data.to).
+-- Une carte rangée dans une colonne a parent_id = la colonne et position = son rang.
+create table public.board_items (
+  id uuid primary key,
+  board_id uuid not null references public.boards(id) on delete cascade,
+  kind text not null check (kind in ('note', 'image', 'todo', 'column', 'arrow')),
+  x real not null default 0,
+  y real not null default 0,
+  w real not null default 240,
+  z double precision not null default 0,
+  parent_id uuid references public.board_items(id) on delete set null,
+  position double precision not null default 0,
+  data jsonb not null default '{}'::jsonb,
+  size_bytes bigint not null default 0,          -- image stockée sur Oracle
+  author text,                                   -- prénom du client ; null = studio
+  client_id text,                                -- visiteur qui a créé la carte (cookie signé)
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index board_items_board_idx on public.board_items (board_id);
+create index board_items_parent_idx on public.board_items (parent_id);
+alter table public.board_items enable row level security;
+create policy "admin full access" on public.board_items
+  for all to authenticated using ((select private.is_admin())) with check ((select private.is_admin()));
+
+-- Le stockage compte aussi les images des tableaux.
+create or replace function public.storage_usage()
+returns table (gallery_id uuid, bytes bigint)
+language sql stable security invoker set search_path = '' as $$
+  select t.gallery_id, sum(t.bytes)::bigint
+  from (
+    select p.gallery_id, p.size_bytes + case when p.variants_bytes > 0 then p.variants_bytes else 1000000 end as bytes
+    from public.photos p
+    union all
+    select v.gallery_id, v.size_bytes + v.extra_bytes
+    from public.videos v
+    union all
+    select b.gallery_id, i.size_bytes
+    from public.board_items i join public.boards b on b.id = i.board_id
+    where i.size_bytes > 0
+  ) t
+  group by t.gallery_id;
+$$;
