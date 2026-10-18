@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { formatLongDate } from "@/lib/dates";
+import type { Contact } from "@/lib/contact";
 import { readDesign, themeAttr } from "@/lib/design";
 import { findGalleryBySlug, getFavoriteListId, hasAccess, isExpired } from "@/lib/gallery-access";
 import { PHOTO_FIELDS, toPhotoViews } from "@/lib/photos";
@@ -26,12 +27,13 @@ export default async function GalleryPage({ params }: { params: Promise<{ slug: 
 
   const db = createServiceClient();
   const listId = await getFavoriteListId(gallery);
-  const [{ data: collections }, { data: photos }, list] = await Promise.all([
+  const [{ data: collections }, { data: photos }, list, { data: studio }] = await Promise.all([
     db.from("collections").select("id, name, position").eq("gallery_id", gallery.id).order("position"),
     db.from("photos").select(PHOTO_FIELDS).eq("gallery_id", gallery.id).eq("status", "ready").order("position"),
     listId
       ? db.from("favorite_lists").select("email, favorites(photo_id)").eq("id", listId).maybeSingle()
       : Promise.resolve({ data: null }),
+    db.from("studio_settings").select("contact").eq("id", 1).maybeSingle(),
   ]);
 
   const views = await toPhotoViews((photos ?? []) as PhotoRow[], gallery.watermark);
@@ -51,6 +53,7 @@ export default async function GalleryPage({ params }: { params: Promise<{ slug: 
       favoritesEnabled={gallery.favorites_enabled}
       cover={cover ? { src: cover.web, width: cover.width, height: cover.height } : null}
       coverAlt={views.find((p) => p.id !== cover?.id)?.web ?? null}
+      contact={(studio?.contact as Contact | undefined) ?? null}
       collections={visibleCollections}
       photos={views}
       favorites={{ email: favData?.email ?? null, photoIds: favData?.favorites.map((f) => f.photo_id) ?? [] }}

@@ -17,7 +17,7 @@ export type PublicGallery = {
   favorites_enabled: boolean;
   download_web_enabled: boolean;
   design: Record<string, unknown> | null;
-} & Omit<GalleryDesign, "nav_style">;
+} & Omit<GalleryDesign, "nav_style" | "show_contact">;
 
 export const GALLERY_FIELDS = `id, slug, title, event_date, cover_photo_id, password_hash, expires_at, watermark, downloads_enabled, favorites_enabled, download_web_enabled, ${DESIGN_FIELDS}`;
 
@@ -91,4 +91,34 @@ export async function loadAccessibleGallery(slug: string) {
     return { error: Response.json({ error: "Mot de passe requis" }, { status: 401 }) } as const;
   }
   return { gallery: g } as const;
+}
+
+/** E-mail du visiteur s'il s'est identifié pour ses favoris (pour le suivi des téléchargements). */
+export async function visitorEmail(g: PublicGallery) {
+  const listId = await getFavoriteListId(g);
+  if (!listId) return null;
+  const { data } = await createServiceClient().from("favorite_lists").select("email").eq("id", listId).maybeSingle();
+  return (data?.email as string | undefined) ?? null;
+}
+
+/** Enregistre un téléchargement (sans jamais bloquer le téléchargement en cas d'erreur). */
+export async function logDownload(
+  g: PublicGallery,
+  entry: { kind: "photo" | "zip"; size?: "hd" | "web"; photoId?: string; collectionId?: string | null; photoCount?: number },
+) {
+  try {
+    await createServiceClient()
+      .from("downloads")
+      .insert({
+        gallery_id: g.id,
+        kind: entry.kind,
+        size: entry.size ?? "hd",
+        photo_id: entry.photoId ?? null,
+        collection_id: entry.collectionId ?? null,
+        photo_count: entry.photoCount ?? 1,
+        email: await visitorEmail(g),
+      });
+  } catch (e) {
+    console.error("Suivi du téléchargement impossible", e);
+  }
 }

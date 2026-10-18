@@ -12,6 +12,7 @@ export function AdminViewer({
   onClose,
   coverId,
   favoriteCounts,
+  downloadCounts,
   onDelete,
   onCover,
 }: {
@@ -21,6 +22,7 @@ export function AdminViewer({
   onClose: () => void;
   coverId: string | null;
   favoriteCounts: Record<string, number>;
+  downloadCounts: Record<string, number>;
   onDelete: (photo: PhotoView) => Promise<void>;
   onCover: (photo: PhotoView) => Promise<void>;
 }) {
@@ -56,6 +58,7 @@ export function AdminViewer({
   if (!photo) return null;
   const isCover = photo.id === coverId;
   const favs = favoriteCounts[photo.id] ?? 0;
+  const dls = downloadCounts[photo.id] ?? 0;
 
   async function act(fn: () => Promise<void>) {
     setBusy(true);
@@ -96,6 +99,7 @@ export function AdminViewer({
                 · <HeartIcon className="w-3 h-3" filled /> {favs}
               </span>
             )}
+            {dls > 0 && <span>· ↓ {dls} téléchargement{dls > 1 ? "s" : ""}</span>}
           </p>
         </div>
         <button className="icon-btn" onClick={onClose} aria-label="Fermer">

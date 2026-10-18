@@ -17,9 +17,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Wordmark height={30} />
             <span className="eyebrow text-muted tracking-[0.2em]">studio</span>
           </Link>
-          <form action={signOut}>
-            <button className="eyebrow text-muted hover:text-ink transition-colors">Déconnexion</button>
-          </form>
+          <div className="flex items-center gap-5">
+            <Link href="/admin/settings" className="eyebrow text-muted hover:text-ink transition-colors">Coordonnées</Link>
+            <form action={signOut}>
+              <button className="eyebrow text-muted hover:text-ink transition-colors">Déconnexion</button>
+            </form>
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-5 sm:px-8 py-6 sm:py-14">{children}</main>

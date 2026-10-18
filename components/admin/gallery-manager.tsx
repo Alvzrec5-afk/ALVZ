@@ -10,6 +10,7 @@ import { PhotosPanel } from "./photos-panel";
 import { DesignPanel } from "./design-panel";
 import { SettingsPanel } from "./settings-panel";
 import { FavoritesPanel } from "./favorites-panel";
+import { DownloadsPanel, type DownloadRow } from "./downloads-panel";
 import { purge } from "./purge";
 
 export type ManagedGallery = {
@@ -34,6 +35,7 @@ type Props = {
   photos: PhotoView[];
   positions: Record<string, number>;
   favoriteLists: { id: string; email: string; photoIds: string[] }[];
+  downloads: DownloadRow[];
 };
 
 const TABS = [
@@ -49,6 +51,11 @@ export function GalleryManager(props: Props) {
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("photos");
   const [menu, setMenu] = useState(false);
   const [drawer, setDrawer] = useState(false);
+  const [activityTab, setActivityTab] = useState<"favorites" | "downloads">("favorites");
+  const downloadCounts = props.downloads.reduce<Record<string, number>>((acc, d) => {
+    if (d.kind === "photo" && d.photo_id) acc[d.photo_id] = (acc[d.photo_id] ?? 0) + 1;
+    return acc;
+  }, {});
   const [copied, setCopied] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -156,6 +163,7 @@ export function GalleryManager(props: Props) {
             collections={props.collections}
             photos={props.photos}
             positions={props.positions}
+            downloadCounts={downloadCounts}
             favoriteCounts={props.favoriteLists.reduce<Record<string, number>>((acc, l) => {
               l.photoIds.forEach((id) => (acc[id] = (acc[id] ?? 0) + 1));
               return acc;
@@ -164,7 +172,29 @@ export function GalleryManager(props: Props) {
         )}
         {tab === "design" && <DesignPanel gallery={gallery} photos={props.photos} />}
         {tab === "settings" && <SettingsPanel gallery={gallery} onDelete={remove} />}
-        {tab === "activity" && <FavoritesPanel lists={props.favoriteLists} photos={props.photos} collections={props.collections} />}
+        {tab === "activity" && (
+          <div>
+            <div className="flex border border-line mb-10">
+              {([
+                ["favorites", `Favoris (${props.favoriteLists.length})`],
+                ["downloads", `Téléchargements (${props.downloads.length})`],
+              ] as const).map(([k, label]) => (
+                <button
+                  key={k}
+                  onClick={() => setActivityTab(k)}
+                  className={`flex-1 py-3 text-[11px] tracking-wider uppercase transition-colors ${activityTab === k ? "bg-ink text-bg" : "text-muted hover:text-ink"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {activityTab === "favorites" ? (
+              <FavoritesPanel lists={props.favoriteLists} photos={props.photos} collections={props.collections} />
+            ) : (
+              <DownloadsPanel downloads={props.downloads} photos={props.photos} collections={props.collections} />
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

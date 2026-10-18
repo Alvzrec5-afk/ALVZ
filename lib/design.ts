@@ -70,6 +70,8 @@ export type GalleryDesign = {
   grid_size: GridSize;
   grid_spacing: GridSpacing;
   nav_style: NavStyle;
+  /** Afficher la carte de visite (coordonnées du studio) en bas de la galerie. */
+  show_contact: boolean;
 };
 
 export const DEFAULT_DESIGN: GalleryDesign = {
@@ -83,6 +85,7 @@ export const DEFAULT_DESIGN: GalleryDesign = {
   grid_size: "large",
   grid_spacing: "fine",
   nav_style: "icons",
+  show_contact: true,
 };
 
 /** Colonnes à lire en base (anciennes colonnes de design + colonne JSON « design »). */
@@ -111,6 +114,7 @@ export function pickDesign(src: Record<string, unknown>): Partial<GalleryDesign>
     if (typeof v === "number" && Number.isFinite(v)) out[key] = Math.min(100, Math.max(0, v));
   }
   if (typeof src.color_follow_device === "boolean") out.color_follow_device = src.color_follow_device;
+  if (typeof src.show_contact === "boolean") out.show_contact = src.show_contact;
   return out as Partial<GalleryDesign>;
 }
 

@@ -1,4 +1,4 @@
-import { loadAccessibleGallery } from "@/lib/gallery-access";
+import { loadAccessibleGallery, logDownload } from "@/lib/gallery-access";
 import { downloadName } from "@/lib/photos";
 import { originalKey, presignGet, variantKey } from "@/lib/storage";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -26,9 +26,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
   if (new URL(req.url).searchParams.get("size") === "web" && gallery.download_web_enabled) {
     const webName = `${photo.filename.replace(/\.[^.]+$/, "")}-web.jpg`;
     const webKey = variantKey(photo.gallery_id, photo.id, gallery.watermark ? "web_wm" : "web");
+    await logDownload(gallery, { kind: "photo", size: "web", photoId: photo.id });
     return Response.redirect(await presignGet(webKey, { downloadName: webName }), 302);
   }
   const name = downloadName(photo);
   const key = originalKey(photo.gallery_id, photo.id, photo.original_ext);
+  await logDownload(gallery, { kind: "photo", size: "hd", photoId: photo.id });
   return Response.redirect(await presignGet(key, { downloadName: name }), 302);
 }

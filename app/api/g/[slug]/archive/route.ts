@@ -1,4 +1,4 @@
-import { loadAccessibleGallery } from "@/lib/gallery-access";
+import { loadAccessibleGallery, logDownload } from "@/lib/gallery-access";
 import { downloadName } from "@/lib/photos";
 import { originalKey, presignGet } from "@/lib/storage";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -41,6 +41,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
       return { name, size: Number(p.size_bytes), url: await presignGet(originalKey(p.gallery_id, p.id, p.original_ext)) };
     }),
   );
+  if (files.length > 0) await logDownload(gallery, { kind: "zip", collectionId: collectionId ?? null, photoCount: files.length });
   const base = `${gallery.title}${collectionId ? ` - ${names.get(collectionId) ?? ""}` : ""}`.replace(/[\\/:*?"<>|]/g, "-");
   return Response.json({ zipName: `${base}.zip`, totalBytes: files.reduce((s, f) => s + f.size, 0), files });
 }

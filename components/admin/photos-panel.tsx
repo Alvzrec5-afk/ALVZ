@@ -19,6 +19,7 @@ type Props = {
   photos: PhotoView[];
   positions: Record<string, number>;
   favoriteCounts: Record<string, number>;
+  downloadCounts: Record<string, number>;
 };
 
 async function post(path: string, body: unknown) {
@@ -221,6 +222,7 @@ export function PhotosPanel(props: Props) {
                   isCover={p.id === coverId}
                   onOpen={() => !dragging.current && setViewer(order.findIndex((o) => o.id === p.id))}
                   favorites={props.favoriteCounts[p.id] ?? 0}
+                  downloads={props.downloadCounts[p.id] ?? 0}
                   onCover={() => run(() => setCover(props.galleryId, p.id))}
                   onDelete={() => {
                     if (confirm(`Supprimer ${p.filename} ?`)) run(() => post("/api/admin/photos/delete", { photoIds: [p.id] }));
@@ -240,6 +242,7 @@ export function PhotosPanel(props: Props) {
           onClose={() => setViewer(null)}
           coverId={coverId}
           favoriteCounts={props.favoriteCounts}
+          downloadCounts={props.downloadCounts}
           onCover={async (p) => {
             await setCover(props.galleryId, p.id);
             setCoverId(p.id);
@@ -269,6 +272,7 @@ function SortablePhoto({
   isCover,
   onOpen,
   favorites,
+  downloads,
   onCover,
   onDelete,
 }: {
@@ -276,6 +280,7 @@ function SortablePhoto({
   isCover: boolean;
   onOpen: () => void;
   favorites: number;
+  downloads: number;
   onCover: () => void;
   onDelete: () => void;
 }) {
@@ -292,9 +297,14 @@ function SortablePhoto({
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={photo.thumb} alt={photo.filename} loading="lazy" draggable={false} className="w-full h-full object-cover" />
       {isCover && <span className="absolute top-1.5 left-1.5 bg-black/60 text-white text-[10px] tracking-widest uppercase px-1.5 py-0.5">Couverture</span>}
-      {favorites > 0 && (
-        <span className="absolute bottom-1.5 left-1.5 flex items-center gap-1 text-white text-[11px] drop-shadow">
-          <HeartIcon className="w-3.5 h-3.5" filled /> {favorites}
+      {(favorites > 0 || downloads > 0) && (
+        <span className="absolute bottom-1.5 left-1.5 flex items-center gap-2 text-white text-[11px] drop-shadow">
+          {favorites > 0 && (
+            <span className="flex items-center gap-1">
+              <HeartIcon className="w-3.5 h-3.5" filled /> {favorites}
+            </span>
+          )}
+          {downloads > 0 && <span>↓ {downloads}</span>}
         </span>
       )}
       <div className="absolute inset-x-0 top-0 flex justify-end gap-1 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity">

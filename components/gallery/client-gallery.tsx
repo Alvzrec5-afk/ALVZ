@@ -7,6 +7,8 @@ import { DownloadIcon, HeartIcon } from "@/components/icons";
 import { Wordmark } from "@/components/wordmark";
 import { PhotoGrid } from "./justified-grid";
 import { Lightbox } from "./lightbox";
+import { ContactCard } from "./contact-card";
+import type { Contact } from "@/lib/contact";
 import { downloadArchive } from "./zip";
 
 type Props = {
@@ -21,6 +23,7 @@ type Props = {
   cover: { src: string; width: number; height: number } | null;
   /** Deuxième photo (mise en page Diptyque). */
   coverAlt: string | null;
+  contact: Contact | null;
   collections: Collection[];
   photos: PhotoView[];
   favorites: { email: string | null; photoIds: string[] };
@@ -176,13 +179,15 @@ export function ClientGallery(props: Props) {
                 className={`relative flex items-center gap-1.5 h-10 px-2 transition-colors ${tab === FAVORITES_TAB ? "text-heart" : "text-ink/80 hover:text-ink"}`}
                 aria-label="Ma sélection"
               >
-                <HeartIcon className="w-[22px] h-[22px]" filled={tab === FAVORITES_TAB} />
-                <span className={`eyebrow text-[10px] ${design.nav_style === "labels" ? "" : "hidden lg:inline"}`}>Sélection</span>
-                {favorites.size > 0 && (
-                  <span key={favorites.size} className="absolute top-1 left-6 min-w-4 h-4 px-1 rounded-full bg-heart text-white text-[9px] leading-4 text-center animate-[heartPop_0.45s_ease-out]">
-                    {favorites.size}
-                  </span>
-                )}
+                <span className="relative">
+                  <HeartIcon className="w-[22px] h-[22px]" filled={tab === FAVORITES_TAB} />
+                  {favorites.size > 0 && (
+                    <span key={favorites.size} className="absolute -top-1.5 -right-2 min-w-4 h-4 px-1 rounded-full bg-heart text-white text-[9px] leading-4 text-center animate-[heartPop_0.45s_ease-out]">
+                      {favorites.size}
+                    </span>
+                  )}
+                </span>
+                <span className={`eyebrow text-[10px] ml-1 ${design.nav_style === "labels" ? "" : "hidden lg:inline"}`}>Sélection</span>
               </button>
             )}
             {(props.downloadsEnabled || props.favoritesEnabled) && (
@@ -272,9 +277,13 @@ export function ClientGallery(props: Props) {
         )}
       </main>
 
-      <footer className="pb-12 text-center">
-        <Wordmark height={44} className="opacity-80" />
-      </footer>
+      {design.show_contact && props.contact ? (
+        <ContactCard contact={props.contact} />
+      ) : (
+        <footer className="pb-12 text-center">
+          <Wordmark height={44} className="opacity-80" />
+        </footer>
+      )}
 
       {open !== null && (
         <Lightbox

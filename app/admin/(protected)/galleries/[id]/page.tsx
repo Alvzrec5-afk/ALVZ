@@ -5,6 +5,7 @@ import { DESIGN_FIELDS, readDesign } from "@/lib/design";
 import { PHOTO_FIELDS, toPhotoViews } from "@/lib/photos";
 import type { Collection, PhotoRow } from "@/lib/types";
 import { GalleryManager, type ManagedGallery } from "@/components/admin/gallery-manager";
+import type { DownloadRow } from "@/components/admin/downloads-panel";
 
 export const metadata = { title: "Galerie" };
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export default async function GalleryPage({ params }: { params: Promise<{ id: st
     .maybeSingle();
   if (!g) notFound();
 
-  const [{ data: collections }, { data: photos }, { data: lists }] = await Promise.all([
+  const [{ data: collections }, { data: photos }, { data: lists }, { data: downloads }] = await Promise.all([
     supabase.from("collections").select("id, name, position").eq("gallery_id", id).order("position"),
     supabase.from("photos").select(PHOTO_FIELDS).eq("gallery_id", id).eq("status", "ready").order("position"),
     supabase
@@ -30,6 +31,12 @@ export default async function GalleryPage({ params }: { params: Promise<{ id: st
       .select("id, email, created_at, favorites(photo_id)")
       .eq("gallery_id", id)
       .order("created_at"),
+    supabase
+      .from("downloads")
+      .select("id, photo_id, collection_id, kind, size, photo_count, email, created_at")
+      .eq("gallery_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1000),
   ]);
 
   const views = await toPhotoViews((photos ?? []) as PhotoRow[], false);
@@ -58,6 +65,7 @@ export default async function GalleryPage({ params }: { params: Promise<{ id: st
       collections={(collections ?? []) as Collection[]}
       photos={views}
       positions={positions}
+      downloads={(downloads ?? []) as DownloadRow[]}
       favoriteLists={(lists ?? []).map((l) => ({
         id: l.id,
         email: l.email,

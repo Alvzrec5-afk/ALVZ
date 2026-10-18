@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdminApi } from "@/lib/auth";
 import { parisEndOfDay } from "@/lib/dates";
+import { sanitizeContact } from "@/lib/contact";
 import { pickDesign, sanitizeSettingsPatch } from "@/lib/design";
 import { createSessionClient } from "@/lib/supabase/server";
 import { newSlug } from "@/lib/tokens";
@@ -154,4 +155,16 @@ export async function reorderCollections(galleryId: string, orderedIds: string[]
     orderedIds.map((id, position) => supabase.from("collections").update({ position }).eq("id", id)),
   );
   revalidatePath(`/admin/galleries/${galleryId}`);
+}
+
+/** Coordonnées du studio (carte de visite des galeries). */
+export async function saveContact(_: FormState, form: FormData): Promise<FormState> {
+  const { supabase } = await requireAdminApi();
+  const contact = sanitizeContact(Object.fromEntries(form.entries()));
+  const { error } = await supabase
+    .from("studio_settings")
+    .upsert({ id: 1, contact, updated_at: new Date().toISOString() });
+  if (error) return { error: error.message };
+  revalidatePath("/admin/settings");
+  return { ok: "Coordonnées enregistrées." };
 }

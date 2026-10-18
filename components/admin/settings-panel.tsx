@@ -8,7 +8,7 @@ import type { ManagedGallery } from "./gallery-manager";
 import { ListRow, SubHeader, Toggle } from "./ui";
 import { SaveStatus, useSave } from "./use-save";
 
-type View = "menu" | "general" | "privacy" | "download" | "favorites";
+type View = "menu" | "general" | "privacy" | "download" | "favorites" | "contact";
 
 export function SettingsPanel({ gallery, onDelete }: { gallery: ManagedGallery; onDelete: () => void }) {
   const router = useRouter();
@@ -19,6 +19,7 @@ export function SettingsPanel({ gallery, onDelete }: { gallery: ManagedGallery; 
     downloads_enabled: gallery.downloadsEnabled,
     download_web_enabled: gallery.downloadWebEnabled,
     favorites_enabled: gallery.favoritesEnabled,
+    show_contact: gallery.design.show_contact,
   });
   useEffect(
     () =>
@@ -27,8 +28,9 @@ export function SettingsPanel({ gallery, onDelete }: { gallery: ManagedGallery; 
         downloads_enabled: gallery.downloadsEnabled,
         download_web_enabled: gallery.downloadWebEnabled,
         favorites_enabled: gallery.favoritesEnabled,
+        show_contact: gallery.design.show_contact,
       }),
-    [gallery.watermark, gallery.downloadsEnabled, gallery.downloadWebEnabled, gallery.favoritesEnabled],
+    [gallery.watermark, gallery.downloadsEnabled, gallery.downloadWebEnabled, gallery.favoritesEnabled, gallery.design.show_contact],
   );
   const toggle = (key: keyof typeof opts) => (v: boolean) => {
     setOpts((o) => ({ ...o, [key]: v }));
@@ -43,6 +45,7 @@ export function SettingsPanel({ gallery, onDelete }: { gallery: ManagedGallery; 
         <ListRow icon={<LockIcon />} label="Confidentialité" value={gallery.hasPassword ? "Mot de passe" : "Lien seul"} onClick={() => setView("privacy")} />
         <ListRow icon={<DownloadIcon />} label="Téléchargement" badge={opts.downloads_enabled} onClick={() => setView("download")} />
         <ListRow icon={<HeartIcon />} label="Favoris" badge={opts.favorites_enabled} onClick={() => setView("favorites")} />
+        <ListRow icon={<CardIcon />} label="Carte de visite" badge={opts.show_contact} onClick={() => setView("contact")} />
       </div>
     );
   }
@@ -82,6 +85,22 @@ export function SettingsPanel({ gallery, onDelete }: { gallery: ManagedGallery; 
             hint="En plus de la haute définition, le client peut télécharger une version légère (2000 px), idéale pour les réseaux sociaux."
           />
         </div>
+        <div className="mt-6"><SaveStatus status={status} /></div>
+      </div>
+    );
+  }
+
+  if (view === "contact") {
+    return (
+      <div>
+        <SubHeader title="Carte de visite" onBack={back} />
+        <Toggle
+          checked={opts.show_contact}
+          onChange={toggle("show_contact")}
+          label="Afficher mes coordonnées en bas de la galerie"
+          hint="WhatsApp, Instagram, TikTok, e-mail… Les coordonnées se modifient une seule fois pour toutes les galeries."
+        />
+        <a href="/admin/settings" className="btn btn-ghost mt-8">Modifier mes coordonnées</a>
         <div className="mt-6"><SaveStatus status={status} /></div>
       </div>
     );
@@ -269,5 +288,15 @@ function SlugSetting({ gallery, onDone }: { gallery: ManagedGallery; onDone: () 
         </p>
       )}
     </form>
+  );
+}
+
+function CardIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="3" y="5.5" width="18" height="13" rx="1.5" />
+      <circle cx="9" cy="11" r="2" />
+      <path d="M6 15.5c.6-1.3 1.7-2 3-2s2.4.7 3 2M14.5 10h4M14.5 13h3" />
+    </svg>
   );
 }
