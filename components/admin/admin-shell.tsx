@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Wordmark } from "@/components/wordmark";
-import { BoardIcon, CardIcon, CloseIcon, FilmIcon, ImageIcon, LogoutIcon, MegaphoneIcon, MenuIcon } from "@/components/icons";
+import { BoardIcon, TrashIcon, CardIcon, CloseIcon, FilmIcon, ImageIcon, LogoutIcon, MegaphoneIcon, MenuIcon } from "@/components/icons";
 
 const NAV = [
   { href: "/admin", label: "Galeries", Icon: ImageIcon, match: (p: string) => p === "/admin" || p.startsWith("/admin/galleries") },
@@ -12,7 +12,10 @@ const NAV = [
   { href: "/admin/boards", label: "Tableaux", Icon: BoardIcon, match: (p: string) => p.startsWith("/admin/boards") },
   { href: "/admin/settings", label: "Coordonnées", Icon: CardIcon, match: (p: string) => p.startsWith("/admin/settings") },
 ];
-const TOOLS = [{ href: "/admin/clients", label: "Clients & e-mails", Icon: MegaphoneIcon, match: (p: string) => p.startsWith("/admin/clients") }];
+const TOOLS = [
+  { href: "/admin/clients", label: "Clients & e-mails", Icon: MegaphoneIcon, match: (p: string) => p.startsWith("/admin/clients") },
+  { href: "/admin/trash", label: "Corbeille", Icon: TrashIcon, match: (p: string) => p.startsWith("/admin/trash") },
+];
 
 /**
  * Mobile : barre en haut. Ordinateur : menu latéral à gauche (comme Pixieset) ;

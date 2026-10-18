@@ -139,7 +139,7 @@ export function BoardHeader({
                 className="block w-full text-left px-4 py-3 text-danger hover:bg-bg"
                 onClick={() => {
                   setPlus(false);
-                  if (confirm(`Supprimer définitivement le tableau « ${board.title} » et ses images ?`)) void deleteBoard(board.id);
+                  if (confirm(`Mettre le tableau « ${board.title} » à la corbeille ? Vous pourrez le restaurer pendant 30 jours.`)) void deleteBoard(board.id);
                 }}
               >
                 Supprimer le tableau

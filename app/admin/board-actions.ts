@@ -41,6 +41,7 @@ export async function openGalleryBoard(galleryId: string) {
     .select("id")
     .eq("gallery_id", galleryId)
     .is("parent_id", null)
+    .is("deleted_at", null)
     .order("created_at")
     .limit(1)
     .maybeSingle();
@@ -96,11 +97,15 @@ export async function regenerateBoardLink(boardId: string) {
   return { slug };
 }
 
-export async function deleteBoard(boardId: string) {
+/** Supprimer un tableau = le mettre à la corbeille (récupérable 30 jours). */
+export async function deleteBoard(boardId: string, opts: { stay?: boolean } = {}) {
   const { supabase } = await requireAdminApi();
-  await purgeBoard(supabase, boardId);
+  const { error } = await supabase.from("boards").update({ deleted_at: new Date().toISOString() }).eq("id", boardId).is("parent_id", null);
+  if (error) return { error: error.message };
   revalidatePath("/admin/boards");
-  redirect("/admin/boards");
+  revalidatePath("/admin/trash");
+  if (!opts.stay) redirect("/admin/boards");
+  return {};
 }
 
 /** Duplique un tableau (avec ses planches et images). Une planche dupliquée reste rangée au même endroit. */
@@ -137,4 +142,27 @@ export async function duplicateBoard(boardId: string, title?: string) {
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Duplication impossible" };
   }
+}
+
+// ——— Corbeille ———
+
+export async function restoreFromTrash(kind: "gallery" | "board", id: string) {
+  const { supabase } = await requireAdminApi();
+  const table = kind === "gallery" ? "galleries" : "boards";
+  const { error } = await supabase.from(table).update({ deleted_at: null }).eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/trash");
+  revalidatePath(kind === "gallery" ? "/admin" : "/admin/boards");
+  revalidatePath("/admin/videos");
+  return {};
+}
+
+/** Tableau supprimé définitivement (depuis la corbeille) : cartes, planches et images. */
+export async function purgeTrashedBoard(id: string) {
+  const { supabase } = await requireAdminApi();
+  const { data } = await supabase.from("boards").select("id").eq("id", id).not("deleted_at", "is", null).maybeSingle();
+  if (!data) return { error: "Ce tableau n'est pas dans la corbeille." };
+  await purgeBoard(supabase, id);
+  revalidatePath("/admin/trash");
+  return {};
 }

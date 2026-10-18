@@ -1,6 +1,6 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireAdminPage } from "@/lib/auth";
-import { boardAncestors, isUuid, loadBoardItems } from "@/lib/boards";
+import { boardAncestors, isUuid, loadBoardItems, purgeDeletedItems } from "@/lib/boards";
 import { BoardCanvas } from "@/components/board/board-canvas";
 import { BoardHeader } from "@/components/admin/board-header";
 
@@ -21,10 +21,12 @@ export default async function BoardPage({
   const [{ data: board }, items, { data: galleries }, path] = await Promise.all([
     supabase.from("boards").select(fields).eq("id", id).maybeSingle(),
     loadBoardItems(supabase, id, { role: "admin" }),
-    supabase.from("galleries").select("id, title, kind").order("created_at", { ascending: false }),
+    supabase.from("galleries").select("id, title, kind").is("deleted_at", null).order("created_at", { ascending: false }),
     boardAncestors(supabase, id),
+    purgeDeletedItems(supabase, id), // cartes supprimées il y a plus de 24 h
   ]);
   if (!board) notFound();
+  if (path.some((b) => b.deleted_at)) redirect("/admin/trash");
   // Sous-tableau : le partage et la galerie reliée sont ceux du tableau principal.
   const root = path.length > 1 ? (await supabase.from("boards").select(fields).eq("id", path[0].id).maybeSingle()).data ?? board : board;
 

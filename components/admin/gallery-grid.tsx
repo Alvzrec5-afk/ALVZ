@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { GridIcon, LockIcon, MenuIcon } from "@/components/icons";
 import { formatBytes } from "@/lib/format";
-import { purge } from "./purge";
+import { trashGallery } from "@/app/admin/actions";
 
 export type GalleryCard = {
   id: string;
@@ -93,10 +93,11 @@ export function GalleryGrid({ galleries, kind = "photo" }: { galleries: GalleryC
 
   async function remove(g: GalleryCard) {
     setMenu(null);
-    if (!confirm(`Supprimer définitivement « ${g.title} » et ses ${g.photoCount} ${L.unit}s ?`)) return;
+    if (!confirm(`Mettre « ${g.title} » à la corbeille ? Vous pourrez la restaurer pendant 30 jours.`)) return;
     setBusy(g.id);
     try {
-      await purge("gallery", g.id);
+      const res = await trashGallery(g.id);
+      if (res.error) throw new Error(res.error);
       router.refresh();
     } catch (e) {
       alert(e instanceof Error ? e.message : String(e));

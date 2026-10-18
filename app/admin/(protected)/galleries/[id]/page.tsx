@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireAdminPage } from "@/lib/auth";
 import { toParisDateInput } from "@/lib/dates";
 import { DESIGN_FIELDS, readDesign } from "@/lib/design";
@@ -21,7 +21,7 @@ export default async function GalleryPage({ params }: { params: Promise<{ id: st
     supabase
       .from("galleries")
       .select(
-        `id, kind, slug, title, event_date, cover_photo_id, password_hash, expires_at, watermark, downloads_enabled, download_web_enabled, favorites_enabled, ${DESIGN_FIELDS}`,
+        `id, deleted_at, kind, slug, title, event_date, cover_photo_id, password_hash, expires_at, watermark, downloads_enabled, download_web_enabled, favorites_enabled, ${DESIGN_FIELDS}`,
       )
       .eq("id", id)
       .maybeSingle(),
@@ -46,6 +46,7 @@ export default async function GalleryPage({ params }: { params: Promise<{ id: st
       .order("position"),
   ]);
   if (!g) notFound();
+  if (g.deleted_at) redirect("/admin/trash");
 
   type VideoWithActivity = VideoRow & { video_comments: VideoComment[]; video_events: { kind: string; watched_pct: number }[] };
   const videos: AdminVideo[] = await Promise.all(

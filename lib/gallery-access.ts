@@ -27,7 +27,7 @@ export const GALLERY_FIELDS = `id, kind, slug, title, event_date, cover_photo_id
 export const findGalleryBySlug = cache(async (slug: string) => {
   if (!/^[A-Za-z0-9_-]{3,64}$/.test(slug)) return null;
   const db = createServiceClient();
-  const { data } = await db.from("galleries").select(GALLERY_FIELDS).eq("slug", slug).maybeSingle();
+  const { data } = await db.from("galleries").select(GALLERY_FIELDS).eq("slug", slug).is("deleted_at", null).maybeSingle();
   return (data as PublicGallery | null) ?? null;
 });
 

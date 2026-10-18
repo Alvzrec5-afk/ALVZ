@@ -14,7 +14,7 @@ import { DesignPanel } from "./design-panel";
 import { SettingsPanel } from "./settings-panel";
 import { FavoritesPanel } from "./favorites-panel";
 import { DownloadsPanel, type DownloadRow } from "./downloads-panel";
-import { purge } from "./purge";
+import { trashGallery } from "@/app/admin/actions";
 import { openGalleryBoard } from "@/app/admin/board-actions";
 
 export type ManagedGallery = {
@@ -97,10 +97,11 @@ export function GalleryManager(props: Props) {
   async function remove() {
     setMenu(false);
     setPlus(false);
-    if (!confirm(`Supprimer définitivement la galerie « ${gallery.title} » et toutes ses photos ?`)) return;
+    if (!confirm(`Mettre « ${gallery.title} » à la corbeille ? Vous pourrez la restaurer pendant 30 jours.`)) return;
     setDeleting(true);
     try {
-      await purge("gallery", gallery.id);
+      const res = await trashGallery(gallery.id);
+      if (res.error) throw new Error(res.error);
       router.replace(home);
       router.refresh();
     } catch (e) {

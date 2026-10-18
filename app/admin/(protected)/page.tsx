@@ -28,6 +28,7 @@ export default async function AdminHome() {
       .from("galleries")
       .select("id, slug, title, event_date, cover_photo_id, password_hash, expires_at, created_at, photos!photos_gallery_id_fkey(count)")
       .eq("kind", "photo")
+      .is("deleted_at", null)
       .order("created_at", { ascending: false }),
     storageUsage(supabase),
   ]);

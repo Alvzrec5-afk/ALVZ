@@ -15,6 +15,7 @@ import {
   type BoardItem,
   type BoardItemInput,
   type BoardKind,
+  type BoardOp,
   type NoteColor,
   linkEmbed,
 } from "@/lib/board-types";
@@ -257,14 +258,109 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
 
   const canEdit = useCallback((it: BoardItem) => role === "admin" || Boolean(clientEditAll) || it.mine, [clientEditAll, role]);
 
+  // ——— Historique (Cmd + Z / Cmd + Maj + Z) ———
+  // Chaque modification enregistrée marque la carte ; après 0,6 s de calme, l'état « avant » et l'état
+  // « après » de ces cartes forment une étape. Annuler remet l'état « avant » (et l'enregistre).
+
+  type Snap = Record<string, BoardItem | null>;
+  const history = useRef<{ before: Snap; after: Snap }[]>([]);
+  const future = useRef<{ before: Snap; after: Snap }[]>([]);
+  const committed = useRef<Items>(items); // état du tableau à la dernière étape
+  const touched = useRef(new Set<string>());
+  const replaying = useRef(false);
+  const checkpointTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [, setHistoryVersion] = useState(0);
+
+  const checkpoint = useCallback(() => {
+    if (checkpointTimer.current) clearTimeout(checkpointTimer.current);
+    checkpointTimer.current = null;
+    const before: Snap = {};
+    const after: Snap = {};
+    const nextCommitted = { ...committed.current };
+    for (const id of touched.current) {
+      const b = committed.current[id] ?? null;
+      const a = itemsRef.current[id] ?? null;
+      if (a) nextCommitted[id] = a;
+      else delete nextCommitted[id];
+      if (JSON.stringify(b && toInput(b)) === JSON.stringify(a && toInput(a))) continue;
+      before[id] = b;
+      after[id] = a;
+    }
+    touched.current.clear();
+    committed.current = nextCommitted;
+    if (!Object.keys(before).length) return;
+    history.current.push({ before, after });
+    if (history.current.length > 100) history.current.shift();
+    future.current = [];
+    setHistoryVersion((v) => v + 1);
+  }, []);
+
+  /** Toute modification passe par ici : envoi au serveur + historique. */
+  const push = useCallback(
+    (op: BoardOp) => {
+      sync.push(op);
+      if (replaying.current) return;
+      touched.current.add(op.op === "put" ? op.item.id : op.id);
+      if (checkpointTimer.current) clearTimeout(checkpointTimer.current);
+      checkpointTimer.current = setTimeout(checkpoint, 600);
+    },
+    [checkpoint, sync],
+  );
+
+  const replay = useCallback(
+    (snap: Snap) => {
+      replaying.current = true;
+      const all = { ...itemsRef.current };
+      const nextCommitted = { ...committed.current };
+      // Colonnes d'abord, pour que leurs cartes puissent y revenir.
+      const entries = Object.entries(snap).sort(([, a], [, b]) => Number(a?.kind !== "column") - Number(b?.kind !== "column"));
+      for (const [id, it] of entries) {
+        if (it) {
+          all[id] = { ...it, src: all[id]?.src ?? it.src };
+          nextCommitted[id] = all[id];
+          sync.push({ op: "put", item: toInput(it) });
+        } else {
+          delete all[id];
+          delete nextCommitted[id];
+          sync.push({ op: "delete", id });
+        }
+      }
+      committed.current = nextCommitted;
+      itemsRef.current = all;
+      setItemsState(all);
+      replaying.current = false;
+      setSelectedState(null);
+      setGroup([]);
+      setEditing(null);
+      setHistoryVersion((v) => v + 1);
+    },
+    [setGroup, sync],
+  );
+
+  const undo = useCallback(() => {
+    checkpoint();
+    const step = history.current.pop();
+    if (!step) return;
+    future.current.push(step);
+    replay(step.before);
+  }, [checkpoint, replay]);
+
+  const redo = useCallback(() => {
+    checkpoint();
+    const step = future.current.pop();
+    if (!step) return;
+    history.current.push(step);
+    replay(step.after);
+  }, [checkpoint, replay]);
+
   // ——— Modifications ———
 
   const persist = useCallback(
     (it: BoardItem) => {
       if (uploading.current.has(it.id)) return; // enregistrée à la fin de l'envoi de l'image
-      sync.push({ op: "put", item: toInput(it) });
+      push({ op: "put", item: toInput(it) });
     },
-    [sync],
+    [push],
   );
 
   const update = useCallback(
@@ -310,7 +406,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       for (const child of Object.values(all).filter((c) => c.parentId === id)) {
         const b = boxOf(child.id);
         all[child.id] = { ...child, parentId: null, x: b?.x ?? it.x, y: b?.y ?? it.y, w: it.w };
-        sync.push({ op: "put", item: toInput(all[child.id]) });
+        push({ op: "put", item: toInput(all[child.id]) });
       }
       const gone = [id];
       if (role === "admin") {
@@ -318,13 +414,13 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       }
       for (const g of gone) {
         delete all[g];
-        sync.push({ op: "delete", id: g });
+        push({ op: "delete", id: g });
       }
       setItems(all);
       setSelected(null);
       setEditing(null);
     },
-    [boxOf, canEdit, role, setItems, setSelected, sync],
+    [boxOf, canEdit, push, role, setItems, setSelected],
   );
 
   /** Supprime toutes les cartes sélectionnées (une seule confirmation). */
@@ -337,18 +433,18 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       for (const child of Object.values(all).filter((c) => c.parentId === id && !gone.has(c.id))) {
         const b = boxOf(child.id);
         all[child.id] = { ...child, parentId: null, x: b?.x ?? all[id].x, y: b?.y ?? all[id].y };
-        sync.push({ op: "put", item: toInput(all[child.id]) });
+        push({ op: "put", item: toInput(all[child.id]) });
       }
     }
     if (role === "admin") for (const a of Object.values(all)) if (a.kind === "arrow" && (gone.has(a.data.from ?? "") || gone.has(a.data.to ?? ""))) gone.add(a.id);
     for (const g of gone) {
       delete all[g];
-      sync.push({ op: "delete", id: g });
+      push({ op: "delete", id: g });
     }
     setItems(all);
     setGroup([]);
     setSelected(null);
-  }, [boxOf, canEdit, role, setGroup, setItems, setSelected, sync]);
+  }, [boxOf, canEdit, push, role, setGroup, setItems, setSelected]);
 
   /** Couleur appliquée à une carte ou à toute la sélection (notes et colonnes). */
   const applyColor = useCallback(
@@ -559,7 +655,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           }
           uploading.current.delete(id);
           const latest = itemsRef.current[id];
-          if (latest) sync.push({ op: "put", item: { ...toInput(latest), sizeBytes: prepared.blob.size } });
+          if (latest) push({ op: "put", item: { ...toInput(latest), sizeBytes: prepared.blob.size } });
         } catch (e) {
           uploading.current.delete(id);
           const all = { ...itemsRef.current };
@@ -571,7 +667,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       onProgress?.(images.length);
       return failed;
     },
-    [create, imageEndpoint, role, setItems, sync],
+    [create, imageEndpoint, push, role, setItems],
   );
 
   const addImages = useCallback(
@@ -1076,6 +1172,12 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       const t = e.target as HTMLElement;
       if (t.closest("input, textarea")) return;
       if (e.key === " ") spaceDown.current = true;
+      if ((e.metaKey || e.ctrlKey) && (e.key === "z" || e.key === "Z" || e.key === "y")) {
+        e.preventDefault();
+        if (e.key === "y" || e.shiftKey) redo();
+        else undo();
+        return;
+      }
       if ((e.key === "Delete" || e.key === "Backspace") && groupRef.current.length > 1) {
         e.preventDefault();
         removeGroup();
@@ -1122,7 +1224,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       window.removeEventListener("keydown", key);
       window.removeEventListener("paste", paste);
     };
-  }, [addImages, canAdd, canEdit, create, ensureName, remove, removeGroup, selected, setGroup, setSelected]);
+  }, [addImages, canAdd, canEdit, create, ensureName, redo, remove, removeGroup, selected, setGroup, setSelected, undo]);
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -1153,6 +1255,14 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       const keep = (id: string) => sync.isPending(id) || uploading.current.has(id) || editing?.id === id || dragId === id;
       for (const s of server) next[s.id] = keep(s.id) && local[s.id] ? local[s.id] : { ...s, src: s.src ?? local[s.id]?.src ?? null };
       for (const l of Object.values(local)) if (!next[l.id] && keep(l.id)) next[l.id] = l;
+      // Changements venus d'ailleurs (le client, un autre appareil) : ils ne sont pas « annulables » ici.
+      const base = { ...committed.current };
+      for (const id of new Set([...Object.keys(base), ...Object.keys(next)])) {
+        if (touched.current.has(id) || keep(id)) continue;
+        if (next[id]) base[id] = next[id];
+        else delete base[id];
+      }
+      committed.current = base;
       setItems(next);
     } catch {
       // Hors connexion : on réessaiera.
@@ -2012,6 +2122,28 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           <span className={`text-[11px] px-2 ${status.state === "error" ? "text-danger" : "text-muted"}`}>
             {status.state === "saving" ? "Enregistrement…" : status.state === "error" ? status.message : "Enregistré"}
           </span>
+        )}
+        {(role === "admin" || canAdd) && (
+          <div className="flex bg-bg border border-line shadow-sm rounded-[4px] text-muted">
+            <button
+              className="w-10 h-10 flex items-center justify-center hover:text-ink disabled:opacity-30"
+              onClick={undo}
+              disabled={!history.current.length && !touched.current.size}
+              aria-label="Annuler"
+              title="Annuler (Cmd + Z)"
+            >
+              ↶
+            </button>
+            <button
+              className="w-10 h-10 flex items-center justify-center hover:text-ink disabled:opacity-30 border-l border-line"
+              onClick={redo}
+              disabled={!future.current.length}
+              aria-label="Rétablir"
+              title="Rétablir (Cmd + Maj + Z)"
+            >
+              ↷
+            </button>
+          </div>
         )}
         <div className="flex sm:flex-row flex-col-reverse bg-bg border border-line shadow-sm rounded-[4px] text-muted">
           <button className="w-10 h-10 flex items-center justify-center hover:text-ink" onClick={() => zoomCenter(1 / 1.25)} aria-label="Dézoomer">

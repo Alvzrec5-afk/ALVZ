@@ -213,3 +213,14 @@ export async function deleteVideoComment(galleryId: string, commentId: string) {
   await supabase.from("video_comments").delete().eq("id", commentId);
   revalidatePath(`/admin/galleries/${galleryId}`);
 }
+
+/** Supprimer une galerie ou un projet vidéo = le mettre à la corbeille (récupérable 30 jours). */
+export async function trashGallery(galleryId: string) {
+  const { supabase } = await requireAdminApi();
+  const { error } = await supabase.from("galleries").update({ deleted_at: new Date().toISOString() }).eq("id", galleryId);
+  if (error) return { error: error.message };
+  revalidatePath("/admin");
+  revalidatePath("/admin/videos");
+  revalidatePath("/admin/trash");
+  return {};
+}

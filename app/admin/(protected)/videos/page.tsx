@@ -27,6 +27,7 @@ export default async function VideosHome() {
       .from("galleries")
       .select("id, slug, title, event_date, password_hash, expires_at, created_at, videos(id, status, position)")
       .eq("kind", "video")
+      .is("deleted_at", null)
       .order("created_at", { ascending: false }),
     storageUsage(supabase),
   ]);

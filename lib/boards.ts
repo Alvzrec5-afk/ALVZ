@@ -51,7 +51,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (v: unknown): v is string => typeof v === "string" && UUID.test(v);
 
 export async function loadBoardItems(db: SupabaseClient, boardId: string, actor: Actor): Promise<BoardItem[]> {
-  const { data, error } = await db.from("board_items").select(BOARD_ITEM_FIELDS).eq("board_id", boardId).limit(MAX_ITEMS);
+  const { data, error } = await db.from("board_items").select(BOARD_ITEM_FIELDS).eq("board_id", boardId).is("deleted_at", null).limit(MAX_ITEMS);
   if (error) throw new Error(`Impossible de charger le tableau : ${error.message}`);
   const rows = (data ?? []) as Row[];
   const [subs, comments] = await Promise.all([
@@ -134,12 +134,13 @@ export async function deleteBoardComment(db: SupabaseClient, boardId: string, co
 /** Aperçu des sous-tableaux d'un tableau : nom, nombre de cartes, 4 images au plus. */
 async function subBoardPreviews(db: SupabaseClient, boardId: string) {
   const out = new Map<string, { title: string; count: number; covers: string[] }>();
-  const { data: boards } = await db.from("boards").select("id, title").eq("parent_id", boardId);
+  const { data: boards } = await db.from("boards").select("id, title").eq("parent_id", boardId).is("deleted_at", null);
   if (!boards?.length) return out;
   const { data: items } = await db
     .from("board_items")
     .select("id, board_id, kind, size_bytes, z")
     .in("board_id", boards.map((b) => b.id as string))
+    .is("deleted_at", null)
     .neq("kind", "arrow");
   for (const b of boards) {
     const mine = (items ?? []).filter((i) => i.board_id === b.id);
@@ -155,12 +156,13 @@ async function subBoardPreviews(db: SupabaseClient, boardId: string) {
 
 /** Chemin depuis le tableau principal jusqu'à ce tableau (fil d'Ariane), du haut vers le bas. */
 export async function boardAncestors(db: SupabaseClient, boardId: string) {
-  const chain: { id: string; title: string; parent_id: string | null }[] = [];
+  type Link = { id: string; title: string; parent_id: string | null; deleted_at: string | null };
+  const chain: Link[] = [];
   let id: string | null = boardId;
   for (let depth = 0; id && depth < 25; depth++) {
-    const { data }: { data: { id: string; title: string; parent_id: string | null } | null } = await db
+    const { data }: { data: Link | null } = await db
       .from("boards")
-      .select("id, title, parent_id")
+      .select("id, title, parent_id, deleted_at")
       .eq("id", id)
       .maybeSingle();
     if (!data) break;
@@ -255,7 +257,7 @@ export async function applyBoardOps(
   ];
   const lookup = [...new Set([...ids, ...parentIds])];
   const { data: existing, error } = lookup.length
-    ? await db.from("board_items").select("id, board_id, kind, client_id, author, size_bytes, data").in("id", lookup)
+    ? await db.from("board_items").select("id, board_id, kind, client_id, author, size_bytes, data, deleted_at").in("id", lookup)
     : { data: [], error: null };
   if (error) throw new Error(error.message);
   const known = new Map((existing ?? []).map((r) => [r.id as string, r]));
@@ -271,7 +273,7 @@ export async function applyBoardOps(
   const deletes: string[] = [];
   const subBoards: { id: string; title: string }[] = []; // cartes « tableau » créées ou renommées
   const deletedSubBoards: string[] = [];
-  const freedKeys: string[] = [];
+  const restoredSubBoards: string[] = []; // planches revenues (Cmd + Z après suppression)
   const now = new Date().toISOString();
 
   for (const o of ops) {
@@ -280,7 +282,6 @@ export async function applyBoardOps(
       if (!row) continue;
       if (!owns(row)) throw new Error("Carte non modifiable");
       deletes.push(o.id);
-      if (row.kind === "image") freedKeys.push(boardImageKey(boardId, o.id));
       if (row.kind === "board" && isUuid((row.data as BoardData | null)?.boardId)) deletedSubBoards.push((row.data as BoardData).boardId!);
       continue;
     }
@@ -305,6 +306,7 @@ export async function applyBoardOps(
       data.boardId = before?.boardId ?? data.boardId ?? crypto.randomUUID();
       // Nom du sous-tableau : seulement à la création ou si la carte a vraiment été renommée.
       if (!row || (before?.title ?? "") !== (data.title ?? "")) subBoards.push({ id: data.boardId, title: data.title || "Sans titre" });
+      if (row?.deleted_at) restoredSubBoards.push(data.boardId);
     }
     puts.push({
       id: it.id,
@@ -326,6 +328,7 @@ export async function applyBoardOps(
           ? { author: actor.name, client_id: actor.clientId }
           : { author: null, client_id: null }),
       updated_at: now,
+      deleted_at: null, // une carte remise (Cmd + Z) sort de la suppression différée
     });
   }
 
@@ -355,11 +358,15 @@ export async function applyBoardOps(
     const { error: putError } = await db.from("board_items").upsert(group, { onConflict: "id" });
     if (putError) throw new Error(putError.message);
   }
+  if (restoredSubBoards.length) {
+    await db.from("boards").update({ deleted_at: null }).in("id", restoredSubBoards).eq("parent_id", boardId);
+  }
   if (deletes.length) {
-    const { error: delError } = await db.from("board_items").delete().eq("board_id", boardId).in("id", deletes);
+    // Suppression différée : la carte (et sa planche, ses images, sa discussion) reste 24 h pour Cmd + Z,
+    // puis `purgeDeletedItems` l'efface pour de bon.
+    const { error: delError } = await db.from("board_items").update({ deleted_at: now }).eq("board_id", boardId).in("id", deletes);
     if (delError) throw new Error(delError.message);
-    if (freedKeys.length) await deleteKeys(freedKeys);
-    for (const sub of deletedSubBoards) await purgeBoard(db, sub, boardId);
+    if (deletedSubBoards.length) await db.from("boards").update({ deleted_at: now }).in("id", deletedSubBoards).eq("parent_id", boardId);
   }
   await db.from("boards").update({ updated_at: now }).eq("id", boardId);
 }
@@ -375,14 +382,15 @@ export async function duplicateBoard(db: SupabaseClient, sourceId: string, title
   if (!top) throw new Error("Tableau introuvable");
   tree.push(top);
   for (let level = [sourceId], depth = 0; level.length && depth < 25; depth++) {
-    const { data } = await db.from("boards").select("id, title, parent_id, gallery_id, client_can_add").in("parent_id", level);
+    const { data } = await db.from("boards").select("id, title, parent_id, gallery_id, client_can_add").in("parent_id", level).is("deleted_at", null);
     tree.push(...(data ?? []));
     level = (data ?? []).map((b) => b.id as string);
   }
   const { data: rows, error } = await db
     .from("board_items")
     .select("id, board_id, kind, x, y, w, z, parent_id, position, data, size_bytes, author")
-    .in("board_id", tree.map((b) => b.id));
+    .in("board_id", tree.map((b) => b.id))
+    .is("deleted_at", null);
   if (error) throw new Error(error.message);
   const items = rows ?? [];
 
@@ -446,6 +454,20 @@ export async function duplicateBoard(db: SupabaseClient, sourceId: string, title
   return boardIds.get(sourceId)!;
 }
 
+/** Efface pour de bon les cartes supprimées depuis plus de 24 h (images, planches et discussions comprises). */
+export async function purgeDeletedItems(db: SupabaseClient, boardId: string) {
+  const limit = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const { data } = await db.from("board_items").select("id, kind, data").eq("board_id", boardId).lt("deleted_at", limit).limit(500);
+  if (!data?.length) return;
+  const images = data.filter((i) => i.kind === "image").map((i) => boardImageKey(boardId, i.id as string));
+  if (images.length) await deleteKeys(images);
+  for (const card of data.filter((i) => i.kind === "board")) {
+    const sub = (card.data as BoardData | null)?.boardId;
+    if (isUuid(sub)) await purgeBoard(db, sub, boardId);
+  }
+  await db.from("board_items").delete().in("id", data.map((i) => i.id as string));
+}
+
 /** Supprime un tableau, ses sous-tableaux, leurs cartes et leurs images. */
 export async function purgeBoard(db: SupabaseClient, boardId: string, expectedParent?: string) {
   if (expectedParent) {
@@ -485,6 +507,7 @@ export const findSharedBoard = cache(async (slug: string) => {
     .select("id, title, share_slug, client_can_add, client_can_edit, gallery_id")
     .eq("share_slug", slug)
     .eq("share_enabled", true)
+    .is("deleted_at", null)
     .maybeSingle();
   return (data as PublicBoard | null) ?? null;
 });
@@ -530,7 +553,7 @@ export async function resolveSharedBoard(slug: string, subId?: string | null) {
   if (!isUuid(subId)) return null;
   const chain = await boardAncestors(createServiceClient(), subId);
   const at = chain.findIndex((b) => b.id === root.id);
-  if (at < 0) return null;
+  if (at < 0 || chain.slice(at).some((b) => b.deleted_at)) return null;
   const path = chain.slice(at).map((b) => ({ id: b.id, title: b.title }));
   return { root, board: path[path.length - 1], path };
 }

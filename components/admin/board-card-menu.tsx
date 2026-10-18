@@ -37,9 +37,12 @@ export function BoardCardMenu({ id, title }: { id: string; title: string }) {
 
   async function remove() {
     setOpen(false);
-    if (!confirm(`Supprimer définitivement le tableau « ${title} », ses planches et ses images ?`)) return;
+    if (!confirm(`Mettre le tableau « ${title} » à la corbeille ? Vous pourrez le restaurer pendant 30 jours.`)) return;
     setBusy("Suppression…");
-    await deleteBoard(id);
+    const res = await deleteBoard(id, { stay: true });
+    setBusy(null);
+    if (res?.error) alert(res.error);
+    else refresh();
   }
 
   return (

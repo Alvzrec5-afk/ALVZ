@@ -9,7 +9,7 @@ export default async function NewBoard({ searchParams }: { searchParams: Promise
   const { supabase } = await requireAdminPage();
   const [{ gallery }, { data }] = await Promise.all([
     searchParams,
-    supabase.from("galleries").select("id, title, kind").order("created_at", { ascending: false }),
+    supabase.from("galleries").select("id, title, kind").is("deleted_at", null).order("created_at", { ascending: false }),
   ]);
   return (
     <div>

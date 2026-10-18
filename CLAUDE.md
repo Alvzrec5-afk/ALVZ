@@ -115,6 +115,16 @@ cartes) ; studio = logo ALVZ.REC, client = prénom + initiale ; API `…/comment
 partage « Le client peut tout modifier » (`boards.client_can_edit`, avec « ajouter ses idées ») : le client
 déplace / modifie / supprime toutes les cartes et a aussi Colonne, Couleur, Flèche (pas Planche ni Importer).
 
+**Corbeille (`/admin/trash`, menu Outils)** — supprimer une galerie, un projet vidéo ou un tableau (principal) met
+`deleted_at` (`trashGallery`, `deleteBoard`) ; restaurer = `deleted_at` à null ; « Supprimer définitivement » =
+ancienne purge (`/api/admin/purge` par lots, `purgeTrashedBoard`) ; au-delà de 30 jours, effacement à l'ouverture
+de la corbeille (`trash-list.tsx`). Tout ce qui lit galeries/tableaux filtre `deleted_at is null` (y compris les
+pages publiques). Les éléments dans la corbeille comptent toujours dans le stockage.
+**Annuler / rétablir dans un tableau** (Cmd + Z, Cmd + Maj + Z, boutons ↶ ↷) : historique dans `board-canvas.tsx`
+(`push` → étape après 0,6 s de calme, `replay`). Pour que ce soit fiable, supprimer une carte met
+`board_items.deleted_at` (et `boards.deleted_at` pour une planche) ; la remettre l'efface ; `purgeDeletedItems`
+efface pour de bon (images, planches) ce qui a plus de 24 h, à l'ouverture du tableau dans le studio.
+
 **Galerie client (`/g/<lien>`)** — `components/gallery/client-gallery.tsx` : couverture animée,
 en-tête collant (Contacter, ♡ sélection, menu), grilles (`justified-grid.tsx`), visionneuse
 (`lightbox.tsx`), ZIP, favoris (e-mail demandé), onglet « Vidéos », carte de visite. Thème qui suit
@@ -138,6 +148,10 @@ images des tableaux). Schéma de référence :
 `supabase/schema.sql` (à tenir à jour après chaque migration).
 
 ## En attente / idées discutées
+
+- **Migration à appliquer au moment de publier** (pas encore faite sur Supabase) : le dernier bloc de
+  `supabase/schema.sql` (« Corbeille » : colonnes `deleted_at` sur `galleries`, `boards`, `board_items` + index).
+  Puis retirer cette ligne.
 
 - Tableaux, idées pour la suite : annuler / rétablir, commentaires sur une carte, aperçu des liens
   (Pinterest, Instagram), cocher les listes du studio côté client, temps réel au lieu du rafraîchissement.

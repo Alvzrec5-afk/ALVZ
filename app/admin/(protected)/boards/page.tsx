@@ -25,6 +25,7 @@ export default async function BoardsHome() {
     .from("boards")
     .select("id, title, share_enabled, updated_at, galleries(title, kind), board_items(id, kind, size_bytes, z)")
     .is("parent_id", null)
+    .is("deleted_at", null)
     .order("updated_at", { ascending: false });
   if (error) throw new Error(`Impossible de charger les tableaux : ${error.message}`);
 

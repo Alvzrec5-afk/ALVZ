@@ -336,3 +336,12 @@ create index board_comments_board_idx on public.board_comments (board_id);
 alter table public.board_comments enable row level security;
 create policy "admin full access" on public.board_comments
   for all to authenticated using ((select private.is_admin())) with check ((select private.is_admin()));
+
+-- Corbeille : galeries, projets vidéo et tableaux supprimés restent récupérables 30 jours.
+-- Cartes d'un tableau : effacées pour de bon 24 h après (Cmd + Z peut les faire revenir avant).
+alter table public.galleries add column deleted_at timestamptz;
+alter table public.boards add column deleted_at timestamptz;
+alter table public.board_items add column deleted_at timestamptz;
+create index galleries_deleted_idx on public.galleries (deleted_at) where deleted_at is not null;
+create index boards_deleted_idx on public.boards (deleted_at) where deleted_at is not null;
+create index board_items_deleted_idx on public.board_items (board_id, deleted_at) where deleted_at is not null;
