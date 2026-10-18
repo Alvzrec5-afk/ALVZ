@@ -235,3 +235,36 @@ export const CommentIcon = ({ className = "w-5 h-5" }: P) => (
     <path d="M8 9.5h8M8 12.5h5" />
   </svg>
 );
+export const MoneyIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <path d="M9 4.5h6l-1.5 3h-3zM10.5 7.5C6.5 9.5 4.5 13 4.5 15.5c0 2.8 2.7 4 7.5 4s7.5-1.2 7.5-4c0-2.5-2-6-6-8" />
+    <path d="M13.6 11.6c-.3-.6-.9-.9-1.6-.9-1 0-1.7.5-1.7 1.3 0 1.9 3.5 1 3.5 2.9 0 .8-.8 1.3-1.8 1.3-.8 0-1.5-.4-1.8-1M12 9.8v.9M12 16.2v.9" />
+  </svg>
+);
+export const PeopleIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <circle cx="12" cy="8.5" r="3" />
+    <path d="M6.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" />
+    <circle cx="5.5" cy="9.5" r="2.2" />
+    <circle cx="18.5" cy="9.5" r="2.2" />
+    <path d="M2.5 17.5c0-2 1.3-3.4 3.2-3.7M21.5 17.5c0-2-1.3-3.4-3.2-3.7" />
+  </svg>
+);
+export const CameraIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <rect x="3" y="7" width="12.5" height="10" rx="1.5" />
+    <path d="M15.5 10.5 21 7.5v9l-5.5-3" />
+  </svg>
+);
+export const ClockIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 7.5V12l3 2" />
+  </svg>
+);
+export const UploadIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <path d="M7 18.5a4.5 4.5 0 0 1-.6-8.96A5.5 5.5 0 0 1 17 8.5a4 4 0 0 1 .5 7.97" />
+    <path d="M12 20v-8m0 0-3 3m3-3 3 3" />
+  </svg>
+);

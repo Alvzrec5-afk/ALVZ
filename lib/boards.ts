@@ -217,10 +217,11 @@ function cleanKind(kind: BoardKind, d: BoardData): BoardData {
       return { hex: isHex(d.hex) ? d.hex.toLowerCase() : "#c8a27a", title: text(d.title, 100) ?? "" };
     case "link": {
       const url = text(d.url, 2000)?.trim() ?? "";
-      return { url: /^https?:\/\//i.test(url) ? url : "", title: text(d.title, 200) ?? "" };
+      // `text` : consigne affichée tant que le lien est vide (« Collez un lien depuis Spotify… »).
+      return { url: /^https?:\/\//i.test(url) ? url : "", title: text(d.title, 200) ?? "", text: text(d.text, 120) || undefined };
     }
     case "board":
-      return { boardId: isUuid(d.boardId) ? d.boardId : undefined, title: text(d.title, 200) ?? "" };
+      return { boardId: isUuid(d.boardId) ? d.boardId : undefined, title: text(d.title, 200) ?? "", icon: text(d.icon, 20) || undefined };
     case "comment":
       return {};
     case "table": {
@@ -321,7 +322,13 @@ export async function applyBoardOps(
       position: num(it.position, -1e12, 1e12),
       data,
       // La taille de l'image n'est enregistrée qu'à la création (après l'envoi du fichier).
-      size_bytes: row ? row.size_bytes : it.kind === "image" ? Math.round(num(it.sizeBytes, 0, MAX_BOARD_IMAGE_BYTES)) : 0,
+      // Une case photo vide (0 octet) prend la taille de l'image qu'on y met.
+      size_bytes:
+        row && Number(row.size_bytes) > 0
+          ? row.size_bytes
+          : it.kind === "image"
+            ? Math.round(num(it.sizeBytes, 0, MAX_BOARD_IMAGE_BYTES))
+            : 0,
       // Toujours explicites : dans un envoi groupé, un champ absent serait remis à vide.
       ...(row
         ? { author: row.author, client_id: row.client_id }

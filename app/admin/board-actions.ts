@@ -3,12 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdminApi } from "@/lib/auth";
-import { TEMPLATES, templateItems, type TemplateId } from "@/lib/board-types";
+import { starterKit } from "@/lib/board-types";
 import { applyBoardOps, duplicateBoard as copyBoard, isUuid, purgeBoard } from "@/lib/boards";
 import { newSlug } from "@/lib/tokens";
 import type { FormState } from "./actions";
 
-async function insertBoard(title: string, template: TemplateId, galleryId: string | null) {
+/** Nouveau tableau, déjà organisé en planches remplies (budget → timeline du tournage). */
+async function insertBoard(title: string, galleryId: string | null) {
   const { supabase } = await requireAdminApi();
   const { data, error } = await supabase
     .from("boards")
@@ -16,8 +17,12 @@ async function insertBoard(title: string, template: TemplateId, galleryId: strin
     .select("id")
     .single();
   if (error) return { error: error.message };
-  const items = templateItems(template);
-  if (items.length) await applyBoardOps(supabase, data.id, items.map((item) => ({ op: "put" as const, item })), { role: "admin" });
+  const kit = starterKit();
+  // Les cartes « planche » créent leurs tableaux ; on remplit ensuite chacun d'eux.
+  await applyBoardOps(supabase, data.id, kit.items.map((item) => ({ op: "put" as const, item })), { role: "admin" });
+  await Promise.all(
+    kit.planches.map((p) => applyBoardOps(supabase, p.boardId, p.items.map((item) => ({ op: "put" as const, item })), { role: "admin" })),
+  );
   revalidatePath("/admin/boards");
   return { id: data.id as string };
 }
@@ -25,12 +30,10 @@ async function insertBoard(title: string, template: TemplateId, galleryId: strin
 export async function createBoard(_: FormState, form: FormData): Promise<FormState> {
   const title = String(form.get("title") ?? "").trim().slice(0, 200);
   if (!title) return { error: "Donnez un nom au tableau." };
-  const raw = String(form.get("template") ?? "vide");
-  const template = (raw in TEMPLATES ? raw : "vide") as TemplateId;
   const gallery = String(form.get("gallery_id") ?? "");
-  const res = await insertBoard(title, template, isUuid(gallery) ? gallery : null);
+  const res = await insertBoard(title, isUuid(gallery) ? gallery : null);
   if ("error" in res) return { error: res.error };
-  redirect(`/admin/boards/${res.id}${template === "milanote" ? "?import=1" : ""}`);
+  redirect(`/admin/boards/${res.id}`);
 }
 
 /** Depuis une galerie ou un projet vidéo : ouvre son tableau de préparation (créé au premier clic). */
@@ -48,7 +51,7 @@ export async function openGalleryBoard(galleryId: string) {
   if (existing) redirect(`/admin/boards/${existing.id}`);
   const { data: g } = await supabase.from("galleries").select("title, kind").eq("id", galleryId).maybeSingle();
   if (!g) redirect("/admin/boards");
-  const res = await insertBoard(`Préparation — ${g.title}`, g.kind === "video" ? "clip" : "shooting", galleryId);
+  const res = await insertBoard(`Préparation — ${g.title}`, galleryId);
   if ("error" in res) throw new Error(res.error);
   redirect(`/admin/boards/${res.id}`);
 }

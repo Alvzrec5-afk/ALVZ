@@ -48,6 +48,8 @@ export type BoardData = {
   url?: string;
   /** Sous-tableau : identifiant du tableau ouvert par la carte (nom dans `title`). */
   boardId?: string;
+  /** Planche : pictogramme affiché quand elle n'a pas encore d'images (clé de `BOARD_ICONS`). */
+  icon?: string;
   /** Tableau (grille) : cellules ligne par ligne ; la première ligne sert d'en-tête. */
   cells?: string[][];
 };
@@ -146,30 +148,19 @@ export function linkEmbed(raw: string): LinkEmbed | null {
 export const MIN_WIDTH = 140;
 export const MAX_WIDTH = 1200;
 
-export const TEMPLATES = {
-  vide: "Tableau vide",
-  moodboard: "Moodboard shooting",
-  shooting: "Préparation shooting",
-  mariage: "Mariage — jour J",
-  clip: "Clip / tournage",
-  milanote: "Depuis Milanote",
-} as const;
-export type TemplateId = keyof typeof TEMPLATES;
-
-export const TEMPLATE_HINTS: Record<TemplateId, string> = {
-  vide: "Une grande page blanche.",
-  moodboard: "Colonnes Ambiance, Tenues, Lieux, Poses.",
-  shooting: "Matériel, liste de plans, infos pratiques, repérages.",
-  mariage: "Déroulé, photos de groupe, contacts, inspirations.",
-  clip: "Storyboard en 3 plans reliés, matériel, musique.",
-  milanote: "Importez un tableau exporté de Milanote (texte + images).",
-};
-
 const uid = () => crypto.randomUUID();
 const todo = (texts: string[]): TodoEntry[] => texts.map((text) => ({ id: uid(), text, done: false }));
+const grid = (head: string[], rows: string[][], blank = 0): string[][] => [
+  head,
+  ...rows,
+  ...Array.from({ length: blank }, () => head.map(() => "")),
+];
 
-/** Cartes de départ d'un modèle (nouveaux identifiants à chaque appel). */
-export function templateItems(id: TemplateId): BoardItemInput[] {
+/** Un tableau à remplir : ses cartes, et les planches (avec leur propre contenu) qu'il contient. */
+export type Starter = { items: BoardItemInput[]; planches: { boardId: string; items: BoardItemInput[] }[] };
+
+/** Fabrique de cartes avec identifiants neufs, z croissant. */
+function maker() {
   let z = 0;
   const item = (kind: BoardKind, x: number, y: number, data: BoardData, extra: Partial<BoardItemInput> = {}): BoardItemInput => ({
     id: uid(),
@@ -183,40 +174,92 @@ export function templateItems(id: TemplateId): BoardItemInput[] {
     data,
     ...extra,
   });
+  /** Cartes rangées dans une colonne, dans l'ordre. */
+  const inside = (col: BoardItemInput, cards: BoardItemInput[]) =>
+    cards.map((c, i) => ({ ...c, parentId: col.id, position: i, x: col.x, y: col.y, w: col.w }));
+  return { item, inside };
+}
 
-  switch (id) {
-    case "moodboard": {
-      const cols = ["Ambiance & lumière", "Tenues", "Lieux", "Poses"].map((title, i) => item("column", 40 + i * 320, 200, { title }));
-      return [
-        item("note", 40, 40, { text: "Moodboard\nAjoutez vos images d'inspiration dans chaque colonne (glissez-déposez des photos sur le tableau).", color: "sable" }, { w: 420 }),
-        ...cols,
-      ];
-    }
-    case "shooting":
-      return [
-        item("note", 40, 40, { text: "Infos pratiques\nLieu :\nHeure :\nContact sur place :", color: "ciel" }),
-        item("todo", 320, 40, { title: "Matériel", items: todo(["Boîtiers + batteries chargées", "Cartes mémoire vides", "Objectifs", "Réflecteur / flash"]) }),
-        item("todo", 620, 40, { title: "Liste de plans", items: todo(["Portrait serré", "Plan large avec le décor", "Détails"]) }),
-        item("column", 920, 40, { title: "Repérages" }),
-      ];
-    case "mariage":
-      return [
-        item("todo", 40, 40, { title: "Déroulé du jour J", items: todo(["Préparatifs", "Cérémonie", "Cocktail", "Photos de groupe", "Soirée"]) }),
-        item("todo", 340, 40, { title: "Photos de groupe à ne pas oublier", items: todo(["Mariés + parents", "Témoins", "Toute la famille"]) }),
-        item("note", 640, 40, { text: "Contacts\nTémoins :\nWedding planner :\nLieu :", color: "rose" }),
-        item("column", 920, 40, { title: "Inspirations" }),
-      ];
-    case "clip": {
-      const plans = ["Plan 1 — ouverture", "Plan 2", "Plan 3 — final"].map((text, i) => item("note", 40 + i * 320, 60, { text, color: "soleil" }));
-      return [
-        ...plans,
-        item("arrow", 0, 0, { from: plans[0].id, to: plans[1].id }),
-        item("arrow", 0, 0, { from: plans[1].id, to: plans[2].id }),
-        item("todo", 40, 300, { title: "Matériel tournage", items: todo(["Stabilisateur", "Micro", "Lumières", "Disques / cartes"]) }),
-        item("note", 340, 300, { text: "Musique & références\nCollez ici les liens et les idées.", color: "sauge" }),
-      ];
-    }
-    default:
-      return [];
-  }
+/**
+ * Tout nouveau tableau : six planches prêtes, comme le déroulé d'un projet (budget → timeline du tournage),
+ * chacune déjà remplie. On supprime simplement ce qui ne sert pas.
+ */
+export function starterKit(): Starter {
+  const { item, inside } = maker();
+  const planches: Starter["planches"] = [];
+  const planche = (title: string, icon: string, items: BoardItemInput[]) => {
+    const boardId = uid();
+    planches.push({ boardId, items });
+    return { title, icon, boardId };
+  };
+
+  // 1. BUDGET
+  const budget = planche("1. BUDGET", "budget", [
+    item("table", 40, 40, { cells: grid(["Poste", "Prévu", "Réel"], [["Équipe / assistant", "", ""], ["Location matériel", "", ""], ["Lieu", "", ""], ["Déplacements", "", ""], ["Post-production", "", ""], ["Total", "", ""]]) }, { w: 460 }),
+    item("note", 540, 40, { text: "Devis\nEnvoyé le :\nAcompte reçu :\nSolde :", color: "sable" }),
+  ]);
+
+  // 2. BRIEF / APPELS CLIENT
+  const brief = planche("2. BRIEF / APPELS CLIENT", "brief", [
+    item("note", 40, 40, { text: "Brief\nClient :\nProjet :\nDate :\nLieu :\nLivrables :\nDurée / format :", color: "ciel" }, { w: 300 }),
+    item("todo", 380, 40, { title: "Appels avec le client", items: todo(["Premier appel", "Validation du moodboard", "Validation du planning", "Appel la veille"]) }, { w: 280 }),
+    item("note", 700, 40, { text: "Notes d'appel\n", color: "blanc" }, { w: 300 }),
+    item("comment", 380, 280, { title: "" }, { w: 320 }),
+  ]);
+
+  // 3. MOODBOARD — trois bandeaux, inspirations musique / vidéo, cases photo, couleurs d'étalonnage.
+  const musique = item("column", 40, 150, { title: "INSPI MUSIQUE" }, { w: 360 });
+  const videos = item("column", 40, 430, { title: "INSPI VIDÉOS" }, { w: 360 });
+  const photo = (x: number, y: number, w: number, h: number) => item("image", x, y, { caption: "", width: w, height: h }, { w });
+  const mood = planche("3. MOODBOARD", "moodboard", [
+    item("note", 40, 40, { text: "INSPIRATIONS", hex: "#d98b5f" }, { w: 360 }),
+    item("note", 420, 40, { text: "MOODBOARD", hex: "#b4521c" }, { w: 880 }),
+    item("note", 1320, 40, { text: "COULEURS/ÉTALONNAGE", hex: "#d98b5f" }, { w: 360 }),
+    musique,
+    ...inside(musique, [
+      item("link", 0, 0, { url: "", title: "", text: "Collez un lien depuis Spotify ou SoundCloud" }),
+      item("link", 0, 0, { url: "", title: "", text: "Collez un lien depuis Spotify ou SoundCloud" }),
+    ]),
+    videos,
+    ...inside(videos, [item("table", 0, 0, { cells: grid(["Coller lien", "Coller lien", "Coller lien"], [], 1) })]),
+    item("link", 40, 700, { url: "", title: "", text: "Collez un lien depuis YouTube ou Vimeo" }, { w: 360 }),
+    // Cases photo vides : un clic pour y mettre une image.
+    photo(420, 150, 430, 440),
+    photo(420, 605, 430, 200),
+    photo(420, 820, 430, 250),
+    photo(870, 150, 430, 190),
+    photo(870, 355, 430, 450),
+    photo(870, 820, 430, 250),
+    item("color", 1320, 150, { hex: "#e04a33", title: "Cinnabar" }, { w: 170 }),
+    item("color", 1510, 150, { hex: "#a8521f", title: "Desert" }, { w: 170 }),
+    item("color", 1320, 330, { hex: "#8b5a44", title: "Spicy Mix" }, { w: 170 }),
+    item("color", 1510, 330, { hex: "#6b4e45", title: "Tobacco Brown" }, { w: 170 }),
+  ]);
+
+  // 4. SHOT LIST
+  const plans = ["Plan 1 — ouverture", "Plan 2", "Plan 3 — final"].map((text, i) => item("note", 40 + i * 300, 420, { text, color: "soleil" }));
+  const shot = planche("4. SHOT LIST", "shotlist", [
+    item("table", 40, 40, { cells: grid(["Fait", "Plan", "Description", "Rig (Ronin, main, trépied…)", "Mouvement"], [], 6) }, { w: 860 }),
+    ...plans,
+    item("arrow", 0, 0, { from: plans[0].id, to: plans[1].id }),
+    item("arrow", 0, 0, { from: plans[1].id, to: plans[2].id }),
+  ]);
+
+  // 5. CHECK-LIST TOURNAGE
+  const check = planche("5. CHECK-LIST TOURNAGE", "checklist", [
+    item("todo", 40, 40, { title: "Caméra", items: todo(["Boîtiers", "Batteries chargées", "Cartes mémoire vides", "Objectifs", "Stabilisateur / Ronin", "Trépied"]) }),
+    item("todo", 330, 40, { title: "Son", items: todo(["Micro", "Enregistreur", "Bonnette", "Piles"]) }),
+    item("todo", 620, 40, { title: "Lumière", items: todo(["Panneaux LED", "Pieds", "Réflecteur", "Rallonges"]) }),
+    item("todo", 910, 40, { title: "La veille", items: todo(["Charger toutes les batteries", "Formater les cartes", "Vérifier la météo", "Itinéraire et horaires"]) }),
+  ]);
+
+  // 6. TIMELINE TOURNAGE
+  const timeline = planche("6. TIMELINE TOURNAGE", "timeline", [
+    item("table", 40, 40, { cells: grid(["Heure", "Étape", "Lieu", "Notes"], [["", "Arrivée / installation", "", ""], ["", "Préparatifs", "", ""], ["", "Plan 1", "", ""], ["", "Pause", "", ""], ["", "Plan 2", "", ""], ["", "Fin / rangement", "", ""]]) }, { w: 760 }),
+  ]);
+
+  const items = [budget, brief, mood, shot, check, timeline].map((p, i) =>
+    item("board", 40 + i * 230, 40, { title: p.title, icon: p.icon, boardId: p.boardId }),
+  );
+  return { items, planches };
 }

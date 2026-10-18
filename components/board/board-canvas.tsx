@@ -23,7 +23,12 @@ import { makeBoardImage } from "@/lib/client/image";
 import { groupZipImages, isImageName, isTextName, parseMilanoteText, readZip } from "@/lib/client/milanote";
 import {
   BoardIcon,
+  CameraIcon,
   ChecklistIcon,
+  ClockIcon,
+  MoneyIcon,
+  PeopleIcon,
+  UploadIcon,
   CloseIcon,
   ColumnIcon,
   ConnectorIcon,
@@ -103,6 +108,16 @@ function inkStyle(d: BoardData): React.CSSProperties | null {
     ["--line" as string]: `color-mix(in srgb, ${ink} 20%, transparent)`,
   } as React.CSSProperties;
 }
+
+/** Pictogrammes des planches (clé enregistrée dans `data.icon`). */
+const BOARD_ICONS: Record<string, typeof BoardIcon> = {
+  budget: MoneyIcon,
+  brief: PeopleIcon,
+  moodboard: BoardIcon,
+  shotlist: ChecklistIcon,
+  checklist: CameraIcon,
+  timeline: ClockIcon,
+};
 
 /** Choix d'une couleur : teinte douce (`color`) ou couleur pleine / libre (`hex`). */
 type ColorChoice = { color: NoteColor; hex?: undefined } | { color?: undefined; hex: string };
@@ -695,6 +710,43 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       return failed;
     },
     [create, imageEndpoint, push, role, setItems],
+  );
+
+  /** Met une image dans une case photo vide (la carte garde sa place et sa largeur). */
+  const fillTarget = useRef<string | null>(null);
+  const fillImage = useCallback(
+    async (id: string, file: File) => {
+      const it = itemsRef.current[id];
+      if (!it) return;
+      let prepared: Awaited<ReturnType<typeof makeBoardImage>>;
+      try {
+        prepared = await makeBoardImage(file);
+      } catch (e) {
+        alert(`${file.name} : ${e instanceof Error ? e.message : e}`);
+        return;
+      }
+      uploading.current.add(id);
+      update(id, { src: URL.createObjectURL(prepared.blob), data: { ...it.data, width: prepared.width, height: prepared.height } }, false);
+      try {
+        const res = await fetch(imageEndpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ itemId: id, size: prepared.blob.size }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.error || `Erreur ${res.status}`);
+        const put = await fetch(json.url, { method: "PUT", headers: { "Content-Type": "image/jpeg" }, body: prepared.blob });
+        if (!put.ok) throw new Error(`Envoi refusé (${put.status})`);
+        uploading.current.delete(id);
+        const latest = itemsRef.current[id];
+        if (latest) push({ op: "put", item: { ...toInput(latest), sizeBytes: prepared.blob.size } });
+      } catch (e) {
+        uploading.current.delete(id);
+        update(id, { src: null, data: it.data }, false);
+        alert(`Image non envoyée : ${e instanceof Error ? e.message : e}`);
+      }
+    },
+    [imageEndpoint, push, update],
   );
 
   const addImages = useCallback(
@@ -1324,7 +1376,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     setEditing((cur) => (cur?.id === it.id ? null : cur));
     const cur = itemsRef.current[it.id];
     if (cur?.kind === "note" && !cur.data.text?.trim()) remove(it.id);
-    if (cur?.kind === "link" && !cur.data.url?.trim()) remove(it.id);
+    if (cur?.kind === "link" && !cur.data.url?.trim() && !cur.data.text) remove(it.id);
   };
 
   const startEdit = (it: BoardItem) => {
@@ -1412,9 +1464,21 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
                 style={{ aspectRatio: `${it.data.width ?? 4} / ${it.data.height ?? 3}` }}
               />
             ) : (
-              <div className="w-full bg-bg-soft flex items-center justify-center text-muted" style={{ aspectRatio: `${it.data.width ?? 4} / ${it.data.height ?? 3}` }}>
-                <ImageIcon className="w-6 h-6" />
-              </div>
+              <button
+                data-nodrag
+                disabled={role !== "admin" || uploading.current.has(it.id)}
+                onClick={() => {
+                  // Case photo vide : on choisit l'image qui prend sa place.
+                  fillTarget.current = it.id;
+                  fileRef.current?.click();
+                }}
+                className="w-full flex flex-col items-center justify-center gap-2 text-muted hover:text-ink transition-colors"
+                style={{ aspectRatio: `${it.data.width ?? 4} / ${it.data.height ?? 3}`, background: "color-mix(in srgb, var(--ink) 6%, var(--bg-soft))" }}
+                title={role === "admin" ? "Ajouter une image" : undefined}
+              >
+                <UploadIcon className="w-10 h-10" />
+                {role === "admin" && <span className="text-[11px]">Ajouter une image</span>}
+              </button>
             )}
             {uploading.current.has(it.id) && <div className="absolute inset-x-0 top-0 h-0.5 bg-emerald-500 animate-pulse" />}
             {ed ? (
@@ -1495,7 +1559,10 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
             ))
           ) : (
             <span className="col-span-2 row-span-2 flex items-center justify-center text-muted">
-              <BoardIcon className="w-7 h-7" />
+              {(() => {
+                const Icon = BOARD_ICONS[it.data.icon ?? ""] ?? BoardIcon;
+                return <Icon className={it.data.icon ? "w-12 h-12" : "w-7 h-7"} />;
+              })()}
             </span>
           )}
         </div>
@@ -1558,11 +1625,19 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
               value={url}
               onChange={(v) => updateData(it.id, { url: v.trim() })}
               onDone={() => finishEdit(it)}
-              placeholder="Collez un lien YouTube, Vimeo, Spotify…"
+              placeholder={it.data.text || "Collez un lien YouTube, Vimeo, Spotify…"}
               className="text-xs"
             />
           ) : (
-            <p className="text-xs text-muted">Lien vide</p>
+            <button
+              data-nodrag
+              disabled={!canEdit(it)}
+              onClick={() => setEditing({ id: it.id })}
+              className="w-full flex items-center gap-3 text-left text-xs text-muted py-1"
+            >
+              <span className="w-6 h-6 shrink-0 rounded-full border border-line flex items-center justify-center text-[9px] pl-px">▶</span>
+              {it.data.text || "Lien vide"}
+            </button>
           )}
         </div>
       );
@@ -2123,6 +2198,13 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         hidden
         onChange={(e) => {
           const files = [...(e.target.files ?? [])];
+          const target = fillTarget.current;
+          fillTarget.current = null;
+          if (target && files[0]) {
+            e.target.value = "";
+            void fillImage(target, files[0]);
+            return;
+          }
           const drop = imageDrop.current;
           imageDrop.current = null;
           e.target.value = "";

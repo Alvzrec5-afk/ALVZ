@@ -81,12 +81,17 @@ Vidéos, Coordonnées, Outils → Clients & e-mails, Déconnexion) ; sur mobile 
 cartes note (6 couleurs, liens cliquables), image (envoi direct Oracle, 1600 px, `boards/<tableau>/<carte>.jpg`),
 liste à cocher, colonne (glisser une carte dedans), flèche (outil Flèche : carte de départ puis d'arrivée).
 Enregistrement automatique groupé (`components/board/sync.ts`), rafraîchissement toutes les 30 s seulement si la
-page est visible et utilisée (crédits Netlify). Modèles : `lib/board-types.ts` (moodboard, shooting, mariage, clip).
+page est visible et utilisée (crédits Netlify). Plus de choix de modèle : tout nouveau tableau (et le « Tableau de
+préparation » d'une galerie) reçoit `starterKit()` (`lib/board-types.ts`) : 6 planches remplies — 1. BUDGET, 2. BRIEF /
+APPELS CLIENT, 3. MOODBOARD (bandeaux, inspi musique / vidéos, 6 cases photo vides, 4 couleurs), 4. SHOT LIST,
+5. CHECK-LIST TOURNAGE, 6. TIMELINE TOURNAGE ; pictogrammes au trait (`data.icon` → `BOARD_ICONS`, jamais d'emoji).
+Case photo vide = carte image à 0 octet : un clic (studio) y met une image (`fillImage`). Carte lien vide avec
+consigne (`data.text`).
 Serveur : `lib/boards.ts` (`applyBoardOps` valide tout ; un client ne touche qu'à ses cartes), actions
 `app/admin/board-actions.ts`, API `app/api/admin/boards/[id]` et `/image`. Relié à une galerie : menu « Plus » →
 « Tableau de préparation » (`openGalleryBoard`, créé au premier clic). Partage client : `/t/<lien>` (lien secret,
 option « le client peut ajouter ses idées », prénom demandé une fois, cookie signé `b_<tableau>`), API `app/api/b/[slug]`.
-Import Milanote (`lib/client/milanote.ts`, bouton « Importer » / menu « Plus », modèle « Depuis Milanote ») :
+Import Milanote (`lib/client/milanote.ts`, bouton « Importer » / menu « Plus ») :
 export Markdown → titres = colonnes, paragraphes = notes, cases à cocher = listes ; ZIP (« Generate ZIP ») lu
 dans le navigateur → un dossier d'images = une colonne (fusionnée avec la colonne du même nom). Format Milanote
 non documenté : lecture tolérante, à ajuster avec un vrai export du propriétaire si besoin. Positions et flèches
