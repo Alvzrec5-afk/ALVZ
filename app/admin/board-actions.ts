@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdminApi } from "@/lib/auth";
 import { TEMPLATES, templateItems, type TemplateId } from "@/lib/board-types";
-import { applyBoardOps, isUuid, purgeBoard } from "@/lib/boards";
+import { applyBoardOps, duplicateBoard as copyBoard, isUuid, purgeBoard } from "@/lib/boards";
 import { newSlug } from "@/lib/tokens";
 import type { FormState } from "./actions";
 
@@ -100,4 +100,40 @@ export async function deleteBoard(boardId: string) {
   await purgeBoard(supabase, boardId);
   revalidatePath("/admin/boards");
   redirect("/admin/boards");
+}
+
+/** Duplique un tableau (avec ses planches et images). Une planche dupliquée reste rangée au même endroit. */
+export async function duplicateBoard(boardId: string, title?: string) {
+  const { supabase } = await requireAdminApi();
+  const { data: board } = await supabase.from("boards").select("title, parent_id").eq("id", boardId).maybeSingle();
+  if (!board) return { error: "Tableau introuvable" };
+  try {
+    const name = (title ?? "").trim().slice(0, 200) || `${board.title} (copie)`;
+    const id = await copyBoard(supabase, boardId, name);
+    if (board.parent_id) {
+      // La copie d'une planche apparaît comme une nouvelle carte à côté de l'originale.
+      const { data: card } = await supabase
+        .from("board_items")
+        .select("x, y, w, z")
+        .eq("board_id", board.parent_id)
+        .eq("kind", "board")
+        .eq("data->>boardId", boardId)
+        .maybeSingle();
+      await supabase.from("board_items").insert({
+        id: crypto.randomUUID(),
+        board_id: board.parent_id,
+        kind: "board",
+        x: (card?.x ?? 0) + 40,
+        y: (card?.y ?? 0) + 40,
+        w: card?.w ?? 200,
+        z: (card?.z ?? 0) + 1,
+        data: { boardId: id, title: name },
+      });
+      revalidatePath(`/admin/boards/${board.parent_id}`);
+    }
+    revalidatePath("/admin/boards");
+    return { id };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Duplication impossible" };
+  }
 }

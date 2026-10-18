@@ -15,9 +15,10 @@ import {
   type BoardKind,
   type BoardOp,
 } from "@/lib/board-types";
-import { deleteKeys, presignGet } from "@/lib/storage";
+import { copyObject, deleteKeys, presignGet } from "@/lib/storage";
 import { createServiceClient } from "@/lib/supabase/server";
 import { newSlug, sign, unsign } from "@/lib/tokens";
+import { storageUsage } from "@/lib/usage";
 
 export const BOARD_ITEM_FIELDS = "id, kind, x, y, w, z, parent_id, position, data, size_bytes, author, client_id";
 export const MAX_BOARD_IMAGE_BYTES = 4 * 1024 * 1024;
@@ -298,6 +299,88 @@ export async function applyBoardOps(
     for (const sub of deletedSubBoards) await purgeBoard(db, sub, boardId);
   }
   await db.from("boards").update({ updated_at: now }).eq("id", boardId);
+}
+
+/**
+ * Copie complète d'un tableau : cartes, colonnes, flèches, planches (à toutes les profondeurs) et images.
+ * Les identifiants sont renouvelés ; la copie n'est pas partagée (nouveau lien, partage désactivé).
+ */
+export async function duplicateBoard(db: SupabaseClient, sourceId: string, title: string) {
+  // Tous les tableaux à copier, du haut vers le bas.
+  const tree: { id: string; title: string; parent_id: string | null; gallery_id: string | null; client_can_add: boolean }[] = [];
+  const { data: top } = await db.from("boards").select("id, title, parent_id, gallery_id, client_can_add").eq("id", sourceId).maybeSingle();
+  if (!top) throw new Error("Tableau introuvable");
+  tree.push(top);
+  for (let level = [sourceId], depth = 0; level.length && depth < 25; depth++) {
+    const { data } = await db.from("boards").select("id, title, parent_id, gallery_id, client_can_add").in("parent_id", level);
+    tree.push(...(data ?? []));
+    level = (data ?? []).map((b) => b.id as string);
+  }
+  const { data: rows, error } = await db
+    .from("board_items")
+    .select("id, board_id, kind, x, y, w, z, parent_id, position, data, size_bytes, author")
+    .in("board_id", tree.map((b) => b.id));
+  if (error) throw new Error(error.message);
+  const items = rows ?? [];
+
+  const imageBytes = items.filter((i) => i.kind === "image").reduce((n, i) => n + Number(i.size_bytes), 0);
+  const usage = await storageUsage(db);
+  if (usage.total + imageBytes > usage.limit) throw new Error("Stockage plein : impossible de copier les images de ce tableau.");
+
+  const boardIds = new Map(tree.map((b) => [b.id, crypto.randomUUID()]));
+  const itemIds = new Map(items.map((i) => [i.id as string, crypto.randomUUID()]));
+  const { error: boardError } = await db.from("boards").insert(
+    tree.map((b) => ({
+      id: boardIds.get(b.id),
+      title: b.id === sourceId ? title : b.title,
+      parent_id: b.id === sourceId ? top.parent_id : boardIds.get(b.parent_id!),
+      gallery_id: b.gallery_id,
+      client_can_add: b.client_can_add,
+      share_slug: newSlug(),
+    })),
+  );
+  if (boardError) throw new Error(boardError.message);
+
+  const copies = items.map((i) => {
+    const d = { ...((i.data as BoardData) ?? {}) };
+    if (i.kind === "board" && d.boardId) d.boardId = boardIds.get(d.boardId) ?? d.boardId;
+    if (i.kind === "arrow") {
+      d.from = d.from ? itemIds.get(d.from) : undefined;
+      d.to = d.to ? itemIds.get(d.to) : undefined;
+    }
+    return {
+      id: itemIds.get(i.id as string),
+      board_id: boardIds.get(i.board_id as string),
+      kind: i.kind,
+      x: i.x,
+      y: i.y,
+      w: i.w,
+      z: i.z,
+      parent_id: i.parent_id ? itemIds.get(i.parent_id as string) ?? null : null,
+      position: i.position,
+      data: d,
+      size_bytes: i.size_bytes,
+      author: i.author,
+      client_id: null,
+    };
+  });
+  // Colonnes d'abord (les cartes rangées dedans y font référence), par paquets.
+  copies.sort((a, b) => Number(a.kind !== "column") - Number(b.kind !== "column"));
+  for (let i = 0; i < copies.length; i += 500) {
+    const { error: itemError } = await db.from("board_items").insert(copies.slice(i, i + 500));
+    if (itemError) throw new Error(itemError.message);
+  }
+  const images = items.filter((i) => i.kind === "image" && Number(i.size_bytes) > 0);
+  for (let i = 0; i < images.length; i += 8) {
+    await Promise.all(
+      images.slice(i, i + 8).map((img) =>
+        copyObject(boardImageKey(img.board_id as string, img.id as string), boardImageKey(boardIds.get(img.board_id as string)!, itemIds.get(img.id as string)!)).catch(
+          () => undefined, // image manquante : la carte reste, sans image
+        ),
+      ),
+    );
+  }
+  return boardIds.get(sourceId)!;
 }
 
 /** Supprime un tableau, ses sous-tableaux, leurs cartes et leurs images. */

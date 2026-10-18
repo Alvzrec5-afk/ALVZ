@@ -2,6 +2,7 @@ import "server-only";
 import {
   AbortMultipartUploadCommand,
   CompleteMultipartUploadCommand,
+  CopyObjectCommand,
   CreateMultipartUploadCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
@@ -106,6 +107,17 @@ export function presignGet(key: string, opts: { downloadName?: string } = {}) {
 /** Petit fichier déjà vérifié par le serveur (ex. image ajoutée par un client sur un tableau). */
 export async function putObject(key: string, body: Uint8Array, contentType: string) {
   await s3().send(new PutObjectCommand({ Bucket: bucket(), Key: key, Body: body, ContentType: contentType }));
+}
+
+/** Copie un fichier dans le même bucket, sans le faire transiter par le serveur (duplication d'un tableau). */
+export async function copyObject(from: string, to: string) {
+  await s3().send(
+    new CopyObjectCommand({
+      Bucket: bucket(),
+      Key: to,
+      CopySource: `${bucket()}/${from.split("/").map(encodeURIComponent).join("/")}`,
+    }),
+  );
 }
 
 export async function createMultipart(key: string, contentType: string) {

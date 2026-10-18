@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { deleteBoard, regenerateBoardLink, updateBoard } from "@/app/admin/board-actions";
+import { deleteBoard, duplicateBoard, regenerateBoardLink, updateBoard } from "@/app/admin/board-actions";
 import { ArrowLeft, ChevronDown, CloseIcon } from "@/components/icons";
 import { Toggle } from "./ui";
 
@@ -102,6 +102,19 @@ export function BoardHeader({
                   Voir comme le client
                 </a>
               )}
+              <button
+                className="block w-full text-left px-4 py-3 hover:bg-bg"
+                onClick={async () => {
+                  setPlus(false);
+                  const name = prompt("Nom de la copie", `${title} (copie)`)?.trim();
+                  if (!name) return;
+                  const res = await duplicateBoard(board.id, name);
+                  if (res.error) alert(res.error);
+                  else if (res.id) router.push(`/admin/boards/${res.id}`);
+                }}
+              >
+                Dupliquer le tableau
+              </button>
               <button
                 className="block w-full text-left px-4 py-3 hover:bg-bg"
                 onClick={() => {

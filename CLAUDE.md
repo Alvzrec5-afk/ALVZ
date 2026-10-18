@@ -107,6 +107,9 @@ Carte `table` (bouton « Tableau », = Tableau de Milanote) : `data.cells` (lign
 Tab / Entrée pour avancer, boutons + / − Ligne / Colonne ; tableaux Markdown « | a | b | » de l'import Milanote.
 Le bouton des sous-tableaux s'appelle « Planche » (comme Milanote). Le canevas annule tout défilement natif
 (`onScroll`) : sinon le focus d'un champ décale la vue.
+Liste des tableaux : menu ⋯ (`board-card-menu.tsx`) Renommer / Dupliquer / Supprimer ; « Dupliquer le tableau »
+aussi dans le menu Plus. `duplicateBoard` (`lib/boards.ts`) copie planches, cartes (ids renouvelés, flèches et
+colonnes reliées) et images (CopyObject Oracle) ; copie non partagée ; une planche copiée reste dans son parent.
 
 **Galerie client (`/g/<lien>`)** — `components/gallery/client-gallery.tsx` : couverture animée,
 en-tête collant (Contacter, ♡ sélection, menu), grilles (`justified-grid.tsx`), visionneuse

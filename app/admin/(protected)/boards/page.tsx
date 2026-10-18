@@ -4,6 +4,7 @@ import { boardImageKey } from "@/lib/boards";
 import { formatLongDate, toParisDateInput } from "@/lib/dates";
 import { presignGet } from "@/lib/storage";
 import { BoardIcon, PlusIcon } from "@/components/icons";
+import { BoardCardMenu } from "@/components/admin/board-card-menu";
 
 export const metadata = { title: "Tableaux" };
 export const dynamic = "force-dynamic";
@@ -61,7 +62,8 @@ export default async function BoardsHome() {
       ) : (
         <ul className="mt-12 grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-3 gap-y-8 sm:gap-x-5 sm:gap-y-10">
           {boards.map((b) => (
-            <li key={b.id}>
+            <li key={b.id} className="relative">
+              <BoardCardMenu id={b.id} title={b.title} />
               <Link href={`/admin/boards/${b.id}`} className="group block">
                 <div className="aspect-[4/3] bg-bg-soft overflow-hidden grid grid-cols-3 gap-px border border-line">
                   {b.covers.length ? (
