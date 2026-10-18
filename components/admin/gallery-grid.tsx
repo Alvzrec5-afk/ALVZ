@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
-import { LockIcon } from "@/components/icons";
+import { useEffect, useMemo, useState } from "react";
+import { GridIcon, LockIcon, MenuIcon } from "@/components/icons";
 import { formatBytes } from "@/lib/format";
 import { purge } from "./purge";
 
@@ -57,6 +57,18 @@ export function GalleryGrid({ galleries }: { galleries: GalleryCard[] }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [sort, setSort] = useState<keyof typeof SORTS>("recent");
   const [sortOpen, setSortOpen] = useState(false);
+  const [view, setView] = useState<"grid" | "list">("grid");
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("studio-view") === "list") setView("list");
+    } catch {}
+  }, []);
+  function changeView(v: "grid" | "list") {
+    setView(v);
+    try {
+      localStorage.setItem("studio-view", v);
+    } catch {}
+  }
   const [menu, setMenu] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -126,14 +138,31 @@ export function GalleryGrid({ galleries }: { galleries: GalleryCard[] }) {
         <span className="eyebrow text-muted">
           {visible.length} galerie{visible.length > 1 ? "s" : ""}
         </span>
-        <div className="relative">
+        <div className="relative flex items-center">
+          <button
+            className={`w-10 h-10 flex items-center justify-center transition-colors ${view === "grid" ? "text-ink" : "text-muted hover:text-ink"}`}
+            onClick={() => changeView("grid")}
+            aria-label="Affichage en grille"
+            title="Grille"
+          >
+            <GridIcon />
+          </button>
+          <button
+            className={`w-10 h-10 flex items-center justify-center transition-colors ${view === "list" ? "text-ink" : "text-muted hover:text-ink"}`}
+            onClick={() => changeView("list")}
+            aria-label="Affichage en liste"
+            title="Liste"
+          >
+            <MenuIcon />
+          </button>
+          <span className="w-px h-5 bg-line mx-1" />
           <button className="icon-btn" onClick={() => setSortOpen((o) => !o)} aria-label="Trier">
             <SortIcon />
           </button>
           {sortOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setSortOpen(false)} />
-              <div className="absolute right-0 z-20 mt-1 w-48 bg-bg-soft border border-line py-1 shadow-xl">
+              <div className="absolute right-0 top-full z-20 mt-1 w-48 bg-bg-soft border border-line py-1 shadow-xl">
                 {(Object.keys(SORTS) as (keyof typeof SORTS)[]).map((k) => (
                   <button
                     key={k}
@@ -160,55 +189,93 @@ export function GalleryGrid({ galleries }: { galleries: GalleryCard[] }) {
       ) : visible.length === 0 ? (
         <p className="py-16 text-center text-sm text-muted">Aucune galerie ne correspond à « {query} ».</p>
       ) : (
-        <ul className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-8 sm:gap-x-6 sm:gap-y-10">
-          {visible.map((g) => (
-            <li key={g.id} className={busy === g.id ? "opacity-40 pointer-events-none" : ""}>
-              <div className="relative">
-                <Link href={`/admin/galleries/${g.id}`} className="group block aspect-square lg:aspect-[4/3] bg-bg-soft overflow-hidden">
-                  {g.cover ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={g.cover} alt="" loading="lazy" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.03]" />
-                  ) : (
-                    <span className="w-full h-full flex items-center justify-center eyebrow text-muted">Aucune photo</span>
-                  )}
-                </Link>
-                <button
-                  onClick={() => setMenu(menu === g.id ? null : g.id)}
-                  className="absolute top-1.5 right-1.5 w-9 h-9 flex items-center justify-center text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.7)]"
-                  aria-label="Options"
-                >
-                  <DotsIcon />
-                </button>
-                {copied === g.id && (
-                  <span className="absolute bottom-2 left-2 bg-black/70 text-white text-[11px] px-2 py-1">Lien copié ✓</span>
+        <ul
+          className={
+            view === "grid"
+              ? "grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-2.5 gap-y-6 sm:gap-x-5 sm:gap-y-9"
+              : "border-t border-line"
+          }
+        >
+          {visible.map((g) => {
+            const status = (
+              <span
+                className={`inline-block w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0 ${g.expired ? "bg-danger" : g.photoCount > 0 ? "bg-emerald-500" : "bg-muted"}`}
+                title={g.expired ? "Expirée" : g.photoCount > 0 ? "En ligne" : "Vide"}
+              />
+            );
+            const meta = (
+              <>
+                {status}
+                {g.photoCount} photo{g.photoCount > 1 ? "s" : ""}
+                {g.bytes > 0 && <span className={view === "grid" ? "hidden sm:inline" : ""}>· {formatBytes(g.bytes)}</span>}
+                {g.locked && <LockIcon className="w-3 h-3" />}
+              </>
+            );
+            const thumb = g.cover ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={g.cover} alt="" loading="lazy" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.03]" />
+            ) : (
+              <span className="w-full h-full flex items-center justify-center text-[10px] text-muted text-center px-1">Aucune photo</span>
+            );
+            const dots = (
+              <button
+                onClick={() => setMenu(menu === g.id ? null : g.id)}
+                className={
+                  view === "grid"
+                    ? "absolute top-0.5 right-0.5 w-8 h-8 flex items-center justify-center text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.7)]"
+                    : "w-10 h-10 flex items-center justify-center text-muted hover:text-ink shrink-0"
+                }
+                aria-label="Options"
+              >
+                <DotsIcon />
+              </button>
+            );
+            return (
+              <li key={g.id} className={`relative ${busy === g.id ? "opacity-40 pointer-events-none" : ""}`}>
+                {view === "grid" ? (
+                  <>
+                    <div className="relative">
+                      <Link href={`/admin/galleries/${g.id}`} className="group block aspect-square lg:aspect-[4/3] bg-bg-soft overflow-hidden">
+                        {thumb}
+                      </Link>
+                      {dots}
+                      {copied === g.id && <span className="absolute bottom-1.5 left-1.5 bg-black/70 text-white text-[10px] px-1.5 py-0.5">Lien copié ✓</span>}
+                    </div>
+                    <Link href={`/admin/galleries/${g.id}`} className="block mt-2 sm:mt-3">
+                      <h2 className="text-[13px] sm:text-base truncate">{g.title}</h2>
+                      <p className="mt-0.5 sm:mt-1 flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-muted">{meta}</p>
+                      {g.date && <p className="hidden sm:block text-[11px] text-muted mt-0.5">{g.date}</p>}
+                    </Link>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-4 py-3 border-b border-line">
+                    <Link href={`/admin/galleries/${g.id}`} className="group flex-1 min-w-0 flex items-center gap-4">
+                      <span className="block w-16 h-16 sm:w-20 sm:h-20 shrink-0 bg-bg-soft overflow-hidden">{thumb}</span>
+                      <span className="min-w-0">
+                        <span className="block text-[15px] truncate">{g.title}</span>
+                        <span className="mt-1 flex items-center gap-2 text-xs text-muted">{meta}</span>
+                        {g.date && <span className="block text-[11px] text-muted mt-0.5">{g.date}</span>}
+                      </span>
+                    </Link>
+                    {copied === g.id && <span className="text-[11px] text-accent shrink-0">Lien copié ✓</span>}
+                    {dots}
+                  </div>
                 )}
                 {menu === g.id && (
                   <>
-                    <div className="fixed inset-0 z-10" onClick={() => setMenu(null)} />
-                    <div className="absolute inset-x-1.5 sm:inset-x-auto sm:right-1.5 sm:w-52 top-11 z-20 bg-bg-soft border border-line py-1 shadow-xl text-[13px] sm:text-sm">
-                      <button className="block w-full text-left px-4 py-2.5 hover:bg-bg" onClick={() => copyLink(g)}>Copier le lien client</button>
-                      <a className="block px-4 py-2.5 hover:bg-bg" href={`/g/${g.slug}`} target="_blank" rel="noreferrer" onClick={() => setMenu(null)}>Voir la galerie</a>
-                      <Link className="block px-4 py-2.5 hover:bg-bg" href={`/admin/galleries/${g.id}`}>Gérer les photos</Link>
-                      <button className="block w-full text-left px-4 py-2.5 text-danger hover:bg-bg" onClick={() => remove(g)}>Supprimer</button>
+                    <div className="fixed inset-0 z-40 bg-black/40 sm:bg-transparent" onClick={() => setMenu(null)} />
+                    <div className="fixed inset-x-0 bottom-0 z-50 pb-[max(env(safe-area-inset-bottom),0.5rem)] sm:pb-1 sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-1.5 sm:top-10 sm:w-52 bg-bg-soft border-t sm:border border-line py-1 shadow-xl text-[15px] sm:text-sm animate-[fadeUp_0.2s_ease-out_both] sm:animate-none">
+                      <p className="sm:hidden px-5 pt-3 pb-2 eyebrow text-muted truncate">{g.title}</p>
+                      <button className="block w-full text-left px-5 sm:px-4 py-3.5 sm:py-2.5 hover:bg-bg" onClick={() => copyLink(g)}>Copier le lien client</button>
+                      <a className="block px-5 sm:px-4 py-3.5 sm:py-2.5 hover:bg-bg" href={`/g/${g.slug}`} target="_blank" rel="noreferrer" onClick={() => setMenu(null)}>Voir la galerie</a>
+                      <Link className="block px-5 sm:px-4 py-3.5 sm:py-2.5 hover:bg-bg" href={`/admin/galleries/${g.id}`}>Gérer les photos</Link>
+                      <button className="block w-full text-left px-5 sm:px-4 py-3.5 sm:py-2.5 text-danger hover:bg-bg" onClick={() => remove(g)}>Supprimer</button>
                     </div>
                   </>
                 )}
-              </div>
-              <Link href={`/admin/galleries/${g.id}`} className="block mt-3">
-                <h2 className="text-[15px] sm:text-base truncate">{g.title}</h2>
-                <p className="mt-1 flex items-center gap-2 text-xs text-muted">
-                  <span
-                    className={`inline-block w-2 h-2 rounded-full ${g.expired ? "bg-danger" : g.photoCount > 0 ? "bg-emerald-500" : "bg-muted"}`}
-                    title={g.expired ? "Expirée" : g.photoCount > 0 ? "En ligne" : "Vide"}
-                  />
-                  {g.photoCount} photo{g.photoCount > 1 ? "s" : ""}
-                  {g.bytes > 0 && <span>· {formatBytes(g.bytes)}</span>}
-                  {g.locked && <LockIcon className="w-3 h-3" />}
-                </p>
-                {g.date && <p className="text-[11px] text-muted mt-0.5">{g.date}</p>}
-              </Link>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
