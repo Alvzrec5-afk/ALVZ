@@ -173,9 +173,6 @@ images des tableaux). Schéma de référence :
 
 ## En attente / idées discutées
 
-- **Migration à appliquer au moment de publier** (pas encore faite sur Supabase) : le dernier bloc de
-  `supabase/schema.sql` (`boards.is_template`). Puis retirer cette ligne.
-
 - Tableaux, idées pour la suite : annuler / rétablir, commentaires sur une carte, aperçu des liens
   (Pinterest, Instagram), cocher les listes du studio côté client, temps réel au lieu du rafraîchissement.
 
