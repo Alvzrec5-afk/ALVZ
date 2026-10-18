@@ -52,7 +52,9 @@ export type VideoView = {
   width: number;
   height: number;
   poster: string;
+  /** `url` vide sur les pages clients : le lecteur les demande à `stream` (jamais écrites dans la page). */
   sources: { h: number; url: string; bytes: number }[];
+  stream?: string;
   downloads: VideoDownload[];
   /** Filigrane affiché par-dessus le lecteur quand il n'est pas incrusté dans la vidéo. */
   overlayWatermark: boolean;

@@ -157,6 +157,11 @@ en-tête collant (Contacter, ♡ sélection, menu), grilles (`justified-grid.tsx
 (`lightbox.tsx`), ZIP, favoris (e-mail demandé), onglet « Vidéos », carte de visite. Thème qui suit
 le mode clair/sombre de l'appareil. Projet vidéo d'un seul clip → ouverture directe du lecteur.
 Vidéo : `/g/<lien>/v/<id>` (`video-page.tsx`, `components/video/`).
+Anti-aspiration (yt-dlp, sites « téléchargeur ») : la page client n'écrit aucune adresse de fichier vidéo
+(`toVideoView(..., { slug })` → `url` vide + `stream`) ; le lecteur les demande en POST à
+`/api/g/<lien>/videos/<id>/stream` (en-tête `x-alvz-player`, `fromOwnPage` : Sec-Fetch-Site / Origin du site),
+les redemande si elles expirent. Le téléchargement vidéo exige aussi `fromOwnPage`. Impossible d'empêcher à 100 %
+un enregistrement d'écran ou un expert avec les outils du navigateur.
 
 **Photos** : variantes faites dans le navigateur (`lib/client/image.ts`) : thumb 640, web 2000,
 + versions filigranées ; original conservé.

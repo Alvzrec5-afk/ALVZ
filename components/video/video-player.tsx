@@ -77,8 +77,22 @@ export const VideoPlayer = forwardRef<PlayerHandle, Props>(function VideoPlayer(
     setLevel(Math.max(start, cap()));
   }, [sources, bitrate, cap]);
 
+  // Page client : les adresses des fichiers sont demandées au serveur (elles ne sont pas dans la page).
+  const [streamed, setStreamed] = useState<Record<string, string> | null>(null);
+  const fetchedAt = useRef(0);
+  const loadStream = useCallback(async () => {
+    if (!video.stream) return;
+    fetchedAt.current = Date.now();
+    const res = await fetch(video.stream, { method: "POST", headers: { "x-alvz-player": "1" }, cache: "no-store" }).catch(() => null);
+    const json = res?.ok ? ((await res.json().catch(() => null)) as { urls?: Record<string, string> } | null) : null;
+    if (json?.urls) setStreamed(json.urls);
+  }, [video.stream]);
+  useEffect(() => {
+    void loadStream();
+  }, [loadStream]);
+
   const current = mode === "auto" ? level : Math.max(0, sources.findIndex((s) => s.h === mode));
-  const src = sources[current]?.url;
+  const src = sources[current]?.url || streamed?.[String(sources[current]?.h)] || undefined;
 
   // Changement de qualité : on reprend exactement au même moment.
   const switchTo = useCallback((i: number) => {
@@ -248,6 +262,13 @@ export const VideoPlayer = forwardRef<PlayerHandle, Props>(function VideoPlayer(
         onPlaying={() => setWaiting(false)}
         onCanPlay={() => setWaiting(false)}
         onLoadedMetadata={onLoadedMetadata}
+        onError={() => {
+          // Adresse expirée (page restée ouverte longtemps) : on en redemande, au même moment de la vidéo.
+          const v = el.current;
+          if (!video.stream || Date.now() - fetchedAt.current < 30_000) return;
+          if (v) pendingSeek.current = { t: v.currentTime, play: !v.paused };
+          void loadStream();
+        }}
         onTimeUpdate={onTimeUpdate}
         onProgress={() => {
           const v = el.current;

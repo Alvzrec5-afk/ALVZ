@@ -31,7 +31,7 @@ export default async function VideoRoute({ params }: { params: Promise<{ slug: s
   const video = await findPublicVideo(db, gallery.id, id);
   if (!video) notFound();
   const [view, { data: comments }, { data: others }] = await Promise.all([
-    toVideoView(video, gallery),
+    toVideoView(video, gallery, { slug }),
     db.from("video_comments").select("id, time_sec, author, body, resolved, created_at").eq("video_id", video.id).order("time_sec"),
     db.from("videos").select(VIDEO_FIELDS).eq("gallery_id", gallery.id).eq("status", "ready").neq("id", video.id).order("position"),
   ]);

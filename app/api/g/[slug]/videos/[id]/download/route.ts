@@ -1,11 +1,13 @@
 import { loadAccessibleGallery } from "@/lib/gallery-access";
 import { presignGet } from "@/lib/storage";
 import { createServiceClient } from "@/lib/supabase/server";
-import { downloadKey, findPublicVideo, videoDownloads, videoFileName } from "@/lib/videos";
+import { downloadKey, findPublicVideo, fromOwnPage, videoDownloads, videoFileName } from "@/lib/videos";
 
 /** Téléchargement d'une vidéo (si autorisé) : redirige vers une URL Oracle temporaire. */
 export async function GET(req: Request, { params }: { params: Promise<{ slug: string; id: string }> }) {
   const { slug, id } = await params;
+  // Seulement depuis le bouton de la page vidéo, jamais depuis un autre site ou logiciel.
+  if (!fromOwnPage(req)) return Response.json({ error: "Téléchargement non autorisé" }, { status: 403 });
   const access = await loadAccessibleGallery(slug);
   if ("error" in access) return access.error;
   const { gallery } = access;

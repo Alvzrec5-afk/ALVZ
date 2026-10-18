@@ -24,6 +24,29 @@ export function videoDownloads(v: VideoRow, g: GallerySettings): VideoDownload[]
   return list;
 }
 
+/** Adresses de lecture, pour le lecteur seulement. */
+export async function streamUrls(v: VideoRow) {
+  return Object.fromEntries(
+    await Promise.all(v.renditions.map(async (r) => [String(r.h), await presignGet(videoKey(v.gallery_id, v.id, `${r.h}.mp4`))] as const)),
+  );
+}
+
+/**
+ * La demande vient-elle d'une page du site, dans un vrai navigateur ?
+ * (Les outils de téléchargement qui partent d'un lien n'envoient pas ces en-têtes.)
+ */
+export function fromOwnPage(req: Request) {
+  const host = req.headers.get("host");
+  const site = req.headers.get("sec-fetch-site");
+  if (site) return site === "same-origin";
+  const from = req.headers.get("origin") ?? req.headers.get("referer");
+  try {
+    return Boolean(from && host && new URL(from).host === host);
+  } catch {
+    return false;
+  }
+}
+
 export function downloadKey(v: VideoRow, quality: string) {
   return quality === "original" ? videoKey(v.gallery_id, v.id, `original.${v.original_ext}`) : videoKey(v.gallery_id, v.id, `${quality}.mp4`);
 }
@@ -33,7 +56,11 @@ export function videoFileName(v: VideoRow, quality: string) {
   return quality === "original" ? `${base}.${v.original_ext}` : `${base} ${label(Number(quality))}.mp4`;
 }
 
-export async function toVideoView(v: VideoRow, g: GallerySettings): Promise<VideoView> {
+/**
+ * Page client (`slug`) : les adresses des fichiers ne sont pas écrites dans la page
+ * (les sites et logiciels qui « aspirent » un lien ne les trouvent pas) ; le lecteur les demande à part.
+ */
+export async function toVideoView(v: VideoRow, g: GallerySettings, opts: { slug?: string } = {}): Promise<VideoView> {
   const renditions = [...v.renditions].sort((a, b) => b.h - a.h);
   return {
     id: v.id,
@@ -42,7 +69,10 @@ export async function toVideoView(v: VideoRow, g: GallerySettings): Promise<Vide
     width: v.width || 16,
     height: v.height || 9,
     poster: await presignGet(videoKey(v.gallery_id, v.id, "poster.jpg")),
-    sources: await Promise.all(renditions.map(async (r) => ({ h: r.h, bytes: r.bytes, url: await presignGet(videoKey(v.gallery_id, v.id, `${r.h}.mp4`)) }))),
+    sources: opts.slug
+      ? renditions.map((r) => ({ h: r.h, bytes: r.bytes, url: "" }))
+      : await Promise.all(renditions.map(async (r) => ({ h: r.h, bytes: r.bytes, url: await presignGet(videoKey(v.gallery_id, v.id, `${r.h}.mp4`)) }))),
+    stream: opts.slug ? `/api/g/${opts.slug}/videos/${v.id}/stream` : undefined,
     downloads: videoDownloads(v, g),
     overlayWatermark: g.watermark && !v.watermarked,
     downloadsEnabled: v.downloads_enabled,
