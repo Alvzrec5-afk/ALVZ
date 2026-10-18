@@ -100,7 +100,8 @@ seulement au clic sur ▶ ; coller un lien crée une carte lien). Sélection mul
 (cadre), Maj + clic, Cmd/Ctrl + A ; le tableau se déplace alors à la molette / pavé tactile, espace + glisser ou
 bouton du milieu ; au doigt, glisser déplace toujours le tableau.
 Couleurs : toute carte (sauf flèche) a un fond `data.color` (teinte douce, `NOTE_COLORS`) ou `data.hex` (couleur
-pleine `SOLID_COLORS` ou libre) ; texte blanc/encre auto (`inkOn`) ; palette dans la barre de la carte et pour une
+pleine `SOLID_COLORS` ou libre) ; texte blanc/encre auto (`inkOn`), ou forcé par `data.ink` (« Texte : Auto / Noir /
+Blanc » dans la palette) ; `inkStyle` redéfinit aussi --ink / --muted / --line dans la carte (colonne : en-tête seul) ; palette dans la barre de la carte et pour une
 sélection multiple. Outils de la barre de gauche : clic = carte au centre, glisser-déposer = carte à l'endroit
 lâché (ou rangée dans la colonne visée).
 Carte `table` (bouton « Tableau », = Tableau de Milanote) : `data.cells` (lignes × colonnes, 1re ligne en gras),

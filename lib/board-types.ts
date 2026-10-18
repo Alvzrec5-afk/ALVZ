@@ -42,6 +42,8 @@ export type BoardData = {
   to?: string;
   /** Couleur : teinte libre « #rrggbb » (nom dans `title`). */
   hex?: string;
+  /** Couleur du texte choisie à la main (sinon automatique : noir ou blanc selon le fond). */
+  ink?: "dark" | "light";
   /** Lien : adresse (YouTube, Vimeo, Spotify, SoundCloud… ou n'importe quel site). */
   url?: string;
   /** Sous-tableau : identifiant du tableau ouvert par la carte (nom dans `title`). */

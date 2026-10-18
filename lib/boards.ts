@@ -184,6 +184,7 @@ function cleanData(kind: BoardKind, raw: BoardData): BoardData {
   const tint = {
     color: d.color && d.color in NOTE_COLORS ? d.color : undefined,
     hex: isHex(d.hex) ? d.hex.toLowerCase() : undefined,
+    ink: d.ink === "dark" || d.ink === "light" ? d.ink : undefined,
   };
   const withTint = (data: BoardData): BoardData => ({ ...data, ...(kind === "color" || kind === "arrow" ? {} : tint) });
   return withTint(cleanKind(kind, d));

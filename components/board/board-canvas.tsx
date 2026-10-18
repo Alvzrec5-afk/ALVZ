@@ -89,6 +89,21 @@ const toInput = (it: BoardItem): BoardItemInput => ({
 const noteBg = (color: NoteColor | undefined, hex?: string) =>
   hex ? hex : !color || color === "blanc" ? "var(--bg)" : `color-mix(in srgb, ${NOTE_COLORS[color]} 30%, var(--bg))`;
 
+/**
+ * Couleur du texte d'une carte : choisie à la main (noir / blanc), sinon automatique sur une couleur pleine.
+ * Renvoie aussi les variables qui font suivre les petits textes gris et les traits.
+ */
+function inkStyle(d: BoardData): React.CSSProperties | null {
+  const ink = d.ink === "dark" ? "#1b1a19" : d.ink === "light" ? "#ffffff" : d.hex ? inkOn(d.hex) : null;
+  if (!ink) return null;
+  return {
+    color: ink,
+    ["--ink" as string]: ink,
+    ["--muted" as string]: `color-mix(in srgb, ${ink} 62%, transparent)`,
+    ["--line" as string]: `color-mix(in srgb, ${ink} 20%, transparent)`,
+  } as React.CSSProperties;
+}
+
 /** Choix d'une couleur : teinte douce (`color`) ou couleur pleine / libre (`hex`). */
 type ColorChoice = { color: NoteColor; hex?: undefined } | { color?: undefined; hex: string };
 
@@ -456,6 +471,18 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         if (it.kind === "color") {
           if (c.hex) update(id, { data: { ...it.data, hex: c.hex } });
         } else update(id, { data: { ...it.data, color: c.color ?? it.data.color ?? "blanc", hex: c.hex } });
+      }
+    },
+    [canEdit, update],
+  );
+
+  /** Couleur du texte choisie à la main (« auto » = noir ou blanc selon le fond). */
+  const applyInk = useCallback(
+    (ids: string[], ink: "auto" | "dark" | "light") => {
+      for (const id of ids) {
+        const it = itemsRef.current[id];
+        if (!it || it.kind === "arrow" || it.kind === "color" || !canEdit(it)) continue;
+        update(id, { data: { ...it.data, ink: ink === "auto" ? undefined : ink } });
       }
     },
     [canEdit, update],
@@ -1348,7 +1375,8 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
               : it.kind === "color"
                 ? "var(--bg)"
                 : noteBg(it.data.color, it.data.hex),
-          color: it.kind !== "color" && it.data.hex ? inkOn(it.data.hex) : undefined,
+          // Colonne : seul son en-tête prend la couleur de texte (ses cartes gardent la leur).
+          ...(it.kind !== "color" && it.kind !== "column" ? inkStyle(it.data) : null),
           outline: isSel || firstPick || inGroup ? "2px solid #10b981" : undefined,
           outlineOffset: 1,
         }}
@@ -1408,7 +1436,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
 
         {it.kind === "column" && (
           <div>
-            <div data-col-head className="flex items-baseline gap-2 px-1 pb-2.5 pt-0.5">
+            <div data-col-head className="flex items-baseline gap-2 px-1 pb-2.5 pt-0.5" style={inkStyle(it.data) ?? undefined}>
               {ed?.field === "title" ? (
                 <InlineInput value={it.data.title ?? ""} onChange={(title) => updateData(it.id, { title })} onDone={() => finishEdit(it)} placeholder="Nom de la colonne" className="text-sm font-medium" />
               ) : (
@@ -2002,6 +2030,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           }
           item={sel}
           onColor={sel.kind !== "arrow" ? (c) => applyColor([sel.id], c) : undefined}
+          onInk={(ink) => applyInk([sel.id], ink)}
           onEdit={sel.kind !== "arrow" ? () => startEdit(sel) : undefined}
           onOpen={sel.kind === "board" ? () => openBoard(sel) : undefined}
           onDelete={() => remove(sel.id)}
@@ -2023,7 +2052,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
 
       {group.length > 1 && groupPalette && !marquee && (
         <div className="absolute z-[200001] top-16 left-1/2 -translate-x-1/2">
-          <Palette current={{}} onColor={(c) => applyColor(groupRef.current, c)} />
+          <Palette current={{}} onColor={(c) => applyColor(groupRef.current, c)} onInk={(ink) => applyInk(groupRef.current, ink)} />
         </div>
       )}
       {/* Plusieurs cartes sélectionnées */}
@@ -2228,6 +2257,7 @@ function SelectionBar({
   pos,
   item,
   onColor,
+  onInk,
   onEdit,
   onOpen,
   onDelete,
@@ -2235,6 +2265,7 @@ function SelectionBar({
   pos: { left: number; top: number };
   item: BoardItem;
   onColor?: (c: ColorChoice) => void;
+  onInk?: (ink: "auto" | "dark" | "light") => void;
   onEdit?: () => void;
   onOpen?: () => void;
   onDelete: () => void;
@@ -2245,9 +2276,13 @@ function SelectionBar({
       data-ui
       onPointerDown={(e) => e.stopPropagation()}
       className="absolute z-[200001] -translate-x-1/2 flex flex-col items-center gap-1"
-      style={{ left: pos.left, top: Math.max(8, palette ? pos.top - 48 : pos.top) }}
+      // La palette est plus large que la barre : on la garde entière à l'écran.
+      style={{
+        left: Math.min(Math.max(pos.left, palette ? 330 : 130), (typeof window !== "undefined" ? window.innerWidth : 1200) - (palette ? 330 : 130)),
+        top: Math.max(8, palette ? pos.top - 84 : pos.top),
+      }}
     >
-      {palette && onColor && <Palette current={item.data} onColor={onColor} />}
+      {palette && onColor && <Palette current={item.data} onColor={onColor} onInk={item.kind !== "color" ? onInk : undefined} />}
       <div className="flex items-center gap-1 bg-bg border border-line shadow-lg rounded-full px-2 h-10">
         {onColor && (
           <button
@@ -2279,7 +2314,15 @@ function SelectionBar({
 }
 
 /** Palette : teintes douces, couleurs pleines, et couleur libre. */
-function Palette({ current, onColor }: { current: BoardData; onColor: (c: ColorChoice) => void }) {
+function Palette({
+  current,
+  onColor,
+  onInk,
+}: {
+  current: BoardData;
+  onColor: (c: ColorChoice) => void;
+  onInk?: (ink: "auto" | "dark" | "light") => void;
+}) {
   const ring = (on: boolean) => (on ? "ring-2 ring-offset-2 ring-offset-[var(--bg)] ring-emerald-500" : "");
   return (
     <div data-ui className="flex flex-wrap items-center justify-center gap-1.5 bg-bg border border-line shadow-lg rounded-2xl px-3 py-2 max-w-[92vw]">
@@ -2315,6 +2358,27 @@ function Palette({ current, onColor }: { current: BoardData; onColor: (c: ColorC
           className="absolute inset-0 opacity-0 cursor-pointer"
         />
       </label>
+      {onInk && (
+        <div className="basis-full flex items-center justify-center gap-2 pt-1.5 mt-0.5 border-t border-line text-[11px]">
+          <span className="text-muted">Texte</span>
+          {(
+            [
+              ["auto", "Auto"],
+              ["dark", "Noir"],
+              ["light", "Blanc"],
+            ] as const
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => onInk(k)}
+              className={`h-6 px-2.5 rounded-full border ${(current.ink ?? "auto") === k ? "border-emerald-500 text-ink" : "border-line text-muted hover:text-ink"}`}
+              style={k === "dark" ? { background: "#f3f1ed", color: "#1b1a19" } : k === "light" ? { background: "#1b1a19", color: "#fff" } : undefined}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
