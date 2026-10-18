@@ -6,7 +6,7 @@ import { useState } from "react";
 import type { GalleryDesign } from "@/lib/design";
 import type { Collection, PhotoView } from "@/lib/types";
 import { formatLongDate } from "@/lib/dates";
-import { ArrowLeft, BrushIcon, ChevronDown, CloseIcon, DotsIcon, FilmIcon, GearIcon, HeartIcon, ImageIcon, MenuIcon, PencilIcon } from "@/components/icons";
+import { ArrowLeft, BrushIcon, ChevronDown, CloseIcon, DotsIcon, DownloadIcon, FeedIcon, FilmIcon, GearIcon, HeartIcon, ImageIcon, MenuIcon, PencilIcon } from "@/components/icons";
 import { VideosPanel, type AdminVideo } from "./videos-panel";
 import { CollectionsSidebar } from "./collections-sidebar";
 import { PhotosPanel } from "./photos-panel";
@@ -51,7 +51,7 @@ const TABS = [
   { id: "videos", label: "Vidéos", Icon: FilmIcon },
   { id: "design", label: "Design", Icon: BrushIcon },
   { id: "settings", label: "Paramètres", Icon: GearIcon },
-  { id: "activity", label: "Activité", Icon: HeartIcon },
+  { id: "activity", label: "Activités", Icon: FeedIcon },
 ] as const;
 
 export function GalleryManager(raw: Props) {
@@ -72,7 +72,6 @@ export function GalleryManager(raw: Props) {
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>(isVideo ? "videos" : "photos");
   const [menu, setMenu] = useState(false);
   const [drawer, setDrawer] = useState(false);
-  const [activityTab, setActivityTab] = useState<"favorites" | "downloads">("favorites");
   const [activeCollection, setActiveCollection] = useState(props.collections[0]?.id ?? "");
   const [plus, setPlus] = useState(false);
   const collectionCounts = props.photos.reduce<Record<string, number>>((acc, p) => {
@@ -110,6 +109,7 @@ export function GalleryManager(raw: Props) {
     .map((l) => ({ key: l.email, label: l.email, ids: new Set(l.photoIds), zips: 0 }));
   // Personne choisie dans la colonne de gauche (« dl:e-mail » ou « fav:e-mail ») : ses photos s'affichent à droite.
   const [downloader, setDownloader] = useState<string | null>(null);
+  const [activity, setActivity] = useState<"dl" | "fav">("dl");
   const shownDownloader =
     [...downloaders.map((p) => ({ ...p, key: `dl:${p.key}`, label: `${p.label} · téléchargées` })),
      ...favoritePeople.map((p) => ({ ...p, key: `fav:${p.key}`, label: `${p.label} · favoris` }))].find((p) => p.key === downloader) ?? null;
@@ -142,10 +142,54 @@ export function GalleryManager(raw: Props) {
 
   const status = gallery.expired ? "bg-danger" : filled ? "bg-emerald-500" : "bg-muted";
   const statusLabel = gallery.expired ? "Expirée" : filled ? "En ligne" : "Vide";
-  const activityItems = [
-    ["favorites", "Favoris", props.favoriteLists.length],
-    ["downloads", "Téléchargements", props.downloads.length],
-  ] as const;
+  const favoriteCounts = props.favoriteLists.reduce<Record<string, number>>((acc, l) => {
+    l.photoIds.forEach((id) => (acc[id] = (acc[id] ?? 0) + 1));
+    return acc;
+  }, {});
+  const openTab = (id: (typeof TABS)[number]["id"]) => {
+    setTab(id);
+    setDownloader(null);
+  };
+  /** Colonne de gauche de l'onglet Activités : rubriques, et sous la rubrique ouverte, une ligne par personne. */
+  const activitySidebar = () => (
+    <div className="pb-6">
+      <p className="eyebrow text-muted px-6 h-14 flex items-center">Activités</p>
+      {([
+        ["dl", "Activité de téléchargement", DownloadIcon, downloaders],
+        ["fav", "Activité des favoris", HeartIcon, favoritePeople],
+      ] as const).map(([kind, label, Icon, people]) => (
+        <div key={kind}>
+          <button
+            onClick={() => {
+              setActivity(kind);
+              setDownloader(null);
+            }}
+            className={`w-full flex items-center gap-4 px-6 h-14 text-[15px] transition-colors ${activity === kind && !downloader ? "bg-bg-soft text-ink" : activity === kind ? "text-ink" : "text-muted hover:text-ink"}`}
+          >
+            <Icon className="w-5 h-5" />
+            <span className="flex-1 text-left">{label}</span>
+          </button>
+          {activity === kind &&
+            people.map((p) => {
+              const key = `${kind}:${p.key}`;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setDownloader(key)}
+                  className={`w-full text-left pl-[60px] pr-6 py-2.5 transition-colors ${downloader === key ? "bg-bg-soft text-ink" : "text-muted hover:text-ink"}`}
+                >
+                  <span className={`block truncate text-sm ${p.key ? "" : "italic"}`}>{p.label}</span>
+                  <span className="block text-xs text-muted mt-0.5">
+                    {p.ids.size} photo{p.ids.size > 1 ? "s" : ""}
+                    {p.zips ? ` · ${p.zips} ZIP` : ""}
+                  </span>
+                </button>
+              );
+            })}
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className={`lg:h-svh lg:flex lg:flex-col ${deleting ? "opacity-40 pointer-events-none" : ""}`}>
@@ -242,14 +286,14 @@ export function GalleryManager(raw: Props) {
                 <button
                   key={id}
                   onClick={() => {
-                    setTab(id);
+                    openTab(id);
                     setDrawer(false);
                   }}
                   className={`w-full flex items-center gap-4 py-4 border-b border-line text-left ${tab === id ? "text-ink" : "text-muted hover:text-ink"}`}
                 >
                   <Icon className="w-5 h-5" />
                   <span className="flex-1 text-[15px]">{label}</span>
-                  {id === "activity" && props.favoriteLists.length > 0 && <span className="text-xs">{props.favoriteLists.length}</span>}
+                  {id === "activity" && props.downloads.length + favoritePeople.length > 0 && <span className="text-xs">{props.downloads.length + favoritePeople.length}</span>}
                   {tab === id && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
                 </button>
               ))}
@@ -280,7 +324,7 @@ export function GalleryManager(raw: Props) {
           {tabs.map(({ id, label, Icon }) => (
             <button
               key={id}
-              onClick={() => setTab(id)}
+              onClick={() => openTab(id)}
               title={label}
               aria-label={label}
               className={`h-14 flex items-center justify-center border-b-2 -mb-px transition-colors ${tab === id ? "border-emerald-500 text-ink" : "border-transparent text-muted hover:text-ink"}`}
@@ -295,59 +339,10 @@ export function GalleryManager(raw: Props) {
             collections={props.collections}
             counts={collectionCounts}
             activeId={activeCollection}
-            onActive={(id) => {
-              setActiveCollection(id);
-              setDownloader(null);
-            }}
+            onActive={setActiveCollection}
           />
         )}
-        {tab === "photos" && (downloaders.length > 0 || favoritePeople.length > 0) && (
-          <div className="border-t border-line mt-4 pb-6">
-            <p className="eyebrow text-muted px-6 h-14 flex items-center">Activité</p>
-            {([
-              ["Téléchargements", downloaders, "dl"],
-              ["Favoris", favoritePeople, "fav"],
-            ] as const).map(([title, people, kind]) =>
-              people.length ? (
-                <div key={kind} className="mb-3">
-                  <p className="px-6 pb-1 text-[11px] uppercase tracking-wider text-muted flex items-center gap-2">
-                    {kind === "dl" ? "↓" : <HeartIcon className="w-3 h-3" filled />} {title}
-                  </p>
-                  {people.map((p) => {
-                    const key = `${kind}:${p.key}`;
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => setDownloader((cur) => (cur === key ? null : key))}
-                        className={`w-full text-left px-6 py-2.5 transition-colors ${downloader === key ? "bg-bg-soft text-ink" : "text-muted hover:text-ink"}`}
-                      >
-                        <span className={`block truncate text-[15px] ${p.key ? "" : "italic"}`}>{p.label}</span>
-                        <span className="block text-xs text-muted mt-0.5">
-                          {p.ids.size} photo{p.ids.size > 1 ? "s" : ""}
-                          {p.zips ? ` · ${p.zips} ZIP` : ""}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : null,
-            )}
-          </div>
-        )}
-        {tab === "activity" && (
-          <div>
-            <p className="eyebrow text-muted px-6 h-14 flex items-center">Activité</p>
-            {activityItems.map(([k, label, n]) => (
-              <button
-                key={k}
-                onClick={() => setActivityTab(k)}
-                className={`w-full flex items-center justify-between px-6 h-14 text-[15px] transition-colors ${activityTab === k ? "bg-bg-soft text-ink" : "text-muted hover:text-ink"}`}
-              >
-                {label} <span className="text-sm text-muted">{n}</span>
-              </button>
-            ))}
-          </div>
-        )}
+        {tab === "activity" && activitySidebar()}
         {tab === "videos" && (
           <div className="px-6 py-5">
             <p className="eyebrow text-muted">Vidéos</p>
@@ -371,7 +366,7 @@ export function GalleryManager(raw: Props) {
 
       <div className="pt-6 lg:pt-8 lg:flex-1 lg:overflow-y-auto lg:px-10 lg:pb-16">
       <div className={tab === "photos" || tab === "videos" ? "" : "lg:max-w-2xl"}>
-        {tab === "photos" && (
+        {(tab === "photos" || shownDownloader) && (
           <PhotosPanel
             activeId={activeCollection}
             onActive={setActiveCollection}
@@ -382,35 +377,33 @@ export function GalleryManager(raw: Props) {
             positions={props.positions}
             downloadCounts={downloadCounts}
             filter={shownDownloader ? { label: shownDownloader.label, ids: shownDownloader.ids, onClear: () => setDownloader(null) } : null}
-            favoriteCounts={props.favoriteLists.reduce<Record<string, number>>((acc, l) => {
-              l.photoIds.forEach((id) => (acc[id] = (acc[id] ?? 0) + 1));
-              return acc;
-            }, {})}
+            favoriteCounts={favoriteCounts}
           />
         )}
         {tab === "videos" && <VideosPanel galleryId={gallery.id} slug={gallery.slug} watermark={gallery.watermark} videos={props.videos} />}
         {tab === "design" && <DesignPanel gallery={gallery} photos={props.photos} />}
         {tab === "settings" && <SettingsPanel gallery={gallery} onDelete={remove} />}
-        {tab === "activity" && (
+        {tab === "activity" && !shownDownloader && (
           <div>
+            {/* Téléphone : pas de colonne de gauche, les deux rubriques en haut */}
             <div className="flex border border-line mb-10 lg:hidden">
               {([
-                ["favorites", `Favoris (${props.favoriteLists.length})`],
-                ["downloads", `Téléchargements (${props.downloads.length})`],
+                ["dl", `Téléchargements (${props.downloads.length})`],
+                ["fav", `Favoris (${favoritePeople.length})`],
               ] as const).map(([k, label]) => (
                 <button
                   key={k}
-                  onClick={() => setActivityTab(k)}
-                  className={`flex-1 py-3 text-[11px] tracking-wider uppercase transition-colors ${activityTab === k ? "bg-ink text-bg" : "text-muted hover:text-ink"}`}
+                  onClick={() => setActivity(k)}
+                  className={`flex-1 py-3 text-[11px] tracking-wider uppercase transition-colors ${activity === k ? "bg-ink text-bg" : "text-muted hover:text-ink"}`}
                 >
                   {label}
                 </button>
               ))}
             </div>
-            {activityTab === "favorites" ? (
-              <FavoritesPanel lists={props.favoriteLists} photos={props.photos} collections={props.collections} />
-            ) : (
+            {activity === "dl" ? (
               <DownloadsPanel downloads={props.downloads} photos={props.photos} collections={props.collections} />
+            ) : (
+              <FavoritesPanel lists={props.favoriteLists} photos={props.photos} collections={props.collections} />
             )}
           </div>
         )}

@@ -84,7 +84,7 @@ export function PhotosPanel(props: Props) {
             <p className="eyebrow text-muted text-[10px]">Activité · {order.length} photo{order.length > 1 ? "s" : ""}</p>
             <h2 className="display text-2xl sm:text-3xl truncate mt-1">{props.filter.label}</h2>
             <button onClick={props.filter.onClear} className="text-xs text-accent mt-2 hover:opacity-80">
-              ← Toutes les photos
+              ← Retour
             </button>
           </div>
         ) : (
@@ -113,9 +113,11 @@ export function PhotosPanel(props: Props) {
               <span className="w-px h-6 bg-line mx-3" />
             </span>
           )}
-          <button onClick={() => setUploadOpen((o) => !o)} className="flex items-center gap-1.5 text-[13px] sm:text-sm text-accent hover:opacity-80">
-            <PlusCircleIcon /> Ajouter des médias
-          </button>
+          {!props.filter && (
+            <button onClick={() => setUploadOpen((o) => !o)} className="flex items-center gap-1.5 text-[13px] sm:text-sm text-accent hover:opacity-80">
+              <PlusCircleIcon /> Ajouter des médias
+            </button>
+          )}
         </div>
       </div>
       {/* Fenêtre d'envoi : reste montée quand elle est fermée, pour ne pas interrompre un envoi en cours */}

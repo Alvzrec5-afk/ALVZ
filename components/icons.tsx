@@ -6,6 +6,13 @@ export const HeartIcon = ({ className = "w-5 h-5", filled }: P) => (
     <path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2Z" />
   </svg>
 );
+/** Flux d'activité (onglet Activités d'une galerie). */
+export const FeedIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <circle cx="6" cy="18" r="1.4" fill="currentColor" />
+    <path d="M5 11.5a7.5 7.5 0 0 1 7.5 7.5M5 5.5A13.5 13.5 0 0 1 18.5 19" />
+  </svg>
+);
 export const DownloadIcon = ({ className = "w-5 h-5" }: P) => (
   <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
     <path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14" />

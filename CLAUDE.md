@@ -67,8 +67,9 @@ Vidéos, Coordonnées, Outils → Clients & e-mails, Déconnexion) ; sur mobile 
   suppression, visionneuse `admin-viewer.tsx`), `design-panel.tsx` (12 couvertures, polices, couleurs,
   grilles), `settings-panel.tsx` (lien, mot de passe, expiration, téléchargements (option « Demander l'e-mail avant le téléchargement » = `galleries.download_email_required` : même fenêtre / liste `favorite_lists` que les favoris, contrôlée par `needsDownloadEmail` dans les routes download et archive), favoris, filigrane,
   carte de visite), activité (favoris + téléchargements : `downloads-panel.tsx` = chiffres, photos les plus
-  téléchargées, « Par personne » (photos + ZIP par e-mail), historique). Colonne de gauche de l'onglet Photos : section « Activité » (Téléchargements / Favoris par personne,
-  `downloaders` / `favoritePeople` dans `gallery-manager`, ZIP compris) ; clic = ses photos à droite (`filter` de `PhotosPanel`).
+  téléchargées, « Par personne » (photos + ZIP par e-mail), historique). Onglet « Activités » (icône `FeedIcon`, plus de cœur), comme Pixieset : à gauche « Activité de
+  téléchargement » / « Activité des favoris », sous la rubrique ouverte une ligne par personne (`downloaders` /
+  `favoritePeople` dans `gallery-manager`, ZIP compris) ; clic = ses photos à droite (`filter` de `PhotosPanel`).
 - Vidéos : `app/admin/(protected)/videos/` — projets vidéo = galeries avec `kind = 'video'`
   (onglets Vidéos / Design / Paramètres). `videos-panel.tsx` : envoi, fiche vidéo (lien direct,
   téléchargement autorisé ou non, commentaires, activité ; liste « Téléchargements » = `video_events` kind download
