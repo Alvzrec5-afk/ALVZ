@@ -156,3 +156,25 @@ insert into public.studio_settings (id) values (1);
 alter table public.studio_settings enable row level security;
 create policy "admin full access" on public.studio_settings
   for all to authenticated using ((select private.is_admin())) with check ((select private.is_admin()));
+
+-- E-mails aux clients : désinscriptions et historique des envois.
+create table public.mail_unsubscribes (
+  email text primary key,
+  created_at timestamptz not null default now()
+);
+alter table public.mail_unsubscribes enable row level security;
+create policy "admin full access" on public.mail_unsubscribes
+  for all to authenticated using ((select private.is_admin())) with check ((select private.is_admin()));
+
+create table public.mail_campaigns (
+  id uuid primary key default gen_random_uuid(),
+  subject text not null,
+  body text not null,
+  recipients integer not null default 0,
+  sent integer not null default 0,
+  failed integer not null default 0,
+  created_at timestamptz not null default now()
+);
+alter table public.mail_campaigns enable row level security;
+create policy "admin full access" on public.mail_campaigns
+  for all to authenticated using ((select private.is_admin())) with check ((select private.is_admin()));

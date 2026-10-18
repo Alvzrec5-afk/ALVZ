@@ -18,4 +18,14 @@ export const env = {
   gallerySecret: () => required("GALLERY_SECRET"),
   /** Optionnel : adresse S3 personnalisée (sinon déduite du namespace et de la région). */
   oracleEndpoint: () => process.env.ORACLE_S3_ENDPOINT || null,
+  /** Optionnel : boîte mail d'envoi (Gmail + mot de passe d'application). */
+  smtp: () =>
+    process.env.SMTP_USER && process.env.SMTP_PASS
+      ? {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS.replace(/\s+/g, ""),
+          host: process.env.SMTP_HOST || "smtp.gmail.com",
+          port: Number(process.env.SMTP_PORT || 465),
+        }
+      : null,
 };

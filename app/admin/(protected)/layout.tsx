@@ -15,9 +15,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="mx-auto max-w-6xl px-5 sm:px-8 h-16 flex items-center justify-between">
           <Link href="/admin" className="flex items-center gap-3">
             <Wordmark height={30} />
-            <span className="eyebrow text-muted tracking-[0.2em]">studio</span>
+            <span className="eyebrow text-muted tracking-[0.2em] hidden sm:inline">studio</span>
           </Link>
-          <div className="flex items-center gap-5">
+          <div className="flex items-center gap-4 sm:gap-5">
+            <Link href="/admin/clients" className="eyebrow text-muted hover:text-ink transition-colors">Clients</Link>
             <Link href="/admin/settings" className="eyebrow text-muted hover:text-ink transition-colors">Coordonnées</Link>
             <form action={signOut}>
               <button className="eyebrow text-muted hover:text-ink transition-colors">Déconnexion</button>

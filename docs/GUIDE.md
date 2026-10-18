@@ -45,6 +45,8 @@ Cochez **Contains secret values** pour les lignes marquées 🔒.
 | `ORACLE_SECRET_ACCESS_KEY` | Secret Key de la Customer Secret Key | 🔒 |
 | `GALLERY_SECRET` | Une longue phrase aléatoire (40 caractères ou plus) | 🔒 |
 | `STORAGE_LIMIT_GB` | *Optionnel.* Limite de stockage en Go (20 par défaut, l'offre gratuite d'Oracle) | |
+| `SMTP_USER` | *Optionnel, pour la page Clients.* Votre adresse Gmail d'envoi | |
+| `SMTP_PASS` | *Optionnel.* Mot de passe d'application Google (voir « E-mails aux clients ») | 🔒 |
 
 Après tout changement de variable : **Deploys** → **Trigger deploy** → **Deploy site** (les variables ne sont prises en compte qu'au déploiement suivant).
 
@@ -56,6 +58,19 @@ Le message doit indiquer « Connexion Oracle opérationnelle ». Sinon, le messa
 ---
 
 ## 2. Utilisation au quotidien
+
+### E-mails aux clients
+
+Le studio → **Clients** liste toutes les adresses laissées par vos clients (sélection de favoris, téléchargements).
+Écrivez un message : il part depuis votre Gmail, **un e-mail séparé par personne** (chacun ne voit que sa propre adresse),
+avec vos coordonnées et un lien de désinscription en bas. Les envois apparaissent dans « Envoyés » de votre Gmail.
+
+Pour l'activer, une seule fois :
+1. Compte Google → **Sécurité** → activez la **Validation en deux étapes**.
+2. Ouvrez https://myaccount.google.com/apppasswords → nom « ALVZ galeries » → **Créer** → copiez les 16 lettres.
+3. Sur Netlify, ajoutez `SMTP_USER` (votre adresse Gmail) et `SMTP_PASS` (les 16 lettres, 🔒), puis redéployez.
+
+Gmail accepte environ 500 destinataires par jour.
 
 ### Créer une galerie
 1. `https://VOTRE-SITE/admin` → **Nouvelle galerie**.
