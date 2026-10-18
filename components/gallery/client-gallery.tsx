@@ -138,12 +138,38 @@ export function ClientGallery(props: Props) {
 
       {/* En-tête de la galerie : nom du client, signature, actions */}
       <header className="sticky top-0 z-30 bg-bg border-b border-line">
-        <div className="mx-auto max-w-[1800px] px-5 sm:px-8 pt-[max(env(safe-area-inset-top),0.9rem)] pb-3 flex items-center gap-3">
-          <button className="flex-1 min-w-0 text-left" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Revenir à la couverture">
+        <div className="mx-auto max-w-[1700px] px-5 sm:px-8 lg:px-12 pt-[max(env(safe-area-inset-top),0.9rem)] md:pt-0 flex flex-wrap md:flex-nowrap items-center gap-x-3 md:gap-x-8 md:h-20">
+          <button className="flex-1 md:flex-none min-w-0 md:max-w-[32%] text-left pb-3 md:pb-0" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Revenir à la couverture">
             <p className="gallery-title text-xl sm:text-2xl truncate">{props.title}</p>
             <p className="eyebrow text-muted text-[9px] mt-1">ALVZ.REC{props.date ? ` · ${props.date}` : ""}</p>
           </button>
-          <div className="flex items-center -mr-2">
+          {(props.collections.length > 1 || tab === FAVORITES_TAB) && (
+            <nav ref={navRef} className="relative order-last md:order-2 w-[calc(100%+2.5rem)] sm:w-full md:w-auto md:flex-1 min-w-0 flex md:justify-center gap-6 overflow-x-auto no-scrollbar -mx-5 px-5 sm:mx-0 sm:px-0 md:h-full md:items-center border-t border-line md:border-0">
+              {indicator && (
+                <span
+                  aria-hidden
+                  className="absolute bottom-0 md:bottom-5 h-px bg-ink transition-[left,width] duration-500 ease-[cubic-bezier(0.22,0.8,0.2,1)]"
+                  style={{ left: indicator.left, width: indicator.width }}
+                />
+              )}
+              {props.collections.map((c) => (
+                <button
+                  key={c.id}
+                  data-tab={c.id}
+                  onClick={() => selectTab(c.id)}
+                  className={`eyebrow whitespace-nowrap py-3 transition-colors duration-300 ${tab === c.id ? "text-ink" : "text-muted hover:text-ink"}`}
+                >
+                  {c.name}
+                </button>
+              ))}
+              {tab === FAVORITES_TAB && (
+                <button data-tab={FAVORITES_TAB} className="eyebrow whitespace-nowrap py-3 text-ink flex items-center gap-1.5">
+                  <HeartIcon className="w-3.5 h-3.5" filled /> Ma sélection
+                </button>
+              )}
+            </nav>
+          )}
+          <div className="flex items-center -mr-2 pb-3 md:pb-0 md:order-3">
             {props.favoritesEnabled && (
               <button
                 onClick={() => selectTab(tab === FAVORITES_TAB ? props.collections[0]?.id ?? "" : FAVORITES_TAB)}
@@ -151,7 +177,7 @@ export function ClientGallery(props: Props) {
                 aria-label="Ma sélection"
               >
                 <HeartIcon className="w-[22px] h-[22px]" filled={tab === FAVORITES_TAB} />
-                {design.nav_style === "labels" && <span className="eyebrow text-[10px]">Favoris</span>}
+                <span className={`eyebrow text-[10px] ${design.nav_style === "labels" ? "" : "hidden lg:inline"}`}>Sélection</span>
                 {favorites.size > 0 && (
                   <span key={favorites.size} className="absolute top-1 left-6 min-w-4 h-4 px-1 rounded-full bg-heart text-white text-[9px] leading-4 text-center animate-[heartPop_0.45s_ease-out]">
                     {favorites.size}
@@ -167,8 +193,15 @@ export function ClientGallery(props: Props) {
                   aria-label="Menu"
                   disabled={zip !== null}
                 >
-                  {props.downloadsEnabled && design.nav_style === "labels" ? <DownloadIcon className="w-5 h-5" /> : <DotsVertical />}
-                  {design.nav_style === "labels" && <span className="eyebrow text-[10px]">{props.downloadsEnabled ? "Télécharger" : "Menu"}</span>}
+                  {props.downloadsEnabled ? (
+                    <>
+                      <span className={design.nav_style === "labels" ? "" : "lg:hidden"}>{design.nav_style === "labels" ? <DownloadIcon className="w-5 h-5" /> : <DotsVertical />}</span>
+                      {design.nav_style !== "labels" && <DownloadIcon className="w-5 h-5 hidden lg:block" />}
+                    </>
+                  ) : (
+                    <DotsVertical />
+                  )}
+                  <span className={`eyebrow text-[10px] ${design.nav_style === "labels" ? "" : "hidden lg:inline"}`}>{props.downloadsEnabled ? "Télécharger" : "Menu"}</span>
                 </button>
                 {menu && (
                   <>
@@ -205,35 +238,9 @@ export function ClientGallery(props: Props) {
             )}
           </div>
         </div>
-        {(props.collections.length > 1 || tab === FAVORITES_TAB) && (
-          <nav ref={navRef} className="relative mx-auto max-w-[1800px] flex md:justify-center gap-6 overflow-x-auto no-scrollbar px-5 sm:px-8">
-            {indicator && (
-              <span
-                aria-hidden
-                className="absolute bottom-0 h-px bg-ink transition-[left,width] duration-500 ease-[cubic-bezier(0.22,0.8,0.2,1)]"
-                style={{ left: indicator.left, width: indicator.width }}
-              />
-            )}
-            {props.collections.map((c) => (
-              <button
-                key={c.id}
-                data-tab={c.id}
-                onClick={() => selectTab(c.id)}
-                className={`eyebrow whitespace-nowrap py-3 transition-colors duration-300 ${tab === c.id ? "text-ink" : "text-muted hover:text-ink"}`}
-              >
-                {c.name}
-              </button>
-            ))}
-            {tab === FAVORITES_TAB && (
-              <button data-tab={FAVORITES_TAB} className="eyebrow whitespace-nowrap py-3 text-ink flex items-center gap-1.5">
-                <HeartIcon className="w-3.5 h-3.5" filled /> Ma sélection
-              </button>
-            )}
-          </nav>
-        )}
       </header>
 
-      <main className="mx-auto max-w-[1800px] px-2 sm:px-8 pt-2 sm:pt-8 pb-24 protect">
+      <main className="mx-auto max-w-[1700px] px-2 sm:px-8 lg:px-12 pt-2 sm:pt-8 lg:pt-10 pb-24 protect">
         {tab === FAVORITES_TAB && favorites.size > 0 && (
           <p className="text-center text-xs text-muted py-6">
             Sélection enregistrée pour {email}. Elle est automatiquement transmise à ALVZ.REC.
@@ -326,31 +333,11 @@ function Cover({
   const focus = { objectPosition: `${design.cover_focus_x}% ${design.cover_focus_y}%` };
   const sectionRef = useRef<HTMLElement>(null);
 
-  // Profondeur au défilement : la photo glisse plus lentement que la page, le texte s'efface.
-  useEffect(() => {
-    const el = sectionRef.current;
-    if (!el || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    let frame = 0;
-    const update = () => {
-      frame = 0;
-      const p = Math.min(1, Math.max(0, window.scrollY / (el.offsetHeight || 1)));
-      el.style.setProperty("--p", p.toFixed(3));
-    };
-    const onScroll = () => {
-      if (!frame) frame = requestAnimationFrame(update);
-    };
-    update();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      if (frame) cancelAnimationFrame(frame);
-    };
-  }, []);
 
   const img = (cls: string, src: string | null | undefined = cover?.src, parallax = true) =>
     src ? (
       <div className={`${cls} overflow-hidden bg-bg-soft`}>
-        <div className="w-full h-full" style={parallax ? { transform: "translateY(calc(var(--p, 0) * 22%))" } : undefined}>
+        <div className={`w-full h-full ${parallax ? "cover-parallax" : ""}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={src}
@@ -390,7 +377,6 @@ function Cover({
       )}
     </>
   );
-  const fadeOnScroll = { opacity: "calc(1 - var(--p, 0) * 1.6)", transform: "translateY(calc(var(--p, 0) * -60px))" };
   const topLogo = (light: boolean) => (
     <div className={`absolute top-0 inset-x-0 z-10 flex justify-center pt-[max(env(safe-area-inset-top),1.75rem)] ${light ? "text-white/90" : ""}`}>
       <Wordmark height={44} tone={light ? "white" : "auto"} />
@@ -481,7 +467,7 @@ function Cover({
           </div>
           <div className="absolute inset-0 bg-black/30" />
           {topLogo(true)}
-          <div style={fadeOnScroll} className="absolute inset-0 flex flex-col items-center justify-center text-center text-white px-6">
+          <div className="cover-fade absolute inset-0 flex flex-col items-center justify-center text-center text-white px-6">
             {heading(big)}
             {enter(true)}
           </div>
@@ -505,8 +491,7 @@ function Cover({
             topLogo(true)
           )}
           <div
-            style={fadeOnScroll}
-            className={`absolute text-white px-6 sm:px-14 ${bottom ? "inset-x-0 bottom-0 pb-[max(env(safe-area-inset-bottom),3rem)] sm:pb-20 text-left" : "inset-0 flex flex-col items-center justify-center text-center"}`}
+            className={`cover-fade absolute text-white px-6 sm:px-14 ${bottom ? "inset-x-0 bottom-0 pb-[max(env(safe-area-inset-bottom),3rem)] sm:pb-20 text-left" : "inset-0 flex flex-col items-center justify-center text-center"}`}
           >
             {layout === "stripe" ? (
               <div className="w-full max-w-4xl">

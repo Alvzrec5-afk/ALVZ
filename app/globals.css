@@ -287,3 +287,15 @@ body {
 /* Sur une photo, le titre reste blanc quelle que soit la palette */
 .text-white .gallery-title, .gallery-title.text-white { color: #fff; }
 @keyframes lineIn { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* Profondeur de la couverture : calculée par le navigateur (fluide), sans JavaScript.
+   Les navigateurs qui ne la gèrent pas affichent simplement une couverture fixe. */
+@keyframes coverParallax { to { transform: translateY(22%); } }
+@keyframes coverFade { to { opacity: 0; transform: translateY(-60px); } }
+@supports (animation-timeline: scroll()) {
+  .cover-parallax { animation: coverParallax linear both; animation-timeline: scroll(root); animation-range: 0 100vh; will-change: transform; }
+  .cover-fade { animation: coverFade linear both; animation-timeline: scroll(root); animation-range: 0 70vh; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cover-parallax, .cover-fade { animation: none !important; }
+}
