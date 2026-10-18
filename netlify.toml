@@ -1,6 +1,8 @@
 [build]
   command = "npm run build"
   publish = ".next"
+  # Pas de publication (ni de crédits consommés) quand seuls la doc et la mémoire du projet changent.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- . ':(exclude)CLAUDE.md' ':(exclude).claude' ':(exclude)docs'"
 
 [build.environment]
   NODE_VERSION = "22"
