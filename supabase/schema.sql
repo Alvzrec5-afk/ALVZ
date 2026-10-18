@@ -126,3 +126,33 @@ language sql stable security invoker set search_path = '' as $$
 $$;
 revoke execute on function public.storage_usage() from public, anon;
 grant execute on function public.storage_usage() to authenticated;
+
+-- Journal des téléchargements (photo HD / taille web / ZIP).
+create table public.downloads (
+  id uuid primary key default gen_random_uuid(),
+  gallery_id uuid not null references public.galleries(id) on delete cascade,
+  photo_id uuid references public.photos(id) on delete set null,
+  collection_id uuid references public.collections(id) on delete set null,
+  kind text not null check (kind in ('photo', 'zip')),
+  size text not null default 'hd' check (size in ('hd', 'web')),
+  photo_count integer not null default 1,
+  email text,
+  created_at timestamptz not null default now()
+);
+create index downloads_gallery_idx on public.downloads (gallery_id, created_at desc);
+create index downloads_photo_idx on public.downloads (photo_id);
+create index downloads_collection_idx on public.downloads (collection_id);
+alter table public.downloads enable row level security;
+create policy "admin full access" on public.downloads
+  for all to authenticated using ((select private.is_admin())) with check ((select private.is_admin()));
+
+-- Réglages du studio (une seule ligne) : coordonnées affichées dans les galeries.
+create table public.studio_settings (
+  id integer primary key default 1 check (id = 1),
+  contact jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+insert into public.studio_settings (id) values (1);
+alter table public.studio_settings enable row level security;
+create policy "admin full access" on public.studio_settings
+  for all to authenticated using ((select private.is_admin())) with check ((select private.is_admin()));
