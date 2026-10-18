@@ -3,28 +3,21 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdminApi } from "@/lib/auth";
-import { starterKit } from "@/lib/board-types";
-import { applyBoardOps, duplicateBoard as copyBoard, isUuid, purgeBoard } from "@/lib/boards";
+import { duplicateBoard as copyBoard, isUuid, purgeBoard, templateBoardId } from "@/lib/boards";
 import { newSlug } from "@/lib/tokens";
 import type { FormState } from "./actions";
 
-/** Nouveau tableau, déjà organisé en planches remplies (budget → timeline du tournage). */
+/** Nouveau tableau = copie du « Modèle des nouveaux tableaux » (six planches, modifiables une fois pour toutes). */
 async function insertBoard(title: string, galleryId: string | null) {
   const { supabase } = await requireAdminApi();
-  const { data, error } = await supabase
-    .from("boards")
-    .insert({ title, gallery_id: galleryId, share_slug: newSlug() })
-    .select("id")
-    .single();
-  if (error) return { error: error.message };
-  const kit = starterKit();
-  // Les cartes « planche » créent leurs tableaux ; on remplit ensuite chacun d'eux.
-  await applyBoardOps(supabase, data.id, kit.items.map((item) => ({ op: "put" as const, item })), { role: "admin" });
-  await Promise.all(
-    kit.planches.map((p) => applyBoardOps(supabase, p.boardId, p.items.map((item) => ({ op: "put" as const, item })), { role: "admin" })),
-  );
-  revalidatePath("/admin/boards");
-  return { id: data.id as string };
+  try {
+    const id = await copyBoard(supabase, await templateBoardId(supabase), title, { parentId: null });
+    if (galleryId) await supabase.from("boards").update({ gallery_id: galleryId }).eq("id", id);
+    revalidatePath("/admin/boards");
+    return { id };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Création impossible" };
+  }
 }
 
 export async function createBoard(_: FormState, form: FormData): Promise<FormState> {

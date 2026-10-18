@@ -17,7 +17,7 @@ export default async function BoardPage({
   const [{ id }, query] = await Promise.all([params, searchParams]);
   if (!isUuid(id)) notFound();
   const { supabase } = await requireAdminPage();
-  const fields = "id, title, gallery_id, share_slug, share_enabled, client_can_add, client_can_edit";
+  const fields = "id, title, gallery_id, share_slug, share_enabled, client_can_add, client_can_edit, is_template";
   const [{ data: board }, items, { data: galleries }, path] = await Promise.all([
     supabase.from("boards").select(fields).eq("id", id).maybeSingle(),
     loadBoardItems(supabase, id, { role: "admin" }),

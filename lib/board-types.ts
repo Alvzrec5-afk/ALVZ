@@ -26,7 +26,8 @@ export function inkOn(hex: string) {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.32 ? "#1b1a19" : "#ffffff";
 }
 
-export type TodoEntry = { id: string; text: string; done: boolean };
+/** Ligne de liste ; `indent` : 1 = sous-élément (ex. « Chargeur » sous « Batteries »). */
+export type TodoEntry = { id: string; text: string; done: boolean; indent?: number };
 
 export type BoardData = {
   text?: string;
@@ -52,6 +53,8 @@ export type BoardData = {
   icon?: string;
   /** Tableau (grille) : cellules ligne par ligne ; la première ligne sert d'en-tête. */
   cells?: string[][];
+  /** Tableau « budget » : la colonne TOTAL, le total, le budget client et le bénéfice se calculent tout seuls. */
+  calc?: "budget";
 };
 
 /** Ce que le navigateur envoie pour créer ou modifier une carte. */
@@ -195,10 +198,42 @@ export function starterKit(): Starter {
     return { title, icon, boardId };
   };
 
-  // 1. BUDGET
+  // 1. BUDGET — calculé tout seul : tarif × jours, total, budget du client, bénéfice.
   const budget = planche("1. BUDGET", "budget", [
-    item("table", 40, 40, { cells: grid(["Poste", "Prévu", "Réel"], [["Équipe / assistant", "", ""], ["Location matériel", "", ""], ["Lieu", "", ""], ["Déplacements", "", ""], ["Post-production", "", ""], ["Total", "", ""]]) }, { w: 460 }),
-    item("note", 540, 40, { text: "Devis\nEnvoyé le :\nAcompte reçu :\nSolde :", color: "sable" }),
+    item(
+      "table",
+      40,
+      40,
+      {
+        title: "BUDGET DE LA VIDÉO",
+        calc: "budget",
+        cells: grid(
+          ["LISTE", "Tarif par jour", "Nbre de jours", "TOTAL"],
+          [
+            ["DÉPLACEMENTS", "", "", ""],
+            ["Péage", "", "", ""],
+            ["Essence", "", "", ""],
+            ["Train/Vol", "", "", ""],
+            ["", "", "", ""],
+            ["Cadreur supplémentaire", "", "", ""],
+            ["Location matériel", "", "", ""],
+            ["Rémunération Acteur 1", "", "", ""],
+            ["Rémunération Acteur 2", "", "", ""],
+            ["Réservation lieu 1", "", "", ""],
+            ["Réservation lieu 2", "", "", ""],
+            ["Coiffure / maquillage", "", "", ""],
+            ["", "", "", ""],
+            ["", "", "", ""],
+            ["", "", "", ""],
+            ["", "", "", ""],
+            ["TOTAL", "", "", ""],
+            ["BUDGET DU CLIENT", "", "", ""],
+            ["BÉNÉFICE", "", "", ""],
+          ],
+        ),
+      },
+      { w: 720 },
+    ),
   ]);
 
   // 2. BRIEF / APPELS CLIENT
@@ -238,21 +273,47 @@ export function starterKit(): Starter {
     item("color", 1510, 330, { hex: "#6b4e45", title: "Tobacco Brown" }, { w: 170 }),
   ]);
 
-  // 4. SHOT LIST
-  const plans = ["Plan 1 — ouverture", "Plan 2", "Plan 3 — final"].map((text, i) => item("note", 40 + i * 300, 420, { text, color: "soleil" }));
+  // 4. SHOT LIST — une colonne par scène : image + description, plans, matériel ; scènes reliées par des flèches.
+  const scenes = [1, 2, 3, 4].map((n) => item("column", 40 + (n - 1) * 440, 40, { title: `Scène ${n}` }, { w: 400 }));
   const shot = planche("4. SHOT LIST", "shotlist", [
-    item("table", 40, 40, { cells: grid(["Fait", "Plan", "Description", "Rig (Ronin, main, trépied…)", "Mouvement"], [], 6) }, { w: 860 }),
-    ...plans,
-    item("arrow", 0, 0, { from: plans[0].id, to: plans[1].id }),
-    item("arrow", 0, 0, { from: plans[1].id, to: plans[2].id }),
+    ...scenes.flatMap((col) => [
+      col,
+      ...inside(col, [
+        item("image", 0, 0, { caption: "DESCRIPTION :", width: 400, height: 230 }),
+        item("table", 0, 0, { cells: grid(["Fait", "Description", "Rig (Ronin, Main, Trépied…)", "Mouvement"], [], 5) }),
+        item("todo", 0, 0, { title: "MATÉRIEL", items: todo(["", "", ""]) }),
+      ]),
+    ]),
+    ...scenes.slice(1).map((col, i) => item("arrow", 0, 0, { from: scenes[i].id, to: col.id })),
   ]);
 
-  // 5. CHECK-LIST TOURNAGE
+  // 5. CHECK-LIST TOURNAGE — le matériel du studio (à adapter une fois dans le modèle des nouveaux tableaux).
+  const list = (title: string, entries: (string | [string, number])[]) => ({
+    title,
+    items: entries.map((e) => ({ id: uid(), text: Array.isArray(e) ? e[0] : e, done: false, ...(Array.isArray(e) ? { indent: e[1] } : {}) })),
+  });
   const check = planche("5. CHECK-LIST TOURNAGE", "checklist", [
-    item("todo", 40, 40, { title: "Caméra", items: todo(["Boîtiers", "Batteries chargées", "Cartes mémoire vides", "Objectifs", "Stabilisateur / Ronin", "Trépied"]) }),
-    item("todo", 330, 40, { title: "Son", items: todo(["Micro", "Enregistreur", "Bonnette", "Piles"]) }),
-    item("todo", 620, 40, { title: "Lumière", items: todo(["Panneaux LED", "Pieds", "Réflecteur", "Rallonges"]) }),
-    item("todo", 910, 40, { title: "La veille", items: todo(["Charger toutes les batteries", "Formater les cartes", "Vérifier la météo", "Itinéraire et horaires"]) }),
+    item("note", 40, 40, { text: "CHECK-LIST MATÉRIEL", hex: "#d98b5f" }, { w: 1320 }),
+    item("todo", 40, 140, list("CAMERA", ["Sony FX30", "[Caméra 2]", "[Caméra 3]", "DJI osmo nano", "Batteries", "Chargeurs"]), { w: 430 }),
+    item("todo", 485, 140, list("LUMIERE", ["NEWEER 150C", "ZHIYUN CINEPEER CF100", 'Softbox 90" + nid d\'abeille', "Pied de lumière", "Prises pour les lumières", "Multiprise"]), { w: 430 }),
+    item(
+      "todo",
+      930,
+      140,
+      list("Accessoires", ["Filtre ND Variable", "[Batteries boitier]", ["Chargeur pour batteries boitier", 1], "Micro cravate", "Moniteur", "Batteries pour moniteur", ["Chargeur pour batteries moniteur", 1]]),
+      { w: 430 },
+    ),
+    item("todo", 40, 500, list("Objectifs", ["sigma 17 40 mm 1.8", "Sony 11 mm 1.8", "[Objectif 3]", "[Objectif 4]"]), { w: 430 }),
+    item("todo", 485, 500, list("RIG", ["DJI RS4 Mini", "Cage Tilta", "Poignée latérale", "Poignée supérieure", "Trépied+ plateau", "Enceinte"]), { w: 430 }),
+    item(
+      "todo",
+      930,
+      560,
+      list("Drones", ["[Drone 1]", ["Radiocommande", 1], ["Batteries", 1], ["Chargeur", 1], "[Drone 2]", ["Radiocommande", 1], ["Batteries", 1], ["Chargeur", 1]]),
+      { w: 430 },
+    ),
+    item("todo", 1380, 140, list("Location de matériel", ["", "", ""]), { w: 430 }),
+    item("comment", 485, 900, {}, { w: 430 }),
   ]);
 
   // 6. TIMELINE TOURNAGE

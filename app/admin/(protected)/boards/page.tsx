@@ -26,6 +26,7 @@ export default async function BoardsHome() {
     .select("id, title, share_enabled, updated_at, galleries(title, kind), board_items(id, kind, size_bytes, z)")
     .is("parent_id", null)
     .is("deleted_at", null)
+    .eq("is_template", false)
     .order("updated_at", { ascending: false });
   if (error) throw new Error(`Impossible de charger les tableaux : ${error.message}`);
 
@@ -54,6 +55,21 @@ export default async function BoardsHome() {
           <PlusIcon className="w-4 h-4" /> <span className="hidden sm:inline">Nouveau tableau</span>
         </Link>
       </div>
+
+      {/* Modèle des nouveaux tableaux : ce qu'on y met se retrouve dans chaque nouveau tableau. */}
+      <Link
+        href="/admin/boards/model"
+        className="mt-10 flex items-center gap-4 border border-line px-5 py-4 hover:border-muted transition-colors max-w-2xl"
+      >
+        <BoardIcon className="w-6 h-6 text-muted shrink-0" />
+        <span className="flex-1 min-w-0">
+          <span className="block text-[15px]">Modèle des nouveaux tableaux</span>
+          <span className="block text-xs text-muted mt-0.5">
+            Remplissez une fois votre check-list, votre budget, votre shot list… chaque nouveau tableau les aura déjà.
+          </span>
+        </span>
+        <span className="text-xs text-muted shrink-0">Modifier →</span>
+      </Link>
 
       {boards.length === 0 ? (
         <Link href="/admin/boards/new" className="mt-14 flex flex-col items-center justify-center gap-4 border border-dashed border-line py-20 text-muted hover:text-ink transition-colors">

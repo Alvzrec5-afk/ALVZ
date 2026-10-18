@@ -26,6 +26,7 @@ type Board = {
   share_enabled: boolean;
   client_can_add: boolean;
   client_can_edit: boolean;
+  is_template?: boolean;
 };
 
 /**
@@ -123,7 +124,11 @@ export function BoardHeader({
           className="w-full bg-transparent outline-none text-base sm:text-lg truncate leading-tight"
           aria-label="Nom du tableau"
         />
-        {isSub ? (
+        {root.is_template ? (
+          <p className="text-[12px] text-amber-500 truncate">
+            Modèle : chaque nouveau tableau commence comme une copie de celui-ci{isSub ? ` · ${path.slice(0, -1).map((b) => b.title).join(" / ")}` : ""}
+          </p>
+        ) : isSub ? (
           <nav className="flex items-center gap-1 text-[12px] text-muted min-w-0 overflow-hidden whitespace-nowrap">
             <Link href="/admin/boards" className="hover:text-ink shrink-0">Tableaux</Link>
             {path.slice(0, -1).map((b) => (

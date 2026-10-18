@@ -345,3 +345,6 @@ alter table public.board_items add column deleted_at timestamptz;
 create index galleries_deleted_idx on public.galleries (deleted_at) where deleted_at is not null;
 create index boards_deleted_idx on public.boards (deleted_at) where deleted_at is not null;
 create index board_items_deleted_idx on public.board_items (board_id, deleted_at) where deleted_at is not null;
+
+-- Modèle des nouveaux tableaux : un tableau spécial que le studio modifie ; chaque nouveau tableau en est une copie.
+alter table public.boards add column is_template boolean not null default false;

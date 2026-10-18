@@ -82,7 +82,10 @@ cartes note (6 couleurs, liens cliquables), image (envoi direct Oracle, 1600 px,
 liste à cocher, colonne (glisser une carte dedans), flèche (outil Flèche : carte de départ puis d'arrivée).
 Enregistrement automatique groupé (`components/board/sync.ts`), rafraîchissement toutes les 30 s seulement si la
 page est visible et utilisée (crédits Netlify). Plus de choix de modèle : tout nouveau tableau (et le « Tableau de
-préparation » d'une galerie) reçoit `starterKit()` (`lib/board-types.ts`) : 6 planches remplies — 1. BUDGET, 2. BRIEF /
+préparation » d'une galerie) est une **copie du « Modèle des nouveaux tableaux »** (`boards.is_template`,
+`templateBoardId` dans `lib/boards.ts`, page `/admin/boards/model`, encadré sur la liste des tableaux) : le
+propriétaire y remplit une fois sa check-list, son budget… Le modèle est créé la première fois avec
+`starterKit()` (`lib/board-types.ts`, `fillStarter`) : 6 planches remplies — 1. BUDGET, 2. BRIEF /
 APPELS CLIENT, 3. MOODBOARD (bandeaux, inspi musique / vidéos, 6 cases photo vides, 4 couleurs), 4. SHOT LIST,
 5. CHECK-LIST TOURNAGE, 6. TIMELINE TOURNAGE ; pictogrammes au trait (`data.icon` → `BOARD_ICONS`, jamais d'emoji).
 Case photo vide = carte image à 0 octet : un clic (studio) y met une image (`fillImage`). Carte lien vide avec
@@ -109,6 +112,9 @@ pleine `SOLID_COLORS` ou libre) ; texte blanc/encre auto (`inkOn`), ou forcé pa
 Blanc » dans la palette) ; `inkStyle` redéfinit aussi --ink / --muted / --line dans la carte (colonne : en-tête seul) ; palette dans la barre de la carte et pour une
 sélection multiple. Outils de la barre de gauche : clic = carte au centre, glisser-déposer = carte à l'endroit
 lâché (ou rangée dans la colonne visée).
+Listes : `TodoEntry.indent` (sous-élément ; Tab / Maj + Tab dans la ligne). Grille : `data.title` (titre au-dessus),
+colonne d'en-tête « Fait » = cases à cocher, `data.calc = "budget"` (TOTAL = tarif × jours, ligne TOTAL = somme,
+BUDGET DU CLIENT saisi, BÉNÉFICE = budget − total ; `budgetFigures` dans `board-canvas.tsx`).
 Carte `table` (bouton « Tableau », = Tableau de Milanote) : `data.cells` (lignes × colonnes, 1re ligne en gras),
 Tab / Entrée pour avancer, boutons + / − Ligne / Colonne ; tableaux Markdown « | a | b | » de l'import Milanote.
 Le bouton des sous-tableaux s'appelle « Planche » (comme Milanote). Le canevas annule tout défilement natif
@@ -161,6 +167,9 @@ images des tableaux). Schéma de référence :
 `supabase/schema.sql` (à tenir à jour après chaque migration).
 
 ## En attente / idées discutées
+
+- **Migration à appliquer au moment de publier** (pas encore faite sur Supabase) : le dernier bloc de
+  `supabase/schema.sql` (`boards.is_template`). Puis retirer cette ligne.
 
 - Tableaux, idées pour la suite : annuler / rétablir, commentaires sur une carte, aperçu des liens
   (Pinterest, Instagram), cocher les listes du studio côté client, temps réel au lieu du rafraîchissement.

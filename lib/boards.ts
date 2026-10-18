@@ -15,6 +15,7 @@ import {
   type BoardItemInput,
   type BoardKind,
   type BoardOp,
+  starterKit,
 } from "@/lib/board-types";
 import { copyObject, deleteKeys, presignGet } from "@/lib/storage";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -207,7 +208,12 @@ function cleanKind(kind: BoardKind, d: BoardData): BoardData {
         items: (Array.isArray(d.items) ? d.items : [])
           .slice(0, 200)
           .filter((e) => e && typeof e.id === "string")
-          .map((e) => ({ id: e.id.slice(0, 64), text: text(e.text, 500) ?? "", done: Boolean(e.done) })),
+          .map((e) => ({
+            id: e.id.slice(0, 64),
+            text: text(e.text, 500) ?? "",
+            done: Boolean(e.done),
+            ...(Number(e.indent) > 0 ? { indent: Math.min(2, Math.round(Number(e.indent))) } : {}),
+          })),
       };
     case "column":
       return { title: text(d.title, 200) ?? "", color: d.color && d.color in NOTE_COLORS ? d.color : "blanc", hex: isHex(d.hex) ? d.hex.toLowerCase() : undefined };
@@ -229,7 +235,11 @@ function cleanKind(kind: BoardKind, d: BoardData): BoardData {
       const rows = (Array.isArray(d.cells) ? d.cells : []).slice(0, TABLE_MAX_ROWS).map((r) => (Array.isArray(r) ? r : []));
       const cols = Math.min(TABLE_MAX_COLS, Math.max(1, ...rows.map((r) => r.length)));
       const cells = rows.map((r) => Array.from({ length: cols }, (_, i) => text(r[i], 1000) ?? ""));
-      return { cells: cells.length ? cells : [Array.from({ length: cols }, () => "")] };
+      return {
+        cells: cells.length ? cells : [Array.from({ length: cols }, () => "")],
+        title: text(d.title, 200) || undefined,
+        calc: d.calc === "budget" ? "budget" : undefined,
+      };
     }
   }
 }
@@ -492,6 +502,39 @@ export async function duplicateBoard(
     );
   }
   return boardIds.get(sourceId)!;
+}
+
+/** Remplit un tableau vide avec les six planches de départ (`starterKit`). */
+export async function fillStarter(db: SupabaseClient, boardId: string) {
+  const kit = starterKit();
+  // Les cartes « planche » créent leurs tableaux ; on remplit ensuite chacun d'eux.
+  await applyBoardOps(db, boardId, kit.items.map((item) => ({ op: "put" as const, item })), { role: "admin" });
+  await Promise.all(kit.planches.map((p) => applyBoardOps(db, p.boardId, p.items.map((item) => ({ op: "put" as const, item })), { role: "admin" })));
+}
+
+/**
+ * Le « Modèle des nouveaux tableaux » : un tableau que le studio modifie (check-list, budget…) ;
+ * chaque nouveau tableau en est une copie. Créé avec les six planches de départ la première fois.
+ */
+export async function templateBoardId(db: SupabaseClient) {
+  const { data } = await db
+    .from("boards")
+    .select("id")
+    .eq("is_template", true)
+    .is("parent_id", null)
+    .is("deleted_at", null)
+    .order("created_at")
+    .limit(1)
+    .maybeSingle();
+  if (data) return data.id as string;
+  const { data: created, error } = await db
+    .from("boards")
+    .insert({ title: "Modèle des nouveaux tableaux", is_template: true, share_slug: newSlug() })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+  await fillStarter(db, created.id as string);
+  return created.id as string;
 }
 
 /** Efface pour de bon les cartes supprimées depuis plus de 24 h (images, planches et discussions comprises). */

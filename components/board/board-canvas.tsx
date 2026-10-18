@@ -1809,23 +1809,55 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       if (selected !== it.id) setSelected(it.id);
       setEditing({ id: it.id, field: field(r, c) });
     };
+    // Colonne « Fait » : cases à cocher.
+    const doneCol = cells[0].findIndex((h) => h.trim().toLowerCase() === "fait");
+    const budget = it.data.calc === "budget" ? budgetFigures(cells) : null;
     return (
       <div className="px-2 pt-3 pb-2">
+        {it.data.title !== undefined && (
+          <p className="text-center font-semibold tracking-wide py-3" style={{ fontFamily: "var(--font-playfair), serif" }}>
+            {it.data.title}
+          </p>
+        )}
         <table className="w-full table-fixed border-collapse text-[12px] leading-snug">
           <tbody>
             {cells.map((row, r) => (
               <tr key={r}>
                 {row.map((cell, c) => {
                   const here = ed?.field === field(r, c);
+                  const auto = budget?.auto.get(`${r}:${c}`); // valeur calculée (budget)
+                  const tone = budget?.tone.get(`${r}:${c}`);
+                  if (doneCol === c && r > 0) {
+                    const on = cell.trim() !== "";
+                    return (
+                      <td key={c} className="border align-middle text-center px-2 py-1.5" style={{ borderColor: "color-mix(in srgb, currentColor 18%, transparent)" }}>
+                        <button
+                          data-nodrag
+                          disabled={!editable}
+                          onClick={() => setCells(cells.map((rr, i) => (i === r ? rr.map((x, j) => (j === c ? (on ? "" : "x") : x)) : rr)))}
+                          className={`w-[15px] h-[15px] rounded-[3px] border inline-flex items-center justify-center text-[10px] ${on ? "bg-emerald-500 border-emerald-500 text-white" : "border-muted"}`}
+                          aria-label={on ? "Décocher" : "Cocher"}
+                        >
+                          {on ? "✓" : ""}
+                        </button>
+                      </td>
+                    );
+                  }
                   return (
                     <td
                       key={c}
-                      data-nodrag={editable ? "" : undefined}
-                      onClick={editable && !here ? () => go(r, c) : undefined}
-                      className={`border border-current/15 align-top px-2 py-1.5 ${r === 0 ? "font-medium" : ""} ${editable ? "cursor-text" : ""}`}
-                      style={{ borderColor: "color-mix(in srgb, currentColor 18%, transparent)" }}
+                      data-nodrag={editable && !auto ? "" : undefined}
+                      onClick={editable && !here && !auto ? () => go(r, c) : undefined}
+                      className={`border border-current/15 align-top px-2 py-1.5 ${r === 0 || budget?.boldRows.has(r) ? "font-semibold" : ""} ${editable && !auto ? "cursor-text" : ""} ${auto ? "text-right tabular-nums" : ""}`}
+                      style={{
+                        borderColor: "color-mix(in srgb, currentColor 18%, transparent)",
+                        ...(r === 0 ? { background: "color-mix(in srgb, currentColor 10%, transparent)" } : null),
+                        ...(tone === "total" ? { background: "#b85445", color: "#fff" } : tone === "profit" ? { background: "#6fcf4f", color: "#1b1a19" } : tone === "loss" ? { background: "#e0533f", color: "#fff" } : null),
+                      }}
                     >
-                      {here ? (
+                      {auto ? (
+                        <span className={auto.computed ? "opacity-90" : ""}>{auto.text}</span>
+                      ) : here ? (
                         <AutoTextarea
                           value={cell}
                           onChange={(v) => setCells(cells.map((rr, i) => (i === r ? rr.map((x, j) => (j === c ? v : x)) : rr)))}
@@ -1956,12 +1988,61 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     );
   }
 
+  /**
+   * Budget : TOTAL d'une ligne = tarif × jours (si la case TOTAL est vide) ; ligne « TOTAL » = somme ;
+   * « BUDGET DU CLIENT » = saisi ; « BÉNÉFICE » = budget − total.
+   */
+  function budgetFigures(cells: string[][]) {
+    const num = (v: string) => {
+      const n = parseFloat(v.replace(/[\s€]/g, "").replace(",", "."));
+      return Number.isFinite(n) ? n : null;
+    };
+    const eur = (n: number) => n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
+    const label = (r: number) => cells[r][0].trim().toUpperCase();
+    const last = cells[0].length - 1;
+    const auto = new Map<string, { text: string; computed: boolean }>();
+    const tone = new Map<string, "total" | "profit" | "loss">();
+    const boldRows = new Set<number>();
+    const totalRow = cells.findIndex((_, r) => r > 0 && label(r) === "TOTAL");
+    const clientRow = cells.findIndex((_, r) => r > 0 && label(r).startsWith("BUDGET"));
+    const profitRow = cells.findIndex((_, r) => r > 0 && label(r).startsWith("BÉNÉFICE"));
+    let sum = 0;
+    cells.forEach((row, r) => {
+      if (r === 0 || r === totalRow || r === clientRow || r === profitRow) return;
+      const typed = num(row[last]);
+      const rate = num(row[1] ?? "");
+      const days = num(row[2] ?? "");
+      if (!row[last]?.trim() && rate !== null) {
+        const v = rate * (days ?? 1);
+        auto.set(`${r}:${last}`, { text: eur(v), computed: true });
+        sum += v;
+      } else if (typed !== null) sum += typed;
+      if (row[0] && row[0] === row[0].toUpperCase() && !rate && !days) boldRows.add(r); // titres de section (DÉPLACEMENTS)
+    });
+    if (totalRow > 0) {
+      auto.set(`${totalRow}:${last}`, { text: eur(sum), computed: true });
+      boldRows.add(totalRow);
+      cells[totalRow].forEach((_, c) => tone.set(`${totalRow}:${c}`, "total"));
+    }
+    const client = clientRow > 0 ? num(cells[clientRow][last]) : null;
+    if (clientRow > 0) boldRows.add(clientRow);
+    if (profitRow > 0) {
+      const profit = (client ?? 0) - sum;
+      auto.set(`${profitRow}:${last}`, { text: eur(profit), computed: true });
+      boldRows.add(profitRow);
+      tone.set(`${profitRow}:${last}`, profit < 0 ? "loss" : "profit");
+    }
+    return { auto, tone, boldRows };
+  }
+
   function renderTodo(it: BoardItem, editable: boolean, ed: Editing) {
     const entries = it.data.items ?? [];
     const done = entries.filter((e) => e.done).length;
     const setEntries = (next: typeof entries) => updateData(it.id, { items: next });
     const addAfter = (index: number) => {
-      const entry = { id: crypto.randomUUID(), text: "", done: false };
+      // Une nouvelle ligne garde le retrait de celle du dessus (sous-éléments à la suite).
+      const above = entries[index];
+      const entry = { id: crypto.randomUUID(), text: "", done: false, ...(above?.indent ? { indent: above.indent } : {}) };
       setEntries([...entries.slice(0, index + 1), entry, ...entries.slice(index + 1)]);
       setEditing({ id: it.id, field: entry.id });
     };
@@ -1990,7 +2071,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         </div>
         <ul className="space-y-1">
           {entries.map((entry, i) => (
-            <li key={entry.id} className="group/entry flex items-start gap-2">
+            <li key={entry.id} className="group/entry flex items-start gap-2" style={entry.indent ? { paddingLeft: entry.indent * 22 } : undefined}>
               <button
                 data-nodrag
                 disabled={!editable}
@@ -2006,9 +2087,17 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
                   onChange={(text) => setEntries(entries.map((x) => (x.id === entry.id ? { ...x, text } : x)))}
                   onDone={() => setEditing((c) => (c?.id === it.id && c.field === entry.id ? null : c))}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") {
+                    if (e.key === "Tab") {
+                      // Tab : en retrait (sous-élément) ; Maj + Tab : retour à gauche.
+                      e.preventDefault();
+                      const indent = Math.max(0, Math.min(2, (entry.indent ?? 0) + (e.shiftKey ? -1 : 1)));
+                      setEntries(entries.map((x) => (x.id === entry.id ? { ...x, indent: indent || undefined } : x)));
+                    } else if (e.key === "Enter") {
                       e.preventDefault();
                       addAfter(i);
+                    } else if (e.key === "Backspace" && !entry.text && entry.indent) {
+                      e.preventDefault();
+                      setEntries(entries.map((x) => (x.id === entry.id ? { ...x, indent: entry.indent! - 1 || undefined } : x)));
                     } else if (e.key === "Backspace" && !entry.text) {
                       e.preventDefault();
                       setEntries(entries.filter((x) => x.id !== entry.id));
