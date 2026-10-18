@@ -21,6 +21,8 @@ type Props = {
   watermark: boolean;
   downloadsEnabled: boolean;
   downloadWebEnabled: boolean;
+  /** Le client donne son e-mail avant de télécharger. */
+  downloadEmailRequired?: boolean;
   favoritesEnabled: boolean;
   cover: { src: string; width: number; height: number } | null;
   /** Deuxième photo (mise en page Diptyque). */
@@ -41,6 +43,9 @@ export function ClientGallery(props: Props) {
   const [favorites, setFavorites] = useState(() => new Set(props.favorites.photoIds));
   const [email, setEmail] = useState(props.favorites.email);
   const [askEmailFor, setAskEmailFor] = useState<string | null | undefined>(undefined);
+  // Téléchargement en attente de l'e-mail du client (option de la galerie).
+  const [askDownload, setAskDownload] = useState<(() => void) | null>(null);
+  const needEmail = Boolean(props.downloadEmailRequired) && !email;
   const [open, setOpen] = useState<number | null>(null);
   const [menu, setMenu] = useState(false);
   const [zip, setZip] = useState<{ done: number; total: number } | null>(null);
@@ -121,8 +126,9 @@ export function ClientGallery(props: Props) {
     if (top < 0) gridTop.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  async function startZip(collectionId: string | null) {
+  async function startZip(collectionId: string | null, emailGiven = false) {
     setMenu(false);
+    if (needEmail && !emailGiven) return setAskDownload(() => () => startZip(collectionId, true));
     try {
       await downloadArchive(props.slug, collectionId, (done, total) => setZip({ done, total }));
     } catch (e) {
@@ -325,6 +331,31 @@ export function ClientGallery(props: Props) {
           onToggleFavorite={toggleFavorite}
           downloadHref={props.downloadsEnabled ? (id, size) => `/api/g/${props.slug}/download?photo=${id}${size === "web" ? "&size=web" : ""}` : null}
           webDownload={props.downloadWebEnabled}
+          onDownload={(e, href) => {
+            if (!needEmail) return;
+            e.preventDefault();
+            setAskDownload(() => () => {
+              const a = document.createElement("a");
+              a.href = href;
+              a.download = "";
+              a.click();
+            });
+          }}
+        />
+      )}
+
+      {askDownload && (
+        <EmailDialog
+          slug={props.slug}
+          purpose="download"
+          onCancel={() => setAskDownload(null)}
+          onDone={(savedEmail, ids) => {
+            setEmail(savedEmail);
+            setFavorites(new Set(ids));
+            const go = askDownload;
+            setAskDownload(null);
+            go();
+          }}
         />
       )}
 
@@ -558,7 +589,17 @@ function Cover({
   }
 }
 
-function EmailDialog({ slug, onCancel, onDone }: { slug: string; onCancel: () => void; onDone: (email: string, ids: string[]) => void }) {
+function EmailDialog({
+  slug,
+  purpose = "favorites",
+  onCancel,
+  onDone,
+}: {
+  slug: string;
+  purpose?: "favorites" | "download";
+  onCancel: () => void;
+  onDone: (email: string, ids: string[]) => void;
+}) {
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -585,10 +626,12 @@ function EmailDialog({ slug, onCancel, onDone }: { slug: string; onCancel: () =>
         onClick={(e) => e.stopPropagation()}
         className="w-full sm:max-w-md bg-bg text-ink px-7 pt-10 pb-[max(env(safe-area-inset-bottom),2rem)] sm:p-12 animate-[fadeUp_0.4s_ease-out_both]"
       >
-        <HeartIcon className="w-5 h-5 mx-auto text-heart" filled />
-        <h2 className="display text-3xl text-center mt-5">Vos favoris</h2>
+        {purpose === "download" ? <DownloadIcon className="w-5 h-5 mx-auto" /> : <HeartIcon className="w-5 h-5 mx-auto text-heart" filled />}
+        <h2 className="display text-3xl text-center mt-5">{purpose === "download" ? "Téléchargement" : "Vos favoris"}</h2>
         <p className="text-sm text-muted text-center mt-3 leading-relaxed">
-          Indiquez votre e-mail pour enregistrer votre sélection et la retrouver plus tard.
+          {purpose === "download"
+            ? "Indiquez votre e-mail pour télécharger vos photos. Il ne vous sera demandé qu'une fois."
+            : "Indiquez votre e-mail pour enregistrer votre sélection et la retrouver plus tard."}
         </p>
         <input
           type="email"

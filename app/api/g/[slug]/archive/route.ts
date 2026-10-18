@@ -1,4 +1,4 @@
-import { loadAccessibleGallery, logDownload } from "@/lib/gallery-access";
+import { loadAccessibleGallery, logDownload, needsDownloadEmail } from "@/lib/gallery-access";
 import { downloadName } from "@/lib/photos";
 import { originalKey, presignGet } from "@/lib/storage";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -13,6 +13,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
   if ("error" in access) return access.error;
   const { gallery } = access;
   if (!gallery.downloads_enabled) return Response.json({ error: "Téléchargement désactivé" }, { status: 403 });
+  const noEmail = await needsDownloadEmail(gallery);
+  if (noEmail) return noEmail;
 
   const collectionId = new URL(req.url).searchParams.get("collection");
   const db = createServiceClient();

@@ -18,6 +18,7 @@ export function SettingsPanel({ gallery, onDelete }: { gallery: ManagedGallery; 
     watermark: gallery.watermark,
     downloads_enabled: gallery.downloadsEnabled,
     download_web_enabled: gallery.downloadWebEnabled,
+    download_email_required: gallery.downloadEmailRequired,
     favorites_enabled: gallery.favoritesEnabled,
     show_contact: gallery.design.show_contact,
   });
@@ -27,10 +28,11 @@ export function SettingsPanel({ gallery, onDelete }: { gallery: ManagedGallery; 
         watermark: gallery.watermark,
         downloads_enabled: gallery.downloadsEnabled,
         download_web_enabled: gallery.downloadWebEnabled,
+        download_email_required: gallery.downloadEmailRequired,
         favorites_enabled: gallery.favoritesEnabled,
         show_contact: gallery.design.show_contact,
       }),
-    [gallery.watermark, gallery.downloadsEnabled, gallery.downloadWebEnabled, gallery.favoritesEnabled, gallery.design.show_contact],
+    [gallery.watermark, gallery.downloadsEnabled, gallery.downloadWebEnabled, gallery.downloadEmailRequired, gallery.favoritesEnabled, gallery.design.show_contact],
   );
   const toggle = (key: keyof typeof opts) => (v: boolean) => {
     setOpts((o) => ({ ...o, [key]: v }));
@@ -83,6 +85,12 @@ export function SettingsPanel({ gallery, onDelete }: { gallery: ManagedGallery; 
             onChange={toggle("download_web_enabled")}
             label="Proposer aussi la taille web"
             hint="En plus de la haute définition, le client peut télécharger une version légère (2000 px), idéale pour les réseaux sociaux."
+          />
+          <Toggle
+            checked={opts.download_email_required}
+            onChange={toggle("download_email_required")}
+            label="Demander l'e-mail avant le téléchargement"
+            hint="Le client indique son e-mail une seule fois avant de télécharger. Les adresses arrivent dans Outils → Clients & e-mails."
           />
         </div>
         <div className="mt-6"><SaveStatus status={status} /></div>

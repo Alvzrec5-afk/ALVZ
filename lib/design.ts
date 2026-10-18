@@ -132,7 +132,7 @@ export function themeAttr(d: Pick<GalleryDesign, "color_theme" | "color_follow_d
 /** Valide une modification envoyée par le studio (hors design) : seules les clés et valeurs connues passent. */
 export function sanitizeSettingsPatch(patch: Record<string, unknown>) {
   const out: Record<string, unknown> = {};
-  for (const key of ["watermark", "downloads_enabled", "download_web_enabled", "favorites_enabled"]) {
+  for (const key of ["watermark", "downloads_enabled", "download_web_enabled", "download_email_required", "favorites_enabled"]) {
     if (typeof patch[key] === "boolean") out[key] = patch[key];
   }
   if (typeof patch.title === "string" && patch.title.trim()) out.title = patch.title.trim().slice(0, 200);

@@ -65,7 +65,7 @@ Vidéos, Coordonnées, Outils → Clients & e-mails, Déconnexion) ; sur mobile 
 - Page galerie façon Pixieset : `gallery-manager.tsx` (barre du haut, colonne gauche avec couverture,
   onglets, `collections-sidebar.tsx` glisser-déposer), `photos-panel.tsx` (envoi, tri, couverture,
   suppression, visionneuse `admin-viewer.tsx`), `design-panel.tsx` (12 couvertures, polices, couleurs,
-  grilles), `settings-panel.tsx` (lien, mot de passe, expiration, téléchargements, favoris, filigrane,
+  grilles), `settings-panel.tsx` (lien, mot de passe, expiration, téléchargements (option « Demander l'e-mail avant le téléchargement » = `galleries.download_email_required` : même fenêtre / liste `favorite_lists` que les favoris, contrôlée par `needsDownloadEmail` dans les routes download et archive), favoris, filigrane,
   carte de visite), activité (favoris + téléchargements).
 - Vidéos : `app/admin/(protected)/videos/` — projets vidéo = galeries avec `kind = 'video'`
   (onglets Vidéos / Design / Paramètres). `videos-panel.tsx` : envoi, fiche vidéo (lien direct,

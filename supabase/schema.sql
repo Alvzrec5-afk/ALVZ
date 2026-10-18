@@ -371,3 +371,6 @@ language sql stable security invoker set search_path = '' as $$
   ) t
   group by t.gallery_id;
 $$;
+
+-- Téléchargement : demander l'e-mail du client avant (pour récupérer les adresses).
+alter table public.galleries add column if not exists download_email_required boolean not null default false;

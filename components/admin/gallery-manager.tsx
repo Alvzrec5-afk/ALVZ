@@ -30,6 +30,7 @@ export type ManagedGallery = {
   watermark: boolean;
   downloadsEnabled: boolean;
   downloadWebEnabled: boolean;
+  downloadEmailRequired: boolean;
   favoritesEnabled: boolean;
   design: GalleryDesign;
   kind: "photo" | "video";

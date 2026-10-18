@@ -9,7 +9,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   const access = await loadAccessibleGallery(slug);
   if ("error" in access) return access.error;
   const { gallery } = access;
-  if (!gallery.favorites_enabled) return Response.json({ error: "Favoris désactivés" }, { status: 403 });
+  // Même identification pour les favoris et pour le téléchargement (option « demander l'e-mail »).
+  const forDownload = gallery.downloads_enabled && gallery.download_email_required;
+  if (!gallery.favorites_enabled && !forDownload) return Response.json({ error: "Favoris désactivés" }, { status: 403 });
 
   const { email } = (await req.json().catch(() => ({}))) as { email?: string };
   const clean = String(email ?? "").trim().toLowerCase();

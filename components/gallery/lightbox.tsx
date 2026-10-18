@@ -28,6 +28,7 @@ export function Lightbox({
   onToggleFavorite,
   downloadHref,
   webDownload,
+  onDownload,
 }: {
   photos: PhotoView[];
   index: number;
@@ -38,6 +39,8 @@ export function Lightbox({
   onToggleFavorite: (id: string) => void;
   downloadHref: ((id: string, size?: "hd" | "web") => string) | null;
   webDownload: boolean;
+  /** Avant chaque téléchargement (ex. demander l'e-mail du client). */
+  onDownload?: (e: React.MouseEvent, href: string) => void;
 }) {
   const photo = photos[index];
   const [loaded, setLoaded] = useState(false);
@@ -191,7 +194,7 @@ export function Lightbox({
             </button>
           )}
           {downloadHref && !webDownload && (
-            <a className="icon-btn" href={downloadHref(photo.id)} download aria-label="Télécharger en HD">
+            <a className="icon-btn" href={downloadHref(photo.id)} download aria-label="Télécharger en HD" onClick={(e) => onDownload?.(e, downloadHref(photo.id))}>
               <DownloadIcon />
             </a>
           )}
@@ -202,10 +205,16 @@ export function Lightbox({
               </button>
               {sizeMenu && (
                 <div className="absolute right-0 mt-1 w-52 bg-bg-soft border border-line py-1 shadow-xl text-sm z-30 animate-[fadeUp_0.2s_ease-out_both]">
-                  <a className="block px-4 py-3 hover:bg-bg" href={downloadHref(photo.id, "hd")} download onClick={() => setSizeMenu(false)}>
+                  <a className="block px-4 py-3 hover:bg-bg" href={downloadHref(photo.id, "hd")} download onClick={(e) => {
+                    setSizeMenu(false);
+                    onDownload?.(e, downloadHref(photo.id, "hd"));
+                  }}>
                     Haute définition
                   </a>
-                  <a className="block px-4 py-3 hover:bg-bg" href={downloadHref(photo.id, "web")} download onClick={() => setSizeMenu(false)}>
+                  <a className="block px-4 py-3 hover:bg-bg" href={downloadHref(photo.id, "web")} download onClick={(e) => {
+                    setSizeMenu(false);
+                    onDownload?.(e, downloadHref(photo.id, "web"));
+                  }}>
                     Taille web <span className="text-muted text-xs">(réseaux sociaux)</span>
                   </a>
                 </div>

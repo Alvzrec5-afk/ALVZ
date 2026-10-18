@@ -18,10 +18,11 @@ export type PublicGallery = {
   downloads_enabled: boolean;
   favorites_enabled: boolean;
   download_web_enabled: boolean;
+  download_email_required: boolean;
   design: Record<string, unknown> | null;
 } & Omit<GalleryDesign, "nav_style" | "show_contact">;
 
-export const GALLERY_FIELDS = `id, kind, slug, title, event_date, cover_photo_id, password_hash, expires_at, watermark, downloads_enabled, favorites_enabled, download_web_enabled, ${DESIGN_FIELDS}`;
+export const GALLERY_FIELDS = `id, kind, slug, title, event_date, cover_photo_id, password_hash, expires_at, watermark, downloads_enabled, favorites_enabled, download_web_enabled, download_email_required, ${DESIGN_FIELDS}`;
 
 /** Une seule lecture par requête (titre de l'onglet et page la partagent). */
 export const findGalleryBySlug = cache(async (slug: string) => {
@@ -102,6 +103,13 @@ export async function visitorEmail(g: PublicGallery) {
   if (!listId) return null;
   const { data } = await createServiceClient().from("favorite_lists").select("email").eq("id", listId).maybeSingle();
   return (data?.email as string | undefined) ?? null;
+}
+
+/** Téléchargement réservé aux visiteurs qui ont donné leur e-mail (option de la galerie). */
+export async function needsDownloadEmail(g: PublicGallery) {
+  if (!g.download_email_required) return null;
+  if (await visitorEmail(g)) return null;
+  return Response.json({ error: "E-mail requis" }, { status: 401 });
 }
 
 /** Enregistre un téléchargement (sans jamais bloquer le téléchargement en cas d'erreur). */
