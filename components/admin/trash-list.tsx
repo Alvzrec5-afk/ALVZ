@@ -6,6 +6,7 @@ import { purgeTrashedBoard, restoreFromTrash } from "@/app/admin/board-actions";
 import { BoardIcon, FilmIcon, ImageIcon } from "@/components/icons";
 import { formatBytes } from "@/lib/format";
 import { purge } from "./purge";
+import { deleteInBackground, useHidden } from "./background";
 
 export type TrashEntry = { kind: "gallery" | "video" | "board"; id: string; title: string; deletedAt: string; bytes: number };
 
@@ -25,7 +26,8 @@ export function TrashList({ entries }: { entries: TrashEntry[] }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [gone, setGone] = useState<Set<string>>(new Set());
   const cleaned = useRef(false);
-  const visible = entries.filter((e) => !gone.has(e.id));
+  const hiddenIds = useHidden();
+  const visible = entries.filter((e) => !gone.has(e.id) && !hiddenIds.has(e.id));
 
   async function erase(e: TrashEntry) {
     if (e.kind === "board") {
@@ -50,35 +52,28 @@ export function TrashList({ entries }: { entries: TrashEntry[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function restore(e: TrashEntry) {
-    setBusy(`Restauration de « ${e.title} »…`);
-    const res = await restoreFromTrash(e.kind === "board" ? "board" : "gallery", e.id);
-    setBusy(null);
-    if (res.error) return alert(res.error);
-    setGone((g) => new Set(g).add(e.id));
-    startTransition(() => router.refresh());
+  // Tout disparaît de la liste tout de suite ; le travail se fait en arrière-plan.
+  const refresh = () => startTransition(() => router.refresh());
+
+  function restore(e: TrashEntry) {
+    deleteInBackground([e.id], () => restoreFromTrash(e.kind === "board" ? "board" : "gallery", e.id), refresh);
   }
 
-  async function eraseNow(e: TrashEntry) {
+  function eraseNow(e: TrashEntry) {
     if (!confirm(`Supprimer définitivement « ${e.title} » ? Cette fois, ce sera impossible à récupérer.`)) return;
-    setBusy(`Suppression de « ${e.title} »…`);
-    try {
-      await erase(e);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : String(err));
-    }
-    setBusy(null);
-    startTransition(() => router.refresh());
+    deleteInBackground([e.id], () => erase(e), refresh);
   }
 
-  async function emptyAll() {
+  function emptyAll() {
     if (!confirm(`Vider la corbeille ? Les ${visible.length} éléments seront supprimés définitivement.`)) return;
-    for (const e of visible) {
-      setBusy(`Suppression de « ${e.title} »…`);
-      await erase(e).catch(() => undefined);
-    }
-    setBusy(null);
-    startTransition(() => router.refresh());
+    const list = [...visible];
+    deleteInBackground(
+      list.map((e) => e.id),
+      async () => {
+        for (const e of list) await erase(e).catch(() => undefined);
+      },
+      refresh,
+    );
   }
 
   const total = visible.reduce((n, e) => n + e.bytes, 0);

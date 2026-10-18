@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { deleteBoard, duplicateBoard, updateBoard } from "@/app/admin/board-actions";
 import { DotsIcon } from "@/components/icons";
+import { deleteInBackground, useHidden } from "./background";
 
 /** Menu ⋯ d'un tableau dans la liste : renommer, dupliquer, supprimer. */
 export function BoardCardMenu({ id, title }: { id: string; title: string }) {
@@ -12,6 +13,13 @@ export function BoardCardMenu({ id, title }: { id: string; title: string }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const refresh = () => startTransition(() => router.refresh());
+  // Tableau en cours de mise à la corbeille : sa vignette disparaît tout de suite de la liste.
+  const box = useRef<HTMLDivElement>(null);
+  const isHidden = useHidden().has(id);
+  useEffect(() => {
+    const li = box.current?.closest("li");
+    if (li) li.style.display = isHidden ? "none" : "";
+  }, [isHidden]);
 
   async function rename() {
     setOpen(false);
@@ -38,15 +46,11 @@ export function BoardCardMenu({ id, title }: { id: string; title: string }) {
   async function remove() {
     setOpen(false);
     if (!confirm(`Mettre le tableau « ${title} » à la corbeille ? Vous pourrez le restaurer pendant 30 jours.`)) return;
-    setBusy("Suppression…");
-    const res = await deleteBoard(id, { stay: true });
-    setBusy(null);
-    if (res?.error) alert(res.error);
-    else refresh();
+    deleteInBackground([id], () => deleteBoard(id, { stay: true }), refresh);
   }
 
   return (
-    <div className="absolute top-2 right-2 z-10">
+    <div ref={box} className="absolute top-2 right-2 z-10">
       {busy ? (
         <span className="block px-3 py-1.5 bg-bg/90 border border-line text-[11px] text-muted">{busy}</span>
       ) : (

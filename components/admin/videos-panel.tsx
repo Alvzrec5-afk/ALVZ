@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { deleteInBackground } from "./background";
 import { deleteVideo, deleteVideoComment, setVideoCommentResolved, updateVideo } from "@/app/admin/actions";
 import type { VideoComment, VideoView } from "@/lib/types";
 import { VideoUploader } from "@/lib/client/video-uploader";
@@ -237,10 +238,8 @@ function VideoDetail({ galleryId, slug, video, onBack }: { galleryId: string; sl
             className="mt-10 text-sm text-danger hover:opacity-80"
             onClick={async () => {
               if (!confirm(`Supprimer définitivement « ${video.title} » ?`)) return;
-              setBusy(true);
-              await deleteVideo(galleryId, video.id);
+              deleteInBackground([video.id], () => deleteVideo(galleryId, video.id), () => router.refresh());
               onBack();
-              router.refresh();
             }}
           >
             Supprimer la vidéo

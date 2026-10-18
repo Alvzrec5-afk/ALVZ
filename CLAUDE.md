@@ -144,6 +144,11 @@ Navigation : dans un tableau (plein écran), bouton ☰ « Studio » à gauche d
 Page client `/t/…` vue par le studio connecté (`isStudioSession`, `lib/auth.ts`) : logo → /admin et bouton
 « Retour au studio » (ouvre le même tableau dans le studio) ; les clients ne voient rien de plus.
 
+**Suppressions fluides** (`components/admin/background.tsx`) : `deleteInBackground(ids, tâche, fin)` masque tout
+de suite (`useHidden`, filtré dans `gallery-grid`, `gallery-manager`, liste des tableaux, corbeille) et fait le
+travail en arrière-plan ; pastille « Suppression en cours… » (`BackgroundStatus` dans `admin-shell`) ; en cas
+d'échec, l'élément réapparaît. Utilisé pour galeries, photos, collections, vidéos, tableaux, corbeille.
+
 **Galerie client (`/g/<lien>`)** — `components/gallery/client-gallery.tsx` : couverture animée,
 en-tête collant (Contacter, ♡ sélection, menu), grilles (`justified-grid.tsx`), visionneuse
 (`lightbox.tsx`), ZIP, favoris (e-mail demandé), onglet « Vidéos », carte de visite. Thème qui suit

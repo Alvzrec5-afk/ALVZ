@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { GridIcon, LockIcon, MenuIcon } from "@/components/icons";
 import { formatBytes } from "@/lib/format";
 import { trashGallery } from "@/app/admin/actions";
+import { deleteInBackground, useHidden } from "./background";
 
 export type GalleryCard = {
   id: string;
@@ -56,7 +57,9 @@ const LABELS = {
   video: { title: "Vidéos", one: "projet", newHref: "/admin/videos/new", newLabel: "Nouveau projet", first: "Créer votre premier projet vidéo", unit: "vidéo", empty: "Aucune vidéo", manage: "Gérer les vidéos", view: "Voir comme le client" },
 } as const;
 
-export function GalleryGrid({ galleries, kind = "photo" }: { galleries: GalleryCard[]; kind?: "photo" | "video" }) {
+export function GalleryGrid({ galleries: all, kind = "photo" }: { galleries: GalleryCard[]; kind?: "photo" | "video" }) {
+  const hiddenIds = useHidden();
+  const galleries = all.filter((g) => !hiddenIds.has(g.id)); // en cours de mise à la corbeille
   const L = LABELS[kind];
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -82,7 +85,8 @@ export function GalleryGrid({ galleries, kind = "photo" }: { galleries: GalleryC
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return galleries.filter((g) => !q || g.title.toLowerCase().includes(q)).sort(SORTS[sort].fn);
-  }, [galleries, query, sort]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [all, hiddenIds.size, query, sort]);
 
   async function copyLink(g: GalleryCard) {
     await navigator.clipboard.writeText(`${window.location.origin}/g/${g.slug}`);
@@ -94,11 +98,8 @@ export function GalleryGrid({ galleries, kind = "photo" }: { galleries: GalleryC
   async function remove(g: GalleryCard) {
     setMenu(null);
     if (!confirm(`Mettre « ${g.title} » à la corbeille ? Vous pourrez la restaurer pendant 30 jours.`)) return;
-    setBusy(g.id);
     try {
-      const res = await trashGallery(g.id);
-      if (res.error) throw new Error(res.error);
-      router.refresh();
+      deleteInBackground([g.id], () => trashGallery(g.id), () => router.refresh());
     } catch (e) {
       alert(e instanceof Error ? e.message : String(e));
     } finally {

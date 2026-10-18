@@ -9,6 +9,7 @@ import { setCover } from "@/app/admin/actions";
 import type { Collection, PhotoView } from "@/lib/types";
 import { CloseIcon, DotsIcon, GridIcon, HeartIcon, PlusCircleIcon, SortIcon } from "@/components/icons";
 import { UploadPanel } from "./upload-panel";
+import { deleteInBackground } from "./background";
 import { AdminViewer } from "./admin-viewer";
 import { CollectionMenu, post, promptNewCollection, useRun } from "./collection-menu";
 
@@ -175,7 +176,9 @@ export function PhotosPanel(props: Props) {
                   downloads={props.downloadCounts[p.id] ?? 0}
                   onCover={() => run(() => setCover(props.galleryId, p.id))}
                   onDelete={() => {
-                    if (confirm(`Supprimer ${p.filename} ?`)) run(() => post("/api/admin/photos/delete", { photoIds: [p.id] }));
+                    if (confirm(`Supprimer ${p.filename} ?`)) {
+                      deleteInBackground([p.id], () => post("/api/admin/photos/delete", { photoIds: [p.id] }), () => router.refresh());
+                    }
                   }}
                 />
               ))}
@@ -199,17 +202,12 @@ export function PhotosPanel(props: Props) {
             router.refresh();
           }}
           onDelete={async (p) => {
-            try {
-              await post("/api/admin/photos/delete", { photoIds: [p.id] });
-            } catch (e) {
-              alert(e instanceof Error ? e.message : String(e));
-              return;
-            }
+            // La photo disparaît tout de suite ; suppression des fichiers en arrière-plan.
+            deleteInBackground([p.id], () => post("/api/admin/photos/delete", { photoIds: [p.id] }), () => router.refresh());
             const remaining = order.filter((o) => o.id !== p.id);
             setOrder(remaining);
             if (remaining.length === 0) setViewer(null);
             else setViewer(Math.min(viewer, remaining.length - 1));
-            router.refresh();
           }}
         />
       )}

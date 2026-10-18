@@ -17,6 +17,7 @@ const STUDIO = [
 ];
 import { Wordmark } from "@/components/wordmark";
 import { Toggle } from "./ui";
+import { deleteInBackground } from "./background";
 
 type Board = {
   id: string;
@@ -191,7 +192,10 @@ export function BoardHeader({
                 className="block w-full text-left px-4 py-3 text-danger hover:bg-bg"
                 onClick={() => {
                   setPlus(false);
-                  if (confirm(`Mettre le tableau « ${board.title} » à la corbeille ? Vous pourrez le restaurer pendant 30 jours.`)) void deleteBoard(board.id);
+                  if (confirm(`Mettre le tableau « ${board.title} » à la corbeille ? Vous pourrez le restaurer pendant 30 jours.`)) {
+                    deleteInBackground([board.id], () => deleteBoard(board.id, { stay: true }), () => router.refresh());
+                    router.push("/admin/boards");
+                  }
                 }}
               >
                 Supprimer le tableau

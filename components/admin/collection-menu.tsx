@@ -6,6 +6,7 @@ import { arrayMove } from "@dnd-kit/sortable";
 import { addCollection, renameCollection, reorderCollections } from "@/app/admin/actions";
 import type { Collection } from "@/lib/types";
 import { purge } from "./purge";
+import { deleteInBackground } from "./background";
 
 export async function post(path: string, body: unknown) {
   const res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -61,6 +62,7 @@ export function CollectionMenu({
   vertical?: boolean;
   className?: string;
 }) {
+  const router = useRouter();
   const move = (dir: -1 | 1) =>
     run(async () => {
       const ids = collections.map((c) => c.id);
@@ -101,7 +103,10 @@ export function CollectionMenu({
         <button
           className={`${item} text-danger`}
           onClick={() => {
-            if (confirm(`Supprimer la collection « ${collection.name} » et ses ${count} photos ?`)) run(() => purge("collection", collection.id));
+            if (confirm(`Supprimer la collection « ${collection.name} » et ses ${count} photos ?`)) {
+              onClose();
+              deleteInBackground([collection.id], () => purge("collection", collection.id), () => router.refresh());
+            }
           }}
         >
           Supprimer la collection

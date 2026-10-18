@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Wordmark } from "@/components/wordmark";
+import { BackgroundStatus } from "./background";
 import { BoardIcon, TrashIcon, CardIcon, CloseIcon, FilmIcon, ImageIcon, LogoutIcon, MegaphoneIcon, MenuIcon } from "@/components/icons";
 
 const NAV = [
@@ -28,7 +29,13 @@ export function AdminShell({ children, signOut }: { children: React.ReactNode; s
   const boardPage = /^\/admin\/boards\/(?!new)[^/]+/.test(pathname);
   const [menu, setMenu] = useState(false);
 
-  if (boardPage) return <main className="h-svh">{children}</main>;
+  if (boardPage)
+    return (
+      <main className="h-svh">
+        {children}
+        <BackgroundStatus />
+      </main>
+    );
 
   return (
     <div className="min-h-svh">
@@ -103,6 +110,7 @@ export function AdminShell({ children, signOut }: { children: React.ReactNode; s
       >
         {children}
       </main>
+      <BackgroundStatus />
     </div>
   );
 }

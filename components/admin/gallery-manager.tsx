@@ -15,6 +15,7 @@ import { SettingsPanel } from "./settings-panel";
 import { FavoritesPanel } from "./favorites-panel";
 import { DownloadsPanel, type DownloadRow } from "./downloads-panel";
 import { trashGallery } from "@/app/admin/actions";
+import { deleteInBackground, useHidden } from "./background";
 import { openGalleryBoard } from "@/app/admin/board-actions";
 
 export type ManagedGallery = {
@@ -52,7 +53,15 @@ const TABS = [
   { id: "activity", label: "Activité", Icon: HeartIcon },
 ] as const;
 
-export function GalleryManager(props: Props) {
+export function GalleryManager(raw: Props) {
+  // Photos, collections et vidéos en cours de suppression : déjà masquées.
+  const hiddenIds = useHidden();
+  const props: Props = {
+    ...raw,
+    collections: raw.collections.filter((c) => !hiddenIds.has(c.id)),
+    photos: raw.photos.filter((p) => !hiddenIds.has(p.id) && !hiddenIds.has(p.collectionId)),
+    videos: raw.videos.filter((v) => !hiddenIds.has(v.id)),
+  };
   const { gallery } = props;
   const router = useRouter();
   const isVideo = gallery.kind === "video";
@@ -98,16 +107,9 @@ export function GalleryManager(props: Props) {
     setMenu(false);
     setPlus(false);
     if (!confirm(`Mettre « ${gallery.title} » à la corbeille ? Vous pourrez la restaurer pendant 30 jours.`)) return;
-    setDeleting(true);
-    try {
-      const res = await trashGallery(gallery.id);
-      if (res.error) throw new Error(res.error);
-      router.replace(home);
-      router.refresh();
-    } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
-      setDeleting(false);
-    }
+    // Retour immédiat à la liste (la galerie n'y apparaît plus) ; la mise à la corbeille se fait en arrière-plan.
+    deleteInBackground([gallery.id], () => trashGallery(gallery.id), () => router.refresh());
+    router.replace(home);
   }
 
   const status = gallery.expired ? "bg-danger" : filled ? "bg-emerald-500" : "bg-muted";
