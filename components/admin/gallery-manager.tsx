@@ -85,34 +85,8 @@ export function GalleryManager(raw: Props) {
     if (d.kind === "photo" && d.photo_id) acc[d.photo_id] = (acc[d.photo_id] ?? 0) + 1;
     return acc;
   }, {});
-  // Téléchargements regroupés par personne (colonne de gauche) : photos prises seules ou dans un ZIP.
-  const downloaders = (() => {
-    const map = new Map<string, { key: string; label: string; ids: Set<string>; singles: number; zips: number; last: string }>();
-    for (const d of props.downloads) {
-      const key = d.email ?? "";
-      const p = map.get(key) ?? { key, label: d.email ?? "Visiteurs non identifiés", ids: new Set<string>(), singles: 0, zips: 0, last: d.created_at };
-      if (d.kind === "photo") {
-        p.singles++;
-        if (d.photo_id) p.ids.add(d.photo_id);
-      } else {
-        p.zips++;
-        props.photos.filter((ph) => !d.collection_id || ph.collectionId === d.collection_id).forEach((ph) => p.ids.add(ph.id));
-      }
-      if (d.created_at > p.last) p.last = d.created_at;
-      map.set(key, p);
-    }
-    // Personnes identifiées d'abord (la plus récente en haut), puis les visiteurs anonymes.
-    return [...map.values()].sort((a, b) => Number(a.key === "") - Number(b.key === "") || b.last.localeCompare(a.last));
-  })();
-  const favoritePeople = props.favoriteLists
-    .filter((l) => l.photoIds.length > 0)
-    .map((l) => ({ key: l.email, label: l.email, ids: new Set(l.photoIds), zips: 0 }));
-  // Personne choisie dans la colonne de gauche (« dl:e-mail » ou « fav:e-mail ») : ses photos s'affichent à droite.
-  const [downloader, setDownloader] = useState<string | null>(null);
+  const favoritePeople = props.favoriteLists.filter((l) => l.photoIds.length > 0);
   const [activity, setActivity] = useState<"dl" | "fav">("dl");
-  const shownDownloader =
-    [...downloaders.map((p) => ({ ...p, key: `dl:${p.key}`, label: `${p.label} · téléchargées` })),
-     ...favoritePeople.map((p) => ({ ...p, key: `fav:${p.key}`, label: `${p.label} · favoris` }))].find((p) => p.key === downloader) ?? null;
   const [copied, setCopied] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -146,46 +120,23 @@ export function GalleryManager(raw: Props) {
     l.photoIds.forEach((id) => (acc[id] = (acc[id] ?? 0) + 1));
     return acc;
   }, {});
-  const openTab = (id: (typeof TABS)[number]["id"]) => {
-    setTab(id);
-    setDownloader(null);
-  };
-  /** Colonne de gauche de l'onglet Activités : rubriques, et sous la rubrique ouverte, une ligne par personne. */
+  const openTab = (id: (typeof TABS)[number]["id"]) => setTab(id);
+  /** Colonne de gauche de l'onglet Activités (comme Pixieset). */
   const activitySidebar = () => (
     <div className="pb-6">
       <p className="eyebrow text-muted px-6 h-14 flex items-center">Activités</p>
       {([
-        ["dl", "Activité de téléchargement", DownloadIcon, downloaders],
-        ["fav", "Activité des favoris", HeartIcon, favoritePeople],
-      ] as const).map(([kind, label, Icon, people]) => (
+        ["dl", "Activité de téléchargement", DownloadIcon],
+        ["fav", "Activité des favoris", HeartIcon],
+      ] as const).map(([kind, label, Icon]) => (
         <div key={kind}>
           <button
-            onClick={() => {
-              setActivity(kind);
-              setDownloader(null);
-            }}
-            className={`w-full flex items-center gap-4 px-6 h-14 text-[15px] transition-colors ${activity === kind && !downloader ? "bg-bg-soft text-ink" : activity === kind ? "text-ink" : "text-muted hover:text-ink"}`}
+            onClick={() => setActivity(kind)}
+            className={`w-full flex items-center gap-4 px-6 h-14 text-[15px] transition-colors ${activity === kind ? "bg-bg-soft text-ink" : "text-muted hover:text-ink"}`}
           >
             <Icon className="w-5 h-5" />
             <span className="flex-1 text-left">{label}</span>
           </button>
-          {activity === kind &&
-            people.map((p) => {
-              const key = `${kind}:${p.key}`;
-              return (
-                <button
-                  key={key}
-                  onClick={() => setDownloader(key)}
-                  className={`w-full text-left pl-[60px] pr-6 py-2.5 transition-colors ${downloader === key ? "bg-bg-soft text-ink" : "text-muted hover:text-ink"}`}
-                >
-                  <span className={`block truncate text-sm ${p.key ? "" : "italic"}`}>{p.label}</span>
-                  <span className="block text-xs text-muted mt-0.5">
-                    {p.ids.size} photo{p.ids.size > 1 ? "s" : ""}
-                    {p.zips ? ` · ${p.zips} ZIP` : ""}
-                  </span>
-                </button>
-              );
-            })}
         </div>
       ))}
     </div>
@@ -366,7 +317,7 @@ export function GalleryManager(raw: Props) {
 
       <div className="pt-6 lg:pt-8 lg:flex-1 lg:overflow-y-auto lg:px-10 lg:pb-16">
       <div className={tab === "photos" || tab === "videos" ? "" : "lg:max-w-2xl"}>
-        {(tab === "photos" || shownDownloader) && (
+        {tab === "photos" && (
           <PhotosPanel
             activeId={activeCollection}
             onActive={setActiveCollection}
@@ -376,14 +327,13 @@ export function GalleryManager(raw: Props) {
             photos={props.photos}
             positions={props.positions}
             downloadCounts={downloadCounts}
-            filter={shownDownloader ? { label: shownDownloader.label, ids: shownDownloader.ids, onClear: () => setDownloader(null) } : null}
             favoriteCounts={favoriteCounts}
           />
         )}
         {tab === "videos" && <VideosPanel galleryId={gallery.id} slug={gallery.slug} watermark={gallery.watermark} videos={props.videos} />}
         {tab === "design" && <DesignPanel gallery={gallery} photos={props.photos} />}
         {tab === "settings" && <SettingsPanel gallery={gallery} onDelete={remove} />}
-        {tab === "activity" && !shownDownloader && (
+        {tab === "activity" && (
           <div>
             {/* Téléphone : pas de colonne de gauche, les deux rubriques en haut */}
             <div className="flex border border-line mb-10 lg:hidden">
@@ -401,7 +351,7 @@ export function GalleryManager(raw: Props) {
               ))}
             </div>
             {activity === "dl" ? (
-              <DownloadsPanel downloads={props.downloads} photos={props.photos} collections={props.collections} />
+              <DownloadsPanel downloads={props.downloads} photos={props.photos} collections={props.collections} videos={props.videos} galleryTitle={gallery.title} />
             ) : (
               <FavoritesPanel lists={props.favoriteLists} photos={props.photos} collections={props.collections} />
             )}
