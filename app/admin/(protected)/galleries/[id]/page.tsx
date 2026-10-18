@@ -14,16 +14,15 @@ export default async function GalleryPage({ params }: { params: Promise<{ id: st
   const { id } = await params;
   const { supabase } = await requireAdminPage();
 
-  const { data: g } = await supabase
-    .from("galleries")
-    .select(
-      `id, slug, title, event_date, cover_photo_id, password_hash, expires_at, watermark, downloads_enabled, download_web_enabled, favorites_enabled, ${DESIGN_FIELDS}`,
-    )
-    .eq("id", id)
-    .maybeSingle();
-  if (!g) notFound();
-
-  const [{ data: collections }, { data: photos }, { data: lists }, { data: downloads }] = await Promise.all([
+  // Toutes les requêtes partent en même temps (une seule attente au lieu de deux).
+  const [{ data: g }, { data: collections }, { data: photos }, { data: lists }, { data: downloads }] = await Promise.all([
+    supabase
+      .from("galleries")
+      .select(
+        `id, slug, title, event_date, cover_photo_id, password_hash, expires_at, watermark, downloads_enabled, download_web_enabled, favorites_enabled, ${DESIGN_FIELDS}`,
+      )
+      .eq("id", id)
+      .maybeSingle(),
     supabase.from("collections").select("id, name, position").eq("gallery_id", id).order("position"),
     supabase.from("photos").select(PHOTO_FIELDS).eq("gallery_id", id).eq("status", "ready").order("position"),
     supabase
@@ -38,6 +37,7 @@ export default async function GalleryPage({ params }: { params: Promise<{ id: st
       .order("created_at", { ascending: false })
       .limit(1000),
   ]);
+  if (!g) notFound();
 
   const views = await toPhotoViews((photos ?? []) as PhotoRow[], false);
   const positions = Object.fromEntries((photos ?? []).map((p) => [p.id, p.position as number]));

@@ -6,7 +6,7 @@ export function StorageMeter({ used, limit }: { used: number; limit: number }) {
   const level = pct >= 95 ? "danger" : pct >= 80 ? "warn" : "ok";
   const bar = level === "danger" ? "bg-danger" : level === "warn" ? "bg-amber-400" : "bg-emerald-500";
   return (
-    <div className="mb-10 border border-line px-4 py-4 sm:px-5">
+    <div className="border border-line px-4 py-4 sm:px-5">
       <div className="flex items-baseline justify-between gap-3">
         <span className="eyebrow text-muted">Stockage</span>
         <span className="text-sm">

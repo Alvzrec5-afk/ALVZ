@@ -23,7 +23,6 @@ export function LoginForm({ initialError }: { initialError: string | null }) {
       return;
     }
     router.replace("/admin");
-    router.refresh();
   }
 
   return (

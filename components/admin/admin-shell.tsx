@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { Wordmark } from "@/components/wordmark";
-import { CardIcon, ImageIcon, LogoutIcon, MegaphoneIcon } from "@/components/icons";
+import { CardIcon, CloseIcon, ImageIcon, LogoutIcon, MegaphoneIcon, MenuIcon } from "@/components/icons";
 
 const NAV = [
   { href: "/admin", label: "Galeries", Icon: ImageIcon, match: (p: string) => p === "/admin" || p.startsWith("/admin/galleries") },
@@ -18,29 +19,48 @@ const TOOLS = [{ href: "/admin/clients", label: "Clients & e-mails", Icon: Megap
 export function AdminShell({ children, signOut }: { children: React.ReactNode; signOut: () => Promise<void> }) {
   const pathname = usePathname();
   const galleryPage = /^\/admin\/galleries\/(?!new)[^/]+/.test(pathname);
+  const [menu, setMenu] = useState(false);
 
   return (
     <div className="min-h-svh">
+      {/* Mobile : logo au milieu ; menu ☰ sur les pages principales (pas dans une galerie) */}
       <header className="border-b border-line lg:hidden">
-        <div className="px-5 sm:px-8 h-16 flex items-center justify-between">
-          <Link href="/admin" className="flex items-center gap-3 shrink-0">
+        <div className="px-3 h-16 grid grid-cols-[2.75rem_1fr_2.75rem] items-center">
+          <span />
+          <Link href="/admin" className="justify-self-center">
             <Wordmark height={30} />
-            <span className="eyebrow text-muted tracking-[0.2em] hidden sm:inline">studio</span>
           </Link>
-          <div className="flex items-center gap-4 sm:gap-6">
-            <Link href="/admin/clients" className="eyebrow text-muted hover:text-ink transition-colors">Clients</Link>
-            <Link href="/admin/settings" className="eyebrow text-muted hover:text-ink transition-colors">
-              <span className="sm:hidden">Infos</span>
-              <span className="hidden sm:inline">Coordonnées</span>
-            </Link>
-            <form action={signOut} className="flex">
-              <button className="text-muted hover:text-ink transition-colors" aria-label="Déconnexion" title="Déconnexion">
-                <LogoutIcon />
-              </button>
-            </form>
-          </div>
+          {!galleryPage && (
+            <button className="icon-btn" onClick={() => setMenu(true)} aria-label="Menu">
+              <MenuIcon />
+            </button>
+          )}
         </div>
       </header>
+
+      {menu && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="absolute inset-0 bg-black/50 animate-[fadeIn_0.2s_ease-out_both]" onClick={() => setMenu(false)} />
+          <aside className="absolute right-0 top-0 h-full w-[78%] max-w-xs bg-bg border-l border-line flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] animate-[slideIn_0.25s_ease-out_both]">
+            <div className="flex items-center justify-between h-16 px-6">
+              <span className="eyebrow text-muted">Studio</span>
+              <button className="icon-btn -mr-2" onClick={() => setMenu(false)} aria-label="Fermer">
+                <CloseIcon />
+              </button>
+            </div>
+            <nav className="flex-1" onClick={() => setMenu(false)}>
+              {[...NAV, ...TOOLS].map((item) => (
+                <NavItem key={item.href} {...item} active={item.match(pathname)} />
+              ))}
+            </nav>
+            <form action={signOut} className="border-t border-line">
+              <button className="w-full flex items-center gap-4 px-7 h-14 text-[15px] text-muted hover:text-ink transition-colors">
+                <LogoutIcon /> Déconnexion
+              </button>
+            </form>
+          </aside>
+        </div>
+      )}
 
       {!galleryPage && (
         <aside className="hidden lg:flex fixed inset-y-0 left-0 w-64 flex-col border-r border-line bg-bg z-30">

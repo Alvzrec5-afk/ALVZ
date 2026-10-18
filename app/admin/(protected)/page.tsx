@@ -23,13 +23,15 @@ type Row = {
 
 export default async function AdminHome() {
   const { supabase } = await requireAdminPage();
-  const { data, error } = await supabase
-    .from("galleries")
-    .select("id, slug, title, event_date, cover_photo_id, password_hash, expires_at, created_at, photos!photos_gallery_id_fkey(count)")
-    .order("created_at", { ascending: false });
+  const [{ data, error }, usage] = await Promise.all([
+    supabase
+      .from("galleries")
+      .select("id, slug, title, event_date, cover_photo_id, password_hash, expires_at, created_at, photos!photos_gallery_id_fkey(count)")
+      .order("created_at", { ascending: false }),
+    storageUsage(supabase),
+  ]);
   if (error) throw new Error(`Impossible de charger les galeries : ${error.message}`);
   const rows = (data ?? []) as Row[];
-  const usage = await storageUsage(supabase);
 
   const galleries: GalleryCard[] = await Promise.all(
     rows.map(async (g) => ({
@@ -48,9 +50,11 @@ export default async function AdminHome() {
 
   return (
     <div>
-      <StorageMeter used={usage.total} limit={usage.limit} />
       <GalleryGrid galleries={galleries} />
-      <div className="mt-24 border-t border-line pt-8">
+      <div className="mt-20">
+        <StorageMeter used={usage.total} limit={usage.limit} />
+      </div>
+      <div className="mt-4 border-t border-line pt-8">
         <StorageCheck />
       </div>
     </div>
