@@ -229,3 +229,9 @@ export const TableIcon = ({ className = "w-5 h-5" }: P) => (
     <path d="M3.5 9.5h17M3.5 14.25h17M9.25 5v14M14.75 5v14" />
   </svg>
 );
+export const CommentIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <path d="M4.5 5.5h15v10h-8l-4 3.5v-3.5h-3z" />
+    <path d="M8 9.5h8M8 12.5h5" />
+  </svg>
+);

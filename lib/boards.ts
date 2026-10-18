@@ -9,6 +9,7 @@ import {
   NOTE_COLORS,
   TABLE_MAX_COLS,
   TABLE_MAX_ROWS,
+  type BoardComment,
   type BoardData,
   type BoardItem,
   type BoardItemInput,
@@ -40,7 +41,7 @@ type Row = {
 };
 
 /** Qui modifie le tableau : le studio (tout) ou un client (seulement ses propres cartes). */
-export type Actor = { role: "admin" } | { role: "client"; clientId: string; name: string };
+export type Actor = { role: "admin" } | { role: "client"; clientId: string; name: string; canEditAll?: boolean };
 
 export function boardImageKey(boardId: string, itemId: string) {
   return `boards/${boardId}/${itemId}.jpg`;
@@ -53,7 +54,10 @@ export async function loadBoardItems(db: SupabaseClient, boardId: string, actor:
   const { data, error } = await db.from("board_items").select(BOARD_ITEM_FIELDS).eq("board_id", boardId).limit(MAX_ITEMS);
   if (error) throw new Error(`Impossible de charger le tableau : ${error.message}`);
   const rows = (data ?? []) as Row[];
-  const subs = await subBoardPreviews(db, boardId);
+  const [subs, comments] = await Promise.all([
+    subBoardPreviews(db, boardId),
+    rows.some((r) => r.kind === "comment") ? loadComments(db, boardId, actor) : new Map<string, BoardComment[]>(),
+  ]);
   return Promise.all(
     rows.map(async (r) => ({
       id: r.id,
@@ -66,11 +70,65 @@ export async function loadBoardItems(db: SupabaseClient, boardId: string, actor:
       position: r.position,
       data: r.data ?? {},
       author: r.author,
-      mine: actor.role === "admin" || (r.client_id !== null && r.client_id === actor.clientId),
+      mine: actor.role === "admin" || Boolean(actor.canEditAll) || (r.client_id !== null && r.client_id === actor.clientId),
       src: r.kind === "image" && r.size_bytes > 0 ? await presignGet(boardImageKey(boardId, r.id)) : null,
       sub: r.kind === "board" && r.data?.boardId ? subs.get(r.data.boardId) ?? null : undefined,
+      comments: r.kind === "comment" ? comments.get(r.id) ?? [] : undefined,
     })),
   );
+}
+
+async function loadComments(db: SupabaseClient, boardId: string, actor: Actor) {
+  const { data } = await db
+    .from("board_comments")
+    .select("id, item_id, author, is_studio, client_id, body, created_at")
+    .eq("board_id", boardId)
+    .order("created_at")
+    .limit(5000);
+  const out = new Map<string, BoardComment[]>();
+  for (const c of data ?? []) {
+    const list = out.get(c.item_id as string) ?? [];
+    list.push({
+      id: c.id as string,
+      author: c.author as string,
+      studio: Boolean(c.is_studio),
+      body: c.body as string,
+      at: c.created_at as string,
+      mine: actor.role === "admin" || (c.client_id !== null && c.client_id === actor.clientId),
+    });
+    out.set(c.item_id as string, list);
+  }
+  return out;
+}
+
+/** Ajoute un message à une carte « commentaire » du tableau. */
+export async function addBoardComment(db: SupabaseClient, boardId: string, itemId: string, body: string, actor: Actor) {
+  const text = body.trim().slice(0, 2000);
+  if (!text || !isUuid(itemId)) throw new Error("Message vide");
+  const { data: item } = await db.from("board_items").select("id").eq("id", itemId).eq("board_id", boardId).eq("kind", "comment").maybeSingle();
+  if (!item) throw new Error("Commentaire introuvable");
+  const { data, error } = await db
+    .from("board_comments")
+    .insert({
+      item_id: itemId,
+      board_id: boardId,
+      body: text,
+      ...(actor.role === "admin" ? { author: "ALVZ.REC", is_studio: true, client_id: null } : { author: actor.name, is_studio: false, client_id: actor.clientId }),
+    })
+    .select("id, created_at")
+    .single();
+  if (error) throw new Error(error.message);
+  await db.from("boards").update({ updated_at: new Date().toISOString() }).eq("id", boardId);
+  return { id: data.id as string, at: data.created_at as string };
+}
+
+/** Efface un message : le studio, tous ; un client, seulement les siens. */
+export async function deleteBoardComment(db: SupabaseClient, boardId: string, commentId: string, actor: Actor) {
+  if (!isUuid(commentId)) return;
+  let q = db.from("board_comments").delete().eq("id", commentId).eq("board_id", boardId);
+  if (actor.role === "client") q = q.eq("client_id", actor.clientId);
+  const { error } = await q;
+  if (error) throw new Error(error.message);
 }
 
 /** Aperçu des sous-tableaux d'un tableau : nom, nombre de cartes, 4 images au plus. */
@@ -160,6 +218,8 @@ function cleanKind(kind: BoardKind, d: BoardData): BoardData {
     }
     case "board":
       return { boardId: isUuid(d.boardId) ? d.boardId : undefined, title: text(d.title, 200) ?? "" };
+    case "comment":
+      return {};
     case "table": {
       // Grille rectangulaire, bornée (60 lignes × 12 colonnes, 1000 caractères par cellule).
       const rows = (Array.isArray(d.cells) ? d.cells : []).slice(0, TABLE_MAX_ROWS).map((r) => (Array.isArray(r) ? r : []));
@@ -170,8 +230,10 @@ function cleanKind(kind: BoardKind, d: BoardData): BoardData {
   }
 }
 
-const KINDS: BoardKind[] = ["note", "image", "todo", "column", "arrow", "board", "color", "link", "table"];
-const CLIENT_KINDS: BoardKind[] = ["note", "todo", "link", "table"];
+const KINDS: BoardKind[] = ["note", "image", "todo", "column", "arrow", "board", "color", "link", "table", "comment"];
+const CLIENT_KINDS: BoardKind[] = ["note", "todo", "link", "table", "comment"];
+/** En plus, quand le studio autorise « le client peut tout modifier ». */
+const CLIENT_EDIT_KINDS: BoardKind[] = ["column", "color", "arrow"];
 
 /**
  * Applique une série de modifications. Toutes les cartes visées doivent appartenir au tableau ;
@@ -199,7 +261,7 @@ export async function applyBoardOps(
   const known = new Map((existing ?? []).map((r) => [r.id as string, r]));
 
   const owns = (row: { board_id: string; client_id: string | null }) =>
-    row.board_id === boardId && (actor.role === "admin" || row.client_id === actor.clientId);
+    row.board_id === boardId && (actor.role === "admin" || Boolean(actor.canEditAll) || row.client_id === actor.clientId);
 
   // Colonnes créées dans ce même envoi : on peut déjà y ranger des cartes.
   const newColumns = new Set(
@@ -227,7 +289,8 @@ export async function applyBoardOps(
     const row = known.get(it.id);
     if (row && !owns(row)) throw new Error("Carte non modifiable");
     if (row && row.kind !== it.kind) throw new Error("Carte invalide");
-    if (!row && actor.role === "client" && !(it.kind === "image" ? opts.clientImage : CLIENT_KINDS.includes(it.kind))) {
+    const clientMay = (k: BoardKind) => CLIENT_KINDS.includes(k) || (actor.role === "client" && Boolean(actor.canEditAll) && CLIENT_EDIT_KINDS.includes(k));
+    if (!row && actor.role === "client" && !(it.kind === "image" ? opts.clientImage : clientMay(it.kind))) {
       throw new Error("Carte non autorisée");
     }
     const parent = it.parentId ? known.get(it.parentId) : null;
@@ -405,13 +468,21 @@ export async function purgeBoard(db: SupabaseClient, boardId: string, expectedPa
 
 // ——— Partage client ———
 
-export type PublicBoard = { id: string; title: string; share_slug: string; client_can_add: boolean; gallery_id: string | null };
+export type PublicBoard = {
+  id: string;
+  title: string;
+  share_slug: string;
+  client_can_add: boolean;
+  /** Le client peut aussi déplacer, modifier et supprimer les cartes du studio. */
+  client_can_edit: boolean;
+  gallery_id: string | null;
+};
 
 export const findSharedBoard = cache(async (slug: string) => {
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(slug)) return null;
   const { data } = await createServiceClient()
     .from("boards")
-    .select("id, title, share_slug, client_can_add, gallery_id")
+    .select("id, title, share_slug, client_can_add, client_can_edit, gallery_id")
     .eq("share_slug", slug)
     .eq("share_enabled", true)
     .maybeSingle();
@@ -443,7 +514,9 @@ export async function setBoardVisitor(board: PublicBoard, clientId: string, name
 
 export async function clientActor(board: PublicBoard): Promise<Actor> {
   const visitor = await boardVisitor(board);
-  return visitor ? { role: "client", ...visitor } : { role: "client", clientId: "", name: "" };
+  // « Tout modifier » suppose de pouvoir ajouter : les deux options vont ensemble.
+  const canEditAll = board.client_can_add && board.client_can_edit;
+  return visitor ? { role: "client", ...visitor, canEditAll } : { role: "client", clientId: "", name: "", canEditAll: false };
 }
 
 /**

@@ -53,6 +53,8 @@ export async function SharedBoard({ slug, subId }: { slug: string; subId?: strin
           endpoint={`/api/b/${slug}${query}`}
           imageEndpoint={`/api/b/${slug}/image${query}`}
           joinEndpoint={`/api/b/${slug}/join`}
+          commentsEndpoint={`/api/b/${slug}/comments${query}`}
+          clientEditAll={root.client_can_add && root.client_can_edit}
           role="client"
           canAdd={root.client_can_add}
           visitorName={visitor?.name ?? null}

@@ -36,6 +36,7 @@ import {
   PencilIcon,
   PlusIcon,
   TableIcon,
+  CommentIcon,
   TrashIcon,
 } from "@/components/icons";
 import { BoardSync, type SyncStatus } from "./sync";
@@ -61,6 +62,10 @@ type Props = {
   openImport?: boolean;
   /** Début de l'adresse d'un sous-tableau (carte « Tableau »), suivi de son identifiant. */
   boardBase: string;
+  /** POST { itemId, body } / DELETE ?id= : messages des cartes « commentaire ». */
+  commentsEndpoint: string;
+  /** Client autorisé à modifier toutes les cartes (option « Le client peut tout modifier »). */
+  clientEditAll?: boolean;
 };
 
 const MIN_ZOOM = 0.15;
@@ -195,7 +200,7 @@ function InlineInput({
   );
 }
 
-export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAdd, visitorName, joinEndpoint, openImport, boardBase }: Props) {
+export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAdd, visitorName, joinEndpoint, openImport, boardBase, commentsEndpoint, clientEditAll }: Props) {
   const router = useRouter();
   const rootRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -220,6 +225,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
   );
   const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
+  const [replies, setReplies] = useState<Record<string, string>>({});
   const [groupPalette, setGroupPalette] = useState(false);
   const [toolGhost, setToolGhost] = useState<{ label: string; Icon: typeof NoteIcon; x: number; y: number } | null>(null);
   const suppressToolClick = useRef(false);
@@ -249,7 +255,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     setViewState(next);
   }, []);
 
-  const canEdit = useCallback((it: BoardItem) => role === "admin" || it.mine, [role]);
+  const canEdit = useCallback((it: BoardItem) => role === "admin" || Boolean(clientEditAll) || it.mine, [clientEditAll, role]);
 
   // ——— Modifications ———
 
@@ -448,6 +454,55 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       const it = create("table", { cells: Array.from({ length: 3 }, () => ["", "", ""]) }, at, extra);
       setEditing({ id: it.id, field: "c:0:0" });
     });
+  const addComment = (at?: At, extra?: Extra) =>
+    ensureName(() => {
+      const it = create("comment", {}, at, { comments: [], ...extra });
+      setEditing({ id: it.id, field: "reply" });
+    });
+
+  /** Envoie un message (affiché tout de suite, confirmé ensuite par le serveur). */
+  const sendComment = (it: BoardItem) =>
+    ensureName(async () => {
+      const body = (replies[it.id] ?? "").trim();
+      if (!body) return;
+      const temp = { id: `tmp-${Date.now()}`, author: role === "admin" ? "ALVZ.REC" : nameRef.current ?? "", studio: role === "admin", body, at: new Date().toISOString(), mine: true };
+      const withMsg = (list: BoardItem["comments"], m: typeof temp) => [...(list ?? []), m];
+      update(it.id, { comments: withMsg(itemsRef.current[it.id]?.comments, temp) }, false);
+      setReplies((r) => ({ ...r, [it.id]: "" }));
+      const post = () =>
+        fetch(commentsEndpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId: it.id, body }) });
+      try {
+        // La carte vient peut-être d'être créée : elle doit d'abord être enregistrée.
+        await sync.flush();
+        let res = await post();
+        if (res.status === 400) {
+          await new Promise((r) => setTimeout(r, 1200));
+          await sync.flush();
+          res = await post();
+        }
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.error || `Erreur ${res.status}`);
+        const cur = itemsRef.current[it.id];
+        if (cur) update(it.id, { comments: (cur.comments ?? []).map((m) => (m.id === temp.id ? { ...m, id: json.id, at: json.at } : m)) }, false);
+      } catch (e) {
+        const cur = itemsRef.current[it.id];
+        if (cur) update(it.id, { comments: (cur.comments ?? []).filter((m) => m.id !== temp.id) }, false);
+        setReplies((r) => ({ ...r, [it.id]: body }));
+        alert(`Message non envoyé : ${e instanceof Error ? e.message : e}`);
+      }
+    });
+
+  const deleteComment = async (it: BoardItem, id: string) => {
+    if (!confirm("Effacer ce message ?")) return;
+    const before = it.comments ?? [];
+    update(it.id, { comments: before.filter((m) => m.id !== id) }, false);
+    const res = await fetch(`${commentsEndpoint}${commentsEndpoint.includes("?") ? "&" : "?"}id=${id}`, { method: "DELETE" }).catch(() => null);
+    if (!res?.ok) {
+      update(it.id, { comments: before }, false);
+      alert("Message non effacé, réessayez.");
+    }
+  };
+
   const imageDrop = useRef<{ at: At; extra?: Extra } | null>(null);
 
   /**
@@ -1147,7 +1202,9 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
             ? "caption"
             : it.kind === "table"
               ? "c:0:0"
-              : undefined,
+              : it.kind === "comment"
+                ? "reply"
+                : undefined,
     });
   };
 
@@ -1237,6 +1294,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         {it.kind === "color" && renderColor(it, ed)}
         {it.kind === "link" && renderLink(it, ed)}
         {it.kind === "table" && renderTable(it, editable, ed, isSel)}
+        {it.kind === "comment" && renderComment(it, ed)}
 
         {it.kind === "column" && (
           <div>
@@ -1516,6 +1574,73 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     );
   }
 
+  /** Carte « commentaire » : la discussion (studio = logo ALVZ.REC, client = son prénom) et le champ de réponse. */
+  function renderComment(it: BoardItem, ed: Editing) {
+    const list = it.comments ?? [];
+    const draft = replies[it.id] ?? "";
+    const canWrite = canAdd;
+    return (
+      <div className="px-3.5 py-3 space-y-3">
+        {list.map((m) => (
+          <div key={m.id} className="group/msg flex gap-2.5">
+            <Avatar name={m.author} studio={m.studio} />
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] flex items-baseline gap-2">
+                <span className="font-medium">{m.studio ? "ALVZ.REC" : m.author}</span>
+                <span className="opacity-50">{when(m.at)}</span>
+                {m.mine && !m.id.startsWith("tmp-") && (
+                  <button data-nodrag onClick={() => void deleteComment(it, m.id)} className="ml-auto opacity-0 group-hover/msg:opacity-60 hover:!opacity-100" aria-label="Effacer le message">
+                    ×
+                  </button>
+                )}
+              </p>
+              <p className="whitespace-pre-wrap break-words">
+                <Linkified text={m.body} />
+              </p>
+            </div>
+          </div>
+        ))}
+        {canWrite ? (
+          <div className="flex items-start gap-2.5">
+            <Avatar name={role === "admin" ? "ALVZ.REC" : name ?? "?"} studio={role === "admin"} />
+            <div data-nodrag className="flex-1 min-w-0 flex items-end gap-2 rounded-[4px] px-2.5 py-1.5" style={{ background: "color-mix(in srgb, currentColor 7%, transparent)" }}>
+              {ed?.field === "reply" ? (
+                <AutoTextarea
+                  value={draft}
+                  onChange={(v) => setReplies((r) => ({ ...r, [it.id]: v }))}
+                  onDone={() => setEditing((c) => (c?.id === it.id && c.field === "reply" ? null : c))}
+                  onKey={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void sendComment(it);
+                    }
+                  }}
+                  placeholder="Rédigez un commentaire…"
+                  className="text-[13px]"
+                />
+              ) : (
+                <button data-nodrag onClick={() => setEditing({ id: it.id, field: "reply" })} className="flex-1 text-left opacity-50 py-0.5">
+                  {draft || "Rédigez un commentaire…"}
+                </button>
+              )}
+              <button
+                data-nodrag
+                onPointerDown={(e) => e.preventDefault()}
+                onClick={() => void sendComment(it)}
+                disabled={!draft.trim()}
+                className="text-[12px] font-medium text-emerald-600 disabled:opacity-30 shrink-0 py-0.5"
+              >
+                Envoyer
+              </button>
+            </div>
+          </div>
+        ) : (
+          !list.length && <p className="text-xs opacity-50">Aucun commentaire.</p>
+        )}
+      </div>
+    );
+  }
+
   function renderTodo(it: BoardItem, editable: boolean, ed: Editing) {
     const entries = it.data.items ?? [];
     const done = entries.filter((e) => e.done).length;
@@ -1619,6 +1744,8 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     /** Outil glissé puis lâché sur le tableau : création à cet endroit (ou dans la colonne visée). */
     drop?: (at: At, extra?: Extra) => void;
     admin?: boolean;
+    /** Studio, ou client autorisé à tout modifier. */
+    edit?: boolean;
     active?: boolean;
     desktop?: boolean;
   };
@@ -1638,12 +1765,13 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     { label: "Liste", Icon: ChecklistIcon, run: () => addTodo(), drop: addTodo },
     { label: "Tableau", Icon: TableIcon, run: () => addTable(), drop: addTable },
     { label: "Planche", Icon: BoardIcon, run: () => addBoard(), drop: addBoard, admin: true },
-    { label: "Colonne", Icon: ColumnIcon, run: () => addColumn(), drop: (at) => addColumn(at), admin: true },
-    { label: "Couleur", Icon: PaletteIcon, run: () => addColor(), drop: addColor, admin: true },
-    { label: "Flèche", Icon: ConnectorIcon, run: () => setArrowMode((m) => (m ? null : { from: null })), admin: true, active: Boolean(arrowMode) },
+    { label: "Colonne", Icon: ColumnIcon, run: () => addColumn(), drop: (at) => addColumn(at), edit: true },
+    { label: "Couleur", Icon: PaletteIcon, run: () => addColor(), drop: addColor, edit: true },
+    { label: "Commentaire", Icon: CommentIcon, run: () => addComment(), drop: addComment },
+    { label: "Flèche", Icon: ConnectorIcon, run: () => setArrowMode((m) => (m ? null : { from: null })), edit: true, active: Boolean(arrowMode) },
     { label: "Importer", Icon: ImportIcon, run: () => setImportOpen(true), admin: true, desktop: true },
   ];
-  const visibleTools = tools.filter((t) => !t.admin || role === "admin");
+  const visibleTools = tools.filter((t) => (!t.admin || role === "admin") && (!t.edit || role === "admin" || clientEditAll));
 
   /** Glisser un outil de la barre jusqu'au tableau (un simple clic marche toujours). */
   const startToolDrag = (e: React.PointerEvent, tool: Tool) => {
@@ -1828,7 +1956,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
                 run();
               }}
               title={tool.drop ? `${label} : cliquez, ou glissez sur le tableau` : desktop ? "Importer un tableau Milanote" : undefined}
-              className={`${desktop ? "hidden sm:flex" : "flex"} shrink-0 flex-col items-center justify-center gap-1 w-[60px] h-[58px] text-[10px] tracking-wide transition-colors ${active ? "bg-emerald-500/15 text-emerald-600" : "text-muted hover:text-ink hover:bg-bg-soft"}`}
+              className={`${desktop ? "hidden sm:flex" : "flex"} shrink-0 flex-col items-center justify-center gap-1 w-[66px] h-[58px] text-[10px] transition-colors ${active ? "bg-emerald-500/15 text-emerald-600" : "text-muted hover:text-ink hover:bg-bg-soft"}`}
             >
               <Icon className="w-5 h-5" />
               {label}
@@ -2155,4 +2283,27 @@ function ImportDialog({ onFiles, onCancel }: { onFiles: (files: File[]) => void;
       </div>
     </div>
   );
+}
+
+/** Pastille de l'auteur d'un message : logo du studio, ou initiale du prénom du client. */
+function Avatar({ name, studio }: { name: string; studio: boolean }) {
+  if (studio) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src="/studio-icon.png" alt="ALVZ.REC" className="w-7 h-7 rounded-full shrink-0 object-cover bg-black" draggable={false} />;
+  }
+  const hue = [...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+  return (
+    <span className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[11px] font-medium text-white" style={{ background: `hsl(${hue} 45% 45%)` }} title={name}>
+      {(name.trim()[0] ?? "?").toUpperCase()}
+    </span>
+  );
+}
+
+/** « à l'instant », « 14:32 » (aujourd'hui), sinon « 12 oct. ». */
+function when(iso: string) {
+  const d = new Date(iso);
+  const diff = Date.now() - d.getTime();
+  if (diff < 60_000) return "à l'instant";
+  if (new Date().toDateString() === d.toDateString()) return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }

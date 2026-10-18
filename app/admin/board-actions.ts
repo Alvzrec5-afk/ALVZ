@@ -54,7 +54,7 @@ export async function openGalleryBoard(galleryId: string) {
 
 export async function updateBoard(
   boardId: string,
-  patch: { title?: string; share_enabled?: boolean; client_can_add?: boolean; gallery_id?: string | null },
+  patch: { title?: string; share_enabled?: boolean; client_can_add?: boolean; client_can_edit?: boolean; gallery_id?: string | null },
 ) {
   const { supabase } = await requireAdminApi();
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -65,6 +65,7 @@ export async function updateBoard(
   }
   if (typeof patch.share_enabled === "boolean") update.share_enabled = patch.share_enabled;
   if (typeof patch.client_can_add === "boolean") update.client_can_add = patch.client_can_add;
+  if (typeof patch.client_can_edit === "boolean") update.client_can_edit = patch.client_can_edit;
   if (patch.gallery_id === null || isUuid(patch.gallery_id)) update.gallery_id = patch.gallery_id;
   const { data: board, error } = await supabase.from("boards").update(update).eq("id", boardId).select("parent_id").maybeSingle();
   if (error) return { error: error.message };

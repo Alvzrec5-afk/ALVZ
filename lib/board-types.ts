@@ -1,6 +1,6 @@
 /** Tableaux façon Milanote : types partagés entre le navigateur et le serveur. */
 
-export type BoardKind = "note" | "image" | "todo" | "column" | "arrow" | "board" | "color" | "link" | "table";
+export type BoardKind = "note" | "image" | "todo" | "column" | "arrow" | "board" | "color" | "link" | "table" | "comment";
 
 /** Teintes des notes : mélangées au fond, elles restent douces en mode clair comme en mode sombre. */
 export const NOTE_COLORS = {
@@ -71,13 +71,26 @@ export type BoardItem = BoardItemInput & {
   mine: boolean;
   /** Image : URL de lecture temporaire. */
   src: string | null;
+  /** Carte « commentaire » : la discussion, dans l'ordre. */
+  comments?: BoardComment[];
   /** Sous-tableau : nom, nombre de cartes et quelques images pour l'aperçu. */
   sub?: { title: string; count: number; covers: string[] } | null;
 };
 
+export type BoardComment = {
+  id: string;
+  author: string;
+  /** Écrit par le studio (logo ALVZ.REC) ou par un client (son prénom). */
+  studio: boolean;
+  body: string;
+  at: string;
+  /** Le visiteur actuel peut effacer ce message. */
+  mine: boolean;
+};
+
 export type BoardOp = { op: "put"; item: BoardItemInput } | { op: "delete"; id: string };
 
-export const DEFAULT_WIDTH: Record<BoardKind, number> = { note: 240, image: 280, todo: 260, column: 280, arrow: 0, board: 200, color: 160, link: 300, table: 420 };
+export const DEFAULT_WIDTH: Record<BoardKind, number> = { note: 240, image: 280, todo: 260, column: 280, arrow: 0, board: 200, color: 160, link: 300, table: 420, comment: 320 };
 export const TABLE_MAX_ROWS = 60;
 export const TABLE_MAX_COLS = 12;
 

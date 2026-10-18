@@ -7,7 +7,15 @@ import { deleteBoard, duplicateBoard, regenerateBoardLink, updateBoard } from "@
 import { ArrowLeft, ChevronDown, CloseIcon } from "@/components/icons";
 import { Toggle } from "./ui";
 
-type Board = { id: string; title: string; gallery_id: string | null; share_slug: string; share_enabled: boolean; client_can_add: boolean };
+type Board = {
+  id: string;
+  title: string;
+  gallery_id: string | null;
+  share_slug: string;
+  share_enabled: boolean;
+  client_can_add: boolean;
+  client_can_edit: boolean;
+};
 
 /**
  * Barre du haut d'un tableau : nom, galerie reliée, partage client.
@@ -31,7 +39,7 @@ export function BoardHeader({
   const [title, setTitle] = useState(board.title);
   const [share, setShare] = useState(false);
   const [plus, setPlus] = useState(false);
-  const [opts, setOpts] = useState({ share_enabled: root.share_enabled, client_can_add: root.client_can_add });
+  const [opts, setOpts] = useState({ share_enabled: root.share_enabled, client_can_add: root.client_can_add, client_can_edit: root.client_can_edit });
   const [slug, setSlug] = useState(root.share_slug);
   const clientPath = isSub ? `/t/${slug}/b/${board.id}` : `/t/${slug}`;
   const [copied, setCopied] = useState(false);
@@ -176,8 +184,19 @@ export function BoardHeader({
                   void save({ client_can_add: v });
                 }}
                 label="Le client peut ajouter ses idées"
-                hint="Notes, images et listes, signées de son prénom. Il ne peut ni déplacer ni modifier vos cartes."
+                hint="Notes, images, listes, liens et commentaires, signés de son prénom."
               />
+              {opts.client_can_add && (
+                <Toggle
+                  checked={opts.client_can_edit}
+                  onChange={(v) => {
+                    setOpts((o) => ({ ...o, client_can_edit: v }));
+                    void save({ client_can_edit: v });
+                  }}
+                  label="Le client peut tout modifier"
+                  hint="Il peut aussi déplacer, modifier, cocher et supprimer vos cartes, et ajouter colonnes, couleurs et flèches. Désactivé : il ne touche qu'à ses propres cartes."
+                />
+              )}
             </div>
             {opts.share_enabled && (
               <div className="mt-8">

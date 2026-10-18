@@ -315,3 +315,24 @@ create index board_items_board_ref_idx on public.board_items ((data->>'boardId')
 alter table public.board_items drop constraint board_items_kind_check;
 alter table public.board_items add constraint board_items_kind_check
   check (kind in ('note', 'image', 'todo', 'column', 'arrow', 'board', 'color', 'link', 'table'));
+
+-- Commentaires (carte « Commentaire ») et option « le client peut tout modifier ».
+alter table public.boards add column client_can_edit boolean not null default false;
+alter table public.board_items drop constraint board_items_kind_check;
+alter table public.board_items add constraint board_items_kind_check
+  check (kind in ('note', 'image', 'todo', 'column', 'arrow', 'board', 'color', 'link', 'table', 'comment'));
+create table public.board_comments (
+  id uuid primary key default gen_random_uuid(),
+  item_id uuid not null references public.board_items(id) on delete cascade,
+  board_id uuid not null references public.boards(id) on delete cascade,
+  author text not null,                 -- prénom du client, ou « ALVZ.REC » pour le studio
+  is_studio boolean not null default false,
+  client_id text,                       -- visiteur qui a écrit (pour qu'il puisse effacer son message)
+  body text not null,
+  created_at timestamptz not null default now()
+);
+create index board_comments_item_idx on public.board_comments (item_id, created_at);
+create index board_comments_board_idx on public.board_comments (board_id);
+alter table public.board_comments enable row level security;
+create policy "admin full access" on public.board_comments
+  for all to authenticated using ((select private.is_admin())) with check ((select private.is_admin()));
