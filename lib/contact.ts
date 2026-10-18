@@ -34,7 +34,9 @@ export function contactLinks(c: Contact) {
   const links: { key: string; label: string; href: string; value: string }[] = [];
   if (c.whatsapp) {
     const digits = c.whatsapp.replace(/\D/g, "").replace(/^0(\d{9})$/, "33$1"); // 06… → 336…
-    links.push({ key: "whatsapp", label: "WhatsApp", href: `https://wa.me/${digits}`, value: c.whatsapp });
+    // Affichage lisible : +33 6 11 32 94 06
+    const pretty = /^33\d{9}$/.test(digits) ? `+33 ${digits.slice(2, 3)} ${digits.slice(3).replace(/(\d{2})(?=\d)/g, "$1 ")}` : c.whatsapp;
+    links.push({ key: "whatsapp", label: "WhatsApp", href: `https://wa.me/${digits}`, value: pretty });
   }
   if (c.instagram) links.push({ key: "instagram", label: "Instagram", href: `https://instagram.com/${c.instagram}`, value: `@${c.instagram}` });
   if (c.tiktok) links.push({ key: "tiktok", label: "TikTok", href: `https://www.tiktok.com/@${c.tiktok}`, value: `@${c.tiktok}` });

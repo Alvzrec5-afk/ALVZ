@@ -7,7 +7,8 @@ import { DownloadIcon, HeartIcon } from "@/components/icons";
 import { Wordmark } from "@/components/wordmark";
 import { PhotoGrid } from "./justified-grid";
 import { Lightbox } from "./lightbox";
-import { ContactCard } from "./contact-card";
+import { ContactCard, ContactSheet } from "./contact-card";
+import { contactLinks } from "@/lib/contact";
 import type { Contact } from "@/lib/contact";
 import { downloadArchive } from "./zip";
 
@@ -40,6 +41,8 @@ export function ClientGallery(props: Props) {
   const [open, setOpen] = useState<number | null>(null);
   const [menu, setMenu] = useState(false);
   const [zip, setZip] = useState<{ done: number; total: number } | null>(null);
+  const [contactOpen, setContactOpen] = useState(false);
+  const canContact = design.show_contact && props.contact !== null && contactLinks(props.contact).length > 0;
   const gridTop = useRef<HTMLDivElement>(null);
   const navRef = useRef<HTMLElement>(null);
   const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
@@ -173,6 +176,16 @@ export function ClientGallery(props: Props) {
             </nav>
           )}
           <div className="flex items-center -mr-2 pb-3 md:pb-0 md:order-3">
+            {canContact && (
+              <button
+                onClick={() => setContactOpen(true)}
+                className="flex items-center gap-1 h-8 px-2 mr-0.5 border border-line hover:border-ink text-ink/90 transition-colors"
+                aria-label="Contacter"
+              >
+                <ChatIcon />
+                <span className="text-[10px] uppercase tracking-[0.1em]">Contacter</span>
+              </button>
+            )}
             {props.favoritesEnabled && (
               <button
                 onClick={() => selectTab(tab === FAVORITES_TAB ? props.collections[0]?.id ?? "" : FAVORITES_TAB)}
@@ -313,6 +326,8 @@ export function ClientGallery(props: Props) {
           }}
         />
       )}
+
+      {contactOpen && props.contact && <ContactSheet contact={props.contact} onClose={() => setContactOpen(false)} />}
 
       {zip && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-ink text-bg px-5 py-3 text-xs tracking-wide shadow-xl">
@@ -585,6 +600,14 @@ function DotsVertical() {
       <circle cx="12" cy="5" r="1.7" />
       <circle cx="12" cy="12" r="1.7" />
       <circle cx="12" cy="19" r="1.7" />
+    </svg>
+  );
+}
+
+function ChatIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4.5 18.5 5.7 15A7.5 7.5 0 1 1 9 18.3l-4.5.2Z" />
     </svg>
   );
 }
