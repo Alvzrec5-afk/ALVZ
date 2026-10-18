@@ -91,8 +91,14 @@ export function GalleryGrid({ galleries }: { galleries: GalleryCard[] }) {
     <div>
       {/* En-tête : titre, recherche, nouvelle galerie */}
       <div className="flex items-center justify-between gap-4">
-        <h1 className="display text-4xl sm:text-5xl">Galeries</h1>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-10 min-w-0">
+          <h1 className="display text-4xl sm:text-5xl">Galeries</h1>
+          <label className="hidden lg:flex items-center gap-3 text-muted w-72">
+            <SearchIcon />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher" className="w-full bg-transparent outline-none text-[15px] text-ink placeholder:text-muted" />
+          </label>
+        </div>
+        <div className="flex items-center gap-1 lg:hidden">
           <button className="icon-btn" onClick={() => setSearchOpen((o) => !o)} aria-label="Rechercher">
             <SearchIcon />
           </button>
@@ -100,6 +106,9 @@ export function GalleryGrid({ galleries }: { galleries: GalleryCard[] }) {
             <PlusIcon />
           </Link>
         </div>
+        <span className="hidden lg:block">
+          <Link href="/admin/galleries/new" className="btn">Nouvelle galerie</Link>
+        </span>
       </div>
 
       {searchOpen && (
@@ -108,7 +117,7 @@ export function GalleryGrid({ galleries }: { galleries: GalleryCard[] }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Rechercher un client…"
-          className="field mt-4"
+          className="field mt-4 lg:hidden"
         />
       )}
 
@@ -155,7 +164,7 @@ export function GalleryGrid({ galleries }: { galleries: GalleryCard[] }) {
           {visible.map((g) => (
             <li key={g.id} className={busy === g.id ? "opacity-40 pointer-events-none" : ""}>
               <div className="relative">
-                <Link href={`/admin/galleries/${g.id}`} className="group block aspect-square bg-bg-soft overflow-hidden">
+                <Link href={`/admin/galleries/${g.id}`} className="group block aspect-square lg:aspect-[4/3] bg-bg-soft overflow-hidden">
                   {g.cover ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={g.cover} alt="" loading="lazy" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.03]" />

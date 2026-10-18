@@ -5,12 +5,12 @@ import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from "@d
 import { CSS } from "@dnd-kit/utilities";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { addCollection, renameCollection, reorderCollections, setCover } from "@/app/admin/actions";
+import { setCover } from "@/app/admin/actions";
 import type { Collection, PhotoView } from "@/lib/types";
-import { CloseIcon, DotsIcon, HeartIcon, PlusCircleIcon } from "@/components/icons";
+import { CloseIcon, DotsIcon, GridIcon, HeartIcon, PlusCircleIcon, SortIcon } from "@/components/icons";
 import { UploadPanel } from "./upload-panel";
 import { AdminViewer } from "./admin-viewer";
-import { purge } from "./purge";
+import { CollectionMenu, post, promptNewCollection, useRun } from "./collection-menu";
 
 type Props = {
   galleryId: string;
@@ -20,22 +20,18 @@ type Props = {
   positions: Record<string, number>;
   favoriteCounts: Record<string, number>;
   downloadCounts: Record<string, number>;
+  activeId: string;
+  onActive: (id: string) => void;
 };
-
-async function post(path: string, body: unknown) {
-  const res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.error || `Erreur ${res.status}`);
-  return json;
-}
 
 export function PhotosPanel(props: Props) {
   const router = useRouter();
-  const [activeId, setActiveId] = useState(props.collections[0]?.id ?? "");
+  const { activeId, onActive: setActiveId } = props;
   const active = props.collections.find((c) => c.id === activeId) ?? props.collections[0];
   const [order, setOrder] = useState<PhotoView[]>([]);
   const [positions, setPositions] = useState(props.positions);
-  const [busy, setBusy] = useState(false);
+  const { busy, run } = useRun();
+  const [large, setLarge] = useState(true); // taille des vignettes sur ordinateur
   const [uploadOpen, setUploadOpen] = useState(false);
   const [actions, setActions] = useState(false);
   const [viewer, setViewer] = useState<number | null>(null);
@@ -77,33 +73,37 @@ export function PhotosPanel(props: Props) {
     await post("/api/admin/photos/position", { photoId: e.active.id, position }).catch((err) => alert(err.message));
   }
 
-  async function run(fn: () => Promise<unknown>) {
-    setBusy(true);
-    try {
-      await fn();
-      router.refresh();
-    } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const moveCollection = (dir: -1 | 1) =>
-    run(async () => {
-      const ids = props.collections.map((c) => c.id);
-      const i = ids.indexOf(active.id);
-      if (i + dir < 0 || i + dir >= ids.length) return;
-      await reorderCollections(props.galleryId, arrayMove(ids, i, i + dir));
-    });
-
   return (
     <div>
-      <div className="flex items-center justify-between gap-4 mb-6">
+      <div className="flex items-center justify-between gap-4 mb-6 lg:mb-8">
         <h2 className="display text-2xl sm:text-3xl min-w-0 truncate">{active?.name ?? "Photos"}</h2>
-        <button onClick={() => setUploadOpen((o) => !o)} className="shrink-0 flex items-center gap-1.5 text-[13px] sm:text-sm text-accent hover:opacity-80">
-          <PlusCircleIcon /> Ajouter des médias
-        </button>
+        <div className="shrink-0 flex items-center gap-1">
+          {active && (
+            <span className="hidden lg:contents">
+              <button
+                className="w-10 h-10 flex items-center justify-center text-muted hover:text-ink"
+                title="Trier par date de prise de vue"
+                aria-label="Trier par date de prise de vue"
+                disabled={busy}
+                onClick={() => run(() => post("/api/admin/photos/sort-by-date", { collectionId: active.id }))}
+              >
+                <SortIcon />
+              </button>
+              <button
+                className="w-10 h-10 flex items-center justify-center text-muted hover:text-ink"
+                title={large ? "Petites vignettes" : "Grandes vignettes"}
+                aria-label="Taille des vignettes"
+                onClick={() => setLarge((l) => !l)}
+              >
+                <GridIcon />
+              </button>
+              <span className="w-px h-6 bg-line mx-3" />
+            </span>
+          )}
+          <button onClick={() => setUploadOpen((o) => !o)} className="flex items-center gap-1.5 text-[13px] sm:text-sm text-accent hover:opacity-80">
+            <PlusCircleIcon /> Ajouter des médias
+          </button>
+        </div>
       </div>
       {/* Fenêtre d'envoi : reste montée quand elle est fermée, pour ne pas interrompre un envoi en cours */}
       <div className={uploadOpen ? "fixed inset-0 z-50 flex items-end sm:items-center justify-center" : "hidden"}>
@@ -120,7 +120,7 @@ export function PhotosPanel(props: Props) {
         </div>
       </div>
 
-      <div className="flex items-center border-b border-line mb-5">
+      <div className="flex items-center border-b border-line mb-5 lg:hidden">
       <div className="flex-1 min-w-0 flex items-center gap-6 overflow-x-auto no-scrollbar">
         {props.collections.map((c) => (
           <button
@@ -131,16 +131,7 @@ export function PhotosPanel(props: Props) {
             {c.name} <span className="text-muted ml-1">{counts[c.id] ?? 0}</span>
           </button>
         ))}
-        <button
-          className="eyebrow py-3 text-muted hover:text-ink whitespace-nowrap"
-          onClick={() => {
-            const name = prompt("Nom de la nouvelle collection (ex : Cérémonie)");
-            if (name) run(async () => {
-              const r = await addCollection(props.galleryId, name);
-              if (r.error) throw new Error(r.error);
-            });
-          }}
-        >
+        <button className="eyebrow py-3 text-muted hover:text-ink whitespace-nowrap" onClick={() => promptNewCollection(props.galleryId, run)}>
           + Collection
         </button>
       </div>
@@ -151,55 +142,14 @@ export function PhotosPanel(props: Props) {
               <DotsIcon />
             </button>
             {actions && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setActions(false)} />
-                <div className="absolute right-0 mt-1 z-20 w-64 bg-bg-soft border border-line py-1 shadow-xl text-sm" onClick={() => setActions(false)}>
-                  <button
-                    className="block w-full text-left px-4 py-3 hover:bg-bg"
-                    onClick={() => {
-                      const name = prompt("Nom de la nouvelle collection (ex : Cérémonie)");
-                      if (name) run(async () => {
-                        const r = await addCollection(props.galleryId, name);
-                        if (r.error) throw new Error(r.error);
-                      });
-                    }}
-                  >
-                    Nouvelle collection
-                  </button>
-                  <button className="block w-full text-left px-4 py-3 hover:bg-bg" onClick={() => run(() => post("/api/admin/photos/sort-by-date", { collectionId: active.id }))}>
-                    Trier par date de prise de vue
-                  </button>
-                  <button
-                    className="block w-full text-left px-4 py-3 hover:bg-bg"
-                    onClick={() => {
-                      const name = prompt("Nouveau nom", active.name);
-                      if (name && name !== active.name) run(async () => {
-                        const r = await renameCollection(props.galleryId, active.id, name);
-                        if (r.error) throw new Error(r.error);
-                      });
-                    }}
-                  >
-                    Renommer la collection
-                  </button>
-                  {props.collections.length > 1 && (
-                    <>
-                      <button className="block w-full text-left px-4 py-3 hover:bg-bg" onClick={() => moveCollection(-1)}>Déplacer vers la gauche</button>
-                      <button className="block w-full text-left px-4 py-3 hover:bg-bg" onClick={() => moveCollection(1)}>Déplacer vers la droite</button>
-                    </>
-                  )}
-                  <button
-                    className="block w-full text-left px-4 py-3 text-danger hover:bg-bg"
-                    onClick={() => {
-                      if (confirm(`Supprimer la collection « ${active.name} » et ses ${counts[active.id] ?? 0} photos ?`)) {
-                        run(() => purge("collection", active.id));
-                      }
-                    }}
-                  >
-                    Supprimer la collection
-                  </button>
-                  <p className="px-4 pt-2 pb-2 text-[11px] text-muted border-t border-line mt-1">Astuce : maintenez une photo puis glissez-la pour la déplacer.</p>
-                </div>
-              </>
+              <CollectionMenu
+                galleryId={props.galleryId}
+                collection={active}
+                collections={props.collections}
+                count={counts[active.id] ?? 0}
+                run={run}
+                onClose={() => setActions(false)}
+              />
             )}
           </div>
         </div>
@@ -212,9 +162,9 @@ export function PhotosPanel(props: Props) {
           <span className="text-accent">Touchez ici pour ajouter des photos</span>
         </button>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={() => (dragging.current = true)} onDragCancel={endDrag} onDragEnd={onDragEnd}>
+        <DndContext id="photos" sensors={sensors} collisionDetection={closestCenter} onDragStart={() => (dragging.current = true)} onDragCancel={endDrag} onDragEnd={onDragEnd}>
           <SortableContext items={order.map((p) => p.id)} strategy={rectSortingStrategy}>
-            <ul className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+            <ul className={`grid grid-cols-3 sm:grid-cols-4 gap-2 ${large ? "lg:grid-cols-4 xl:grid-cols-5 lg:gap-6" : "lg:grid-cols-6 xl:grid-cols-8 lg:gap-3"}`}>
               {order.map((p) => (
                 <SortablePhoto
                   key={p.id}
@@ -295,7 +245,7 @@ function SortablePhoto({
       onClick={onOpen}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={photo.thumb} alt={photo.filename} loading="lazy" draggable={false} className="w-full h-full object-cover" />
+      <img src={photo.thumb} alt={photo.filename} loading="lazy" draggable={false} className="w-full h-full object-cover lg:object-contain lg:p-[7%]" />
       {isCover && <span className="absolute top-1.5 left-1.5 bg-black/60 text-white text-[10px] tracking-widest uppercase px-1.5 py-0.5">Couverture</span>}
       {(favorites > 0 || downloads > 0) && (
         <span className="absolute bottom-1.5 left-1.5 flex items-center gap-2 text-white text-[11px] drop-shadow">

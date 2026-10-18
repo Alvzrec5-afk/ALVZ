@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { GalleryDesign } from "@/lib/design";
 import type { Collection, PhotoView } from "@/lib/types";
-import { ArrowLeft, BrushIcon, CloseIcon, DotsIcon, GearIcon, HeartIcon, ImageIcon, MenuIcon, PencilIcon } from "@/components/icons";
+import { formatLongDate } from "@/lib/dates";
+import { ArrowLeft, BrushIcon, ChevronDown, CloseIcon, DotsIcon, GearIcon, HeartIcon, ImageIcon, MenuIcon, PencilIcon } from "@/components/icons";
+import { CollectionsSidebar } from "./collections-sidebar";
 import { PhotosPanel } from "./photos-panel";
 import { DesignPanel } from "./design-panel";
 import { SettingsPanel } from "./settings-panel";
@@ -52,6 +54,13 @@ export function GalleryManager(props: Props) {
   const [menu, setMenu] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const [activityTab, setActivityTab] = useState<"favorites" | "downloads">("favorites");
+  const [activeCollection, setActiveCollection] = useState(props.collections[0]?.id ?? "");
+  const [plus, setPlus] = useState(false);
+  const collectionCounts = props.photos.reduce<Record<string, number>>((acc, p) => {
+    acc[p.collectionId] = (acc[p.collectionId] ?? 0) + 1;
+    return acc;
+  }, {});
+  const cover = props.photos.find((p) => p.id === gallery.coverPhotoId) ?? props.photos[0];
   const downloadCounts = props.downloads.reduce<Record<string, number>>((acc, d) => {
     if (d.kind === "photo" && d.photo_id) acc[d.photo_id] = (acc[d.photo_id] ?? 0) + 1;
     return acc;
@@ -62,12 +71,14 @@ export function GalleryManager(props: Props) {
   async function copy() {
     await navigator.clipboard.writeText(`${window.location.origin}/g/${gallery.slug}`);
     setMenu(false);
+    setPlus(false);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
   async function remove() {
     setMenu(false);
+    setPlus(false);
     if (!confirm(`Supprimer définitivement la galerie « ${gallery.title} » et toutes ses photos ?`)) return;
     setDeleting(true);
     try {
@@ -81,10 +92,53 @@ export function GalleryManager(props: Props) {
   }
 
   const status = gallery.expired ? "bg-danger" : props.photos.length > 0 ? "bg-emerald-500" : "bg-muted";
+  const statusLabel = gallery.expired ? "Expirée" : props.photos.length > 0 ? "En ligne" : "Vide";
+  const activityItems = [
+    ["favorites", "Favoris", props.favoriteLists.length],
+    ["downloads", "Téléchargements", props.downloads.length],
+  ] as const;
 
   return (
-    <div className={deleting ? "opacity-40 pointer-events-none" : ""}>
-      {/* En-tête */}
+    <div className={`lg:h-svh lg:flex lg:flex-col ${deleting ? "opacity-40 pointer-events-none" : ""}`}>
+      {/* Ordinateur : barre du haut (retour, nom, statut, aperçu, partage) */}
+      <div className="hidden lg:flex items-center gap-4 h-[72px] shrink-0 px-5 border-b border-line">
+        <Link href="/admin" className="icon-btn" aria-label="Retour aux galeries">
+          <ArrowLeft />
+        </Link>
+        <div className="min-w-0">
+          <h1 className="text-lg truncate leading-tight">{gallery.title}</h1>
+          <button onClick={() => setTab("settings")} className="text-[13px] text-muted hover:text-ink">
+            {formatLongDate(gallery.eventDate || null) || "Ajouter une date d'événement"}
+          </button>
+        </div>
+        <span className={`ml-2 shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-semibold tracking-widest uppercase ${gallery.expired ? "bg-danger/15 text-danger" : props.photos.length > 0 ? "bg-emerald-500/15 text-emerald-600" : "bg-bg-soft text-muted"}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${status}`} /> {statusLabel}
+        </span>
+        <div className="flex-1" />
+        {copied && <span className="text-xs text-accent">Lien copié ✓</span>}
+        <div className="relative">
+          <button onClick={() => setPlus((o) => !o)} className="flex items-center gap-1 px-3 h-10 text-sm text-muted hover:text-ink">
+            Plus <ChevronDown className="w-4 h-4" />
+          </button>
+          {plus && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setPlus(false)} />
+              <div className="absolute right-0 mt-1 z-20 w-56 bg-bg-soft border border-line py-1 shadow-xl text-sm">
+                <button className="block w-full text-left px-4 py-3 hover:bg-bg" onClick={copy}>Copier le lien client</button>
+                <button className="block w-full text-left px-4 py-3 hover:bg-bg" onClick={() => { setTab("settings"); setPlus(false); }}>Paramètres de la galerie</button>
+                <button className="block w-full text-left px-4 py-3 text-danger hover:bg-bg" onClick={remove}>Supprimer la galerie</button>
+              </div>
+            </>
+          )}
+        </div>
+        <a href={`/g/${gallery.slug}`} target="_blank" rel="noreferrer" className="px-3 h-10 flex items-center text-sm text-muted hover:text-ink">
+          Aperçu
+        </a>
+        <button onClick={copy} className="btn">Partager</button>
+      </div>
+
+      {/* Mobile : en-tête */}
+      <div className="lg:hidden">
       <div className="flex items-center gap-2 -mx-2">
         <Link href="/admin" className="icon-btn" aria-label="Retour aux galeries">
           <ArrowLeft />
@@ -154,10 +208,73 @@ export function GalleryManager(props: Props) {
       {tab !== "photos" && (
         <button onClick={() => setTab("photos")} className="mt-6 eyebrow text-muted hover:text-ink">← Photos</button>
       )}
+      </div>
 
-      <div className="pt-6">
+      <div className="lg:flex lg:flex-1 lg:min-h-0">
+      {/* Ordinateur : colonne de gauche (couverture, onglets, collections) */}
+      <aside className="hidden lg:block w-80 shrink-0 border-r border-line overflow-y-auto">
+        <button onClick={() => setTab("design")} className="block w-full aspect-[16/10] bg-bg-soft overflow-hidden" title="Modifier la couverture">
+          {cover ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={cover.web} alt="" className="w-full h-full object-cover" style={{ objectPosition: `${gallery.design.cover_focus_x}% ${gallery.design.cover_focus_y}%` }} />
+          ) : (
+            <span className="eyebrow text-muted">Aucune couverture</span>
+          )}
+        </button>
+        <div className="grid grid-cols-4 border-b border-line">
+          {TABS.map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              title={label}
+              aria-label={label}
+              className={`h-14 flex items-center justify-center border-b-2 -mb-px transition-colors ${tab === id ? "border-emerald-500 text-ink" : "border-transparent text-muted hover:text-ink"}`}
+            >
+              <Icon className="w-5 h-5" />
+            </button>
+          ))}
+        </div>
+        {tab === "photos" && (
+          <CollectionsSidebar
+            galleryId={gallery.id}
+            collections={props.collections}
+            counts={collectionCounts}
+            activeId={activeCollection}
+            onActive={setActiveCollection}
+          />
+        )}
+        {tab === "activity" && (
+          <div>
+            <p className="eyebrow text-muted px-6 h-14 flex items-center">Activité</p>
+            {activityItems.map(([k, label, n]) => (
+              <button
+                key={k}
+                onClick={() => setActivityTab(k)}
+                className={`w-full flex items-center justify-between px-6 h-14 text-[15px] transition-colors ${activityTab === k ? "bg-bg-soft text-ink" : "text-muted hover:text-ink"}`}
+              >
+                {label} <span className="text-sm text-muted">{n}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {(tab === "design" || tab === "settings") && (
+          <div className="px-6 py-5">
+            <p className="eyebrow text-muted">{tab === "design" ? "Design" : "Paramètres"}</p>
+            <p className="text-sm text-muted mt-3 leading-relaxed">
+              {tab === "design"
+                ? "Couverture, typographie, couleurs et grille de la galerie que voient vos clients."
+                : "Nom, date, lien, mot de passe, expiration, téléchargements, favoris et filigrane."}
+            </p>
+          </div>
+        )}
+      </aside>
+
+      <div className="pt-6 lg:pt-8 lg:flex-1 lg:overflow-y-auto lg:px-10 lg:pb-16">
+      <div className={tab === "photos" ? "" : "lg:max-w-2xl"}>
         {tab === "photos" && (
           <PhotosPanel
+            activeId={activeCollection}
+            onActive={setActiveCollection}
             galleryId={gallery.id}
             coverPhotoId={gallery.coverPhotoId}
             collections={props.collections}
@@ -174,7 +291,7 @@ export function GalleryManager(props: Props) {
         {tab === "settings" && <SettingsPanel gallery={gallery} onDelete={remove} />}
         {tab === "activity" && (
           <div>
-            <div className="flex border border-line mb-10">
+            <div className="flex border border-line mb-10 lg:hidden">
               {([
                 ["favorites", `Favoris (${props.favoriteLists.length})`],
                 ["downloads", `Téléchargements (${props.downloads.length})`],
@@ -195,6 +312,8 @@ export function GalleryManager(props: Props) {
             )}
           </div>
         )}
+      </div>
+      </div>
       </div>
     </div>
   );
