@@ -120,7 +120,9 @@ Carte `table` (bouton « Tableau », = Tableau de Milanote) : `data.cells` (lign
 Tab / Entrée pour avancer, boutons + / − Ligne / Colonne ; tableaux Markdown « | a | b | » de l'import Milanote.
 Le bouton des sous-tableaux s'appelle « Planche » (comme Milanote). Le canevas annule tout défilement natif
 (`onScroll`) : sinon le focus d'un champ décale la vue.
-Liste des tableaux : menu ⋯ (`board-card-menu.tsx`) Renommer / Dupliquer / Supprimer ; « Dupliquer le tableau »
+Liste des tableaux (`boards-list.tsx`) : grille ou liste à petites vignettes (choix mémorisé, `boards-view`) ;
+vignette = couverture choisie (`boards.cover_key`, envoi via `/api/admin/boards/[id]/cover`, `setBoardCover`) sinon
+le nom du projet en grand. Menu ⋯ (`board-card-menu.tsx`) Renommer / Dupliquer / Choisir ou retirer la couverture / Supprimer ; « Dupliquer le tableau »
 aussi dans le menu Plus. `duplicateBoard` (`lib/boards.ts`) copie planches, cartes (ids renouvelés, flèches et
 colonnes reliées) et images (CopyObject Oracle) ; copie non partagée ; une planche copiée reste dans son parent.
 Carte `comment` : messages dans la table `board_comments` (ajout seul, jamais écrasés par l'enregistrement des
@@ -173,6 +175,9 @@ images des tableaux). Schéma de référence :
 `supabase/schema.sql` (à tenir à jour après chaque migration).
 
 ## En attente / idées discutées
+
+- **Migration à appliquer au moment de publier** (pas encore faite sur Supabase) : le dernier bloc de
+  `supabase/schema.sql` (`boards.cover_key`, `boards.cover_size`, nouvelle `storage_usage()`). Puis retirer cette ligne.
 
 - Tableaux, idées pour la suite : annuler / rétablir, commentaires sur une carte, aperçu des liens
   (Pinterest, Instagram), cocher les listes du studio côté client, temps réel au lieu du rafraîchissement.

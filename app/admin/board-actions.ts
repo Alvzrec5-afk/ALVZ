@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdminApi } from "@/lib/auth";
 import { duplicateBoard as copyBoard, isUuid, purgeBoard, templateBoardId } from "@/lib/boards";
+import { deleteKeys } from "@/lib/storage";
 import { newSlug } from "@/lib/tokens";
 import type { FormState } from "./actions";
 
@@ -160,5 +161,22 @@ export async function purgeTrashedBoard(id: string) {
   if (!data) return { error: "Ce tableau n'est pas dans la corbeille." };
   await purgeBoard(supabase, id);
   revalidatePath("/admin/trash");
+  return {};
+}
+
+// ——— Couverture d'un tableau (liste des tableaux) ———
+
+/** Enregistre la couverture envoyée (et efface l'ancienne). Sans `key` : retour au nom du projet en grand. */
+export async function setBoardCover(boardId: string, cover: { key: string; size: number } | null) {
+  const { supabase } = await requireAdminApi();
+  if (cover && !new RegExp(`^boards/${boardId}/cover-[0-9a-f]{12}\\.jpg$`).test(cover.key)) return { error: "Couverture invalide" };
+  const { data: before } = await supabase.from("boards").select("cover_key").eq("id", boardId).maybeSingle();
+  const { error } = await supabase
+    .from("boards")
+    .update({ cover_key: cover?.key ?? null, cover_size: cover ? Math.max(0, Math.round(cover.size)) : 0 })
+    .eq("id", boardId);
+  if (error) return { error: error.message };
+  if (before?.cover_key && before.cover_key !== cover?.key) await deleteKeys([before.cover_key as string]).catch(() => undefined);
+  revalidatePath("/admin/boards");
   return {};
 }

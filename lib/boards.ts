@@ -566,6 +566,8 @@ export async function purgeBoard(db: SupabaseClient, boardId: string, expectedPa
   }
   const { data: images } = await db.from("board_items").select("id, board_id").in("board_id", all).eq("kind", "image");
   if (images?.length) await deleteKeys(images.map((r) => boardImageKey(r.board_id as string, r.id as string)));
+  const { data: covers } = await db.from("boards").select("cover_key").in("id", all).not("cover_key", "is", null);
+  if (covers?.length) await deleteKeys(covers.map((c) => c.cover_key as string));
   // Les sous-tableaux disparaissent avec le tableau (suppression en cascade).
   const { error } = await db.from("boards").delete().eq("id", boardId);
   if (error) throw new Error(error.message);

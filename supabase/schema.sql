@@ -348,3 +348,26 @@ create index board_items_deleted_idx on public.board_items (board_id, deleted_at
 
 -- Modèle des nouveaux tableaux : un tableau spécial que le studio modifie ; chaque nouveau tableau en est une copie.
 alter table public.boards add column is_template boolean not null default false;
+
+-- Couverture choisie pour un tableau (vignette de la liste des tableaux).
+alter table public.boards add column cover_key text;
+alter table public.boards add column cover_size bigint not null default 0;
+create or replace function public.storage_usage()
+returns table (gallery_id uuid, bytes bigint)
+language sql stable security invoker set search_path = '' as $$
+  select t.gallery_id, sum(t.bytes)::bigint
+  from (
+    select p.gallery_id, p.size_bytes + case when p.variants_bytes > 0 then p.variants_bytes else 1000000 end as bytes
+    from public.photos p
+    union all
+    select v.gallery_id, v.size_bytes + v.extra_bytes
+    from public.videos v
+    union all
+    select b.gallery_id, i.size_bytes
+    from public.board_items i join public.boards b on b.id = i.board_id
+    where i.size_bytes > 0
+    union all
+    select b.gallery_id, b.cover_size from public.boards b where b.cover_size > 0
+  ) t
+  group by t.gallery_id;
+$$;
