@@ -999,6 +999,27 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       }
       return;
     }
+    // Au doigt (téléphone, tablette) : glisser fait défiler le tableau, même sur une carte.
+    // Un toucher sélectionne la carte ; une fois sélectionnée, on peut la faire glisser.
+    if (e.pointerType !== "mouse" && selected !== it.id && !groupRef.current.includes(it.id)) {
+      const sx = e.clientX;
+      const sy = e.clientY;
+      const pid = e.pointerId;
+      const tap = (ev: PointerEvent) => {
+        if (ev.pointerId !== pid) return;
+        window.removeEventListener("pointerup", tap);
+        window.removeEventListener("pointercancel", cancel);
+        // Le fond a déjà désélectionné et fait défiler ; un simple toucher sélectionne la carte.
+        if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 8 && pointers.current.size <= 1) setSelected(it.id);
+      };
+      const cancel = () => {
+        window.removeEventListener("pointerup", tap);
+        window.removeEventListener("pointercancel", cancel);
+      };
+      window.addEventListener("pointerup", tap);
+      window.addEventListener("pointercancel", cancel);
+      return; // l'évènement continue jusqu'au fond, qui fait défiler / zoomer
+    }
     if (!canEdit(it)) return; // carte du studio côté client : le geste déplace le tableau
     e.stopPropagation();
     if (editing?.id !== it.id) setEditing(null);

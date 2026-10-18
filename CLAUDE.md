@@ -106,7 +106,8 @@ client : `/t/<lien>/b/<id>` (`resolveSharedBoard` vérifie que le sous-tableau e
 Cartes `color` (teinte + nom) et `link` (lecteur YouTube/Vimeo/Spotify/SoundCloud/Deezer via `linkEmbed`, chargé
 seulement au clic sur ▶ ; coller un lien crée une carte lien). Sélection multiple : glisser sur le fond à la souris
 (cadre), Maj + clic, Cmd/Ctrl + A ; le tableau se déplace alors à la molette / pavé tactile, espace + glisser ou
-bouton du milieu ; au doigt, glisser déplace toujours le tableau.
+bouton du milieu. Au doigt (téléphone / tablette, studio et clients) : glisser fait toujours défiler le tableau,
+même sur une carte ; un toucher sélectionne la carte, et seule une carte sélectionnée se déplace (`startDrag`).
 Couleurs : toute carte (sauf flèche) a un fond `data.color` (teinte douce, `NOTE_COLORS`) ou `data.hex` (couleur
 pleine `SOLID_COLORS` ou libre) ; texte blanc/encre auto (`inkOn`), ou forcé par `data.ink` (« Texte : Auto / Noir /
 Blanc » dans la palette) ; `inkStyle` redéfinit aussi --ink / --muted / --line dans la carte (colonne : en-tête seul) ; palette dans la barre de la carte et pour une
