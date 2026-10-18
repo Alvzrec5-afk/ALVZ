@@ -7,8 +7,14 @@ import { BoardHeader } from "@/components/admin/board-header";
 export const metadata = { title: "Tableau" };
 export const dynamic = "force-dynamic";
 
-export default async function BoardPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export default async function BoardPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ import?: string }>;
+}) {
+  const [{ id }, query] = await Promise.all([params, searchParams]);
   if (!isUuid(id)) notFound();
   const { supabase } = await requireAdminPage();
   const [{ data: board }, items, { data: galleries }] = await Promise.all([
@@ -28,6 +34,7 @@ export default async function BoardPage({ params }: { params: Promise<{ id: stri
           imageEndpoint={`/api/admin/boards/${id}/image`}
           role="admin"
           canAdd
+          openImport={query.import === "1"}
         />
       </div>
     </div>

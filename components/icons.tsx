@@ -213,3 +213,8 @@ export const FitIcon = ({ className = "w-5 h-5" }: P) => (
     <path d="M4 9V4.5h4.5M15.5 4.5H20V9M20 15v4.5h-4.5M8.5 19.5H4V15" />
   </svg>
 );
+export const ImportIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <path d="M12 3.5v10m0 0-4-4m4 4 4-4M4.5 14v5.5h15V14" />
+  </svg>
+);

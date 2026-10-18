@@ -41,8 +41,12 @@ export class BoardSync {
 
   async flush(keepalive = false) {
     if (this.inflight.size || !this.queue.size) return;
-    for (const [id, op] of this.queue) this.inflight.set(id, op);
-    this.queue.clear();
+    // Par paquets de 300 au plus (gros import) : le reste part juste après.
+    for (const [id, op] of this.queue) {
+      if (this.inflight.size >= 300) break;
+      this.inflight.set(id, op);
+    }
+    for (const id of this.inflight.keys()) this.queue.delete(id);
     try {
       const res = await fetch(this.endpoint, {
         method: "POST",

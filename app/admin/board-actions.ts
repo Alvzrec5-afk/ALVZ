@@ -30,7 +30,7 @@ export async function createBoard(_: FormState, form: FormData): Promise<FormSta
   const gallery = String(form.get("gallery_id") ?? "");
   const res = await insertBoard(title, template, isUuid(gallery) ? gallery : null);
   if ("error" in res) return { error: res.error };
-  redirect(`/admin/boards/${res.id}`);
+  redirect(`/admin/boards/${res.id}${template === "milanote" ? "?import=1" : ""}`);
 }
 
 /** Depuis une galerie ou un projet vidéo : ouvre son tableau de préparation (créé au premier clic). */

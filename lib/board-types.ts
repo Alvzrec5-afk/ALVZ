@@ -64,6 +64,7 @@ export const TEMPLATES = {
   shooting: "Préparation shooting",
   mariage: "Mariage — jour J",
   clip: "Clip / tournage",
+  milanote: "Depuis Milanote",
 } as const;
 export type TemplateId = keyof typeof TEMPLATES;
 
@@ -73,6 +74,7 @@ export const TEMPLATE_HINTS: Record<TemplateId, string> = {
   shooting: "Matériel, liste de plans, infos pratiques, repérages.",
   mariage: "Déroulé, photos de groupe, contacts, inspirations.",
   clip: "Storyboard en 3 plans reliés, matériel, musique.",
+  milanote: "Importez un tableau exporté de Milanote (texte + images).",
 };
 
 const uid = () => crypto.randomUUID();

@@ -13,6 +13,7 @@ import {
   type NoteColor,
 } from "@/lib/board-types";
 import { makeBoardImage } from "@/lib/client/image";
+import { groupZipImages, isImageName, isTextName, parseMilanoteText, readZip } from "@/lib/client/milanote";
 import {
   ChecklistIcon,
   CloseIcon,
@@ -20,6 +21,7 @@ import {
   ConnectorIcon,
   FitIcon,
   ImageIcon,
+  ImportIcon,
   MinusIcon,
   NoteIcon,
   PencilIcon,
@@ -45,6 +47,8 @@ type Props = {
   /** Client : prénom déjà donné (sinon demandé au premier ajout). */
   visitorName?: string | null;
   joinEndpoint?: string;
+  /** Ouvre la fenêtre d'import Milanote dès l'arrivée (tableau créé « Depuis Milanote »). */
+  openImport?: boolean;
 };
 
 const MIN_ZOOM = 0.15;
@@ -173,7 +177,7 @@ function InlineInput({
   );
 }
 
-export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAdd, visitorName, joinEndpoint }: Props) {
+export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAdd, visitorName, joinEndpoint, openImport }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [items, setItemsState] = useState<Items>(() => Object.fromEntries(initialItems.map((i) => [i.id, i])));
@@ -338,60 +342,196 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     setEditing({ id: it.id, field: "title" });
   };
 
+  /**
+   * Prépare et envoie des images, une par une. `place` décide où va chaque image (ex. dans une colonne,
+   * lors d'un import) ; sans lui, elles s'empilent légèrement décalées. Renvoie les échecs au lieu d'alerter.
+   */
+  const uploadImages = useCallback(
+    async (
+      files: File[],
+      at?: { x: number; y: number },
+      place?: (i: number, size: { width: number; height: number }) => Partial<BoardItem>,
+      onProgress?: (done: number) => void,
+    ) => {
+      const images = files.filter((f) => f.type.startsWith("image/") || /\.(jpe?g|png|webp|heic|heif|avif|gif)$/i.test(f.name));
+      const failed: string[] = [];
+      for (const [i, file] of images.entries()) {
+        onProgress?.(i);
+        const pos = at ? { x: at.x + i * 30, y: at.y + i * 30 } : undefined;
+        let prepared: Awaited<ReturnType<typeof makeBoardImage>>;
+        try {
+          prepared = await makeBoardImage(file);
+        } catch (e) {
+          failed.push(`${file.name} : ${e instanceof Error ? e.message : e}`);
+          continue;
+        }
+        const id = crypto.randomUUID();
+        uploading.current.add(id);
+        const it = create("image", { caption: "", width: prepared.width, height: prepared.height }, pos, {
+          id,
+          src: URL.createObjectURL(prepared.blob),
+          ...place?.(i, prepared),
+        });
+        try {
+          if (role === "client") {
+            // Client : le serveur vérifie l'image et crée la carte.
+            const res = await fetch(imageEndpoint, {
+              method: "POST",
+              headers: { "Content-Type": "image/jpeg", "x-board-item": JSON.stringify(toInput(itemsRef.current[id] ?? it)) },
+              body: prepared.blob,
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(json.error || `Erreur ${res.status}`);
+          } else {
+            // Studio : envoi direct vers Oracle.
+            const res = await fetch(imageEndpoint, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ itemId: it.id, size: prepared.blob.size }),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(json.error || `Erreur ${res.status}`);
+            const put = await fetch(json.url, { method: "PUT", headers: { "Content-Type": "image/jpeg" }, body: prepared.blob });
+            if (!put.ok) throw new Error(`Envoi refusé (${put.status})`);
+          }
+          uploading.current.delete(id);
+          const latest = itemsRef.current[id];
+          if (latest) sync.push({ op: "put", item: { ...toInput(latest), sizeBytes: prepared.blob.size } });
+        } catch (e) {
+          uploading.current.delete(id);
+          const all = { ...itemsRef.current };
+          delete all[id];
+          setItems(all);
+          failed.push(`${file.name} : ${e instanceof Error ? e.message : e}`);
+        }
+      }
+      onProgress?.(images.length);
+      return failed;
+    },
+    [create, imageEndpoint, role, setItems, sync],
+  );
+
   const addImages = useCallback(
     (files: File[], at?: { x: number; y: number }) =>
       ensureName(async () => {
-        const images = files.filter((f) => f.type.startsWith("image/") || /\.(jpe?g|png|webp|heic|heif|avif|gif)$/i.test(f.name));
-        for (const [i, file] of images.entries()) {
-          const pos = at ? { x: at.x + i * 30, y: at.y + i * 30 } : undefined;
-          let prepared: Awaited<ReturnType<typeof makeBoardImage>>;
-          try {
-            prepared = await makeBoardImage(file);
-          } catch (e) {
-            alert(`${file.name} : ${e instanceof Error ? e.message : e}`);
-            continue;
-          }
-          const id = crypto.randomUUID();
-          uploading.current.add(id);
-          const it = create("image", { caption: "", width: prepared.width, height: prepared.height }, pos, {
-            id,
-            src: URL.createObjectURL(prepared.blob),
-          });
-          try {
-            if (role === "client") {
-              // Client : le serveur vérifie l'image et crée la carte.
-              const res = await fetch(imageEndpoint, {
-                method: "POST",
-                headers: { "Content-Type": "image/jpeg", "x-board-item": JSON.stringify(toInput(itemsRef.current[id] ?? it)) },
-                body: prepared.blob,
-              });
-              const json = await res.json().catch(() => ({}));
-              if (!res.ok) throw new Error(json.error || `Erreur ${res.status}`);
-            } else {
-              // Studio : envoi direct vers Oracle.
-              const res = await fetch(imageEndpoint, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ itemId: it.id, size: prepared.blob.size }),
-              });
-              const json = await res.json().catch(() => ({}));
-              if (!res.ok) throw new Error(json.error || `Erreur ${res.status}`);
-              const put = await fetch(json.url, { method: "PUT", headers: { "Content-Type": "image/jpeg" }, body: prepared.blob });
-              if (!put.ok) throw new Error(`Envoi refusé (${put.status})`);
-            }
-            uploading.current.delete(id);
-            const latest = itemsRef.current[id];
-            if (latest) sync.push({ op: "put", item: { ...toInput(latest), sizeBytes: prepared.blob.size } });
-          } catch (e) {
-            uploading.current.delete(id);
-            const all = { ...itemsRef.current };
-            delete all[id];
-            setItems(all);
-            alert(`Image non envoyée : ${e instanceof Error ? e.message : e}`);
+        const failed = await uploadImages(files, at);
+        if (failed.length) alert(`Image${failed.length > 1 ? "s" : ""} non envoyée${failed.length > 1 ? "s" : ""} :\n${failed.join("\n")}`);
+      }),
+    [ensureName, uploadImages],
+  );
+
+  // ——— Import Milanote (studio) ———
+
+  const [importing, setImporting] = useState<string | null>(null);
+  const fitRef = useRef<() => void>(() => {}); // « Tout voir », défini plus bas
+  const [importOpen, setImportOpen] = useState(Boolean(openImport) && role === "admin");
+
+  /** Exports Milanote (Markdown / texte, ZIP d'images, images seules) → cartes, à droite du contenu existant. */
+  const importMilanote = useCallback(
+    async (files: File[]) => {
+      setImportOpen(false);
+      setImporting("Lecture des fichiers…");
+      try {
+        const texts: File[] = [];
+        const imageGroups: { title: string | null; files: File[] }[] = [];
+        let other = 0;
+        for (const f of files) {
+          if (/\.zip$/i.test(f.name)) {
+            const entries = await readZip(f);
+            texts.push(...entries.filter((e) => isTextName(e.path)).map((e) => e.file));
+            imageGroups.push(...groupZipImages(entries));
+            other += entries.filter((e) => !isTextName(e.path) && !isImageName(e.path)).length;
+          } else if (isTextName(f.name) || f.type.startsWith("text/")) texts.push(f);
+          else if (isImageName(f.name) || f.type.startsWith("image/")) imageGroups.push({ title: null, files: [f] });
+          else other++;
+        }
+        const looseImages = imageGroups.filter((g) => !g.title).flatMap((g) => g.files);
+        const folders = imageGroups.filter((g) => g.title);
+
+        // Point de départ : à droite de ce qui existe déjà.
+        const boxes = Object.values(itemsRef.current)
+          .filter((i) => i.kind !== "arrow" && !i.parentId)
+          .map((i) => boxOf(i.id))
+          .filter((b): b is Box => Boolean(b));
+        const ox = boxes.length ? Math.max(...boxes.map((b) => b.x + b.w)) + 160 : 0;
+        const oy = boxes.length ? Math.min(...boxes.map((b) => b.y)) : 0;
+        let col = 0; // colonnes posées de gauche à droite
+        let z = maxZ();
+        const created: BoardItem[] = [];
+        const base = { author: null, mine: true, src: null, parentId: null, position: 0 } as const;
+        const column = (title: string) => {
+          const c: BoardItem = { ...base, id: crypto.randomUUID(), kind: "column", x: ox + col++ * 320, y: oy, w: 280, z: ++z, data: { title, color: "blanc" } };
+          created.push(c);
+          return c;
+        };
+
+        let skippedImages = 0;
+        for (const t of texts) {
+          const parsed = parseMilanoteText(await t.text());
+          skippedImages += parsed.skippedImages;
+          for (const g of parsed.groups) {
+            const parent = column(g.title ?? (texts.length > 1 ? t.name.replace(/\.\w+$/, "") : "Notes"));
+            g.cards.forEach((card, i) =>
+              created.push({
+                ...base,
+                id: crypto.randomUUID(),
+                kind: card.kind,
+                x: parent.x,
+                y: parent.y,
+                w: 280,
+                z: ++z,
+                parentId: parent.id,
+                position: i,
+                data: card.kind === "note" ? { text: card.text, color: "blanc" } : { title: card.title, items: card.items },
+              }),
+            );
           }
         }
-      }),
-    [create, ensureName, imageEndpoint, role, setItems, sync],
+        // Un dossier d'images qui porte le nom d'une colonne du texte va dans cette colonne.
+        const byTitle = new Map(created.filter((c) => c.kind === "column").map((c) => [String(c.data.title).toLowerCase(), c]));
+        const count = (id: string) => created.filter((c) => c.parentId === id).length;
+        const folderColumns = folders.map((f) => {
+          const existing = byTitle.get(f.title!.toLowerCase());
+          return { col: existing ?? column(f.title!), files: f.files, start: existing ? count(existing.id) : 0 };
+        });
+        const looseColumn = looseImages.length ? column(folders.length || texts.length ? "Images" : "Images importées") : null;
+
+        if (created.length) {
+          const all = { ...itemsRef.current };
+          for (const it of created) all[it.id] = it;
+          setItems(all);
+          // Colonnes d'abord, pour que leurs cartes puissent y être rangées.
+          for (const it of [...created].sort((a, b) => Number(a.kind !== "column") - Number(b.kind !== "column"))) persist(it);
+        }
+        requestAnimationFrame(() => fitRef.current());
+
+        const total = folderColumns.reduce((n, f) => n + f.files.length, 0) + looseImages.length;
+        let sent = 0;
+        const failed: string[] = [];
+        for (const { col: c, files: list, start } of [...folderColumns, ...(looseColumn ? [{ col: looseColumn, files: looseImages, start: 0 }] : [])]) {
+          failed.push(
+            ...(await uploadImages(list, undefined, (i) => ({ parentId: c.id, position: start + i, x: c.x, y: c.y, w: 280 }), (d) =>
+              setImporting(`Envoi des images… ${Math.min(total, sent + d)} / ${total}`),
+            )),
+          );
+          sent += list.length;
+        }
+        setSelected(null);
+        requestAnimationFrame(() => fitRef.current());
+
+        const notes: string[] = [];
+        if (skippedImages && !total) notes.push(`${skippedImages} image(s) citée(s) dans le texte : importez aussi le ZIP (Export → Generate ZIP) pour les récupérer.`);
+        if (other) notes.push(`${other} fichier(s) ignoré(s) (PDF, vidéos, documents…).`);
+        if (failed.length) notes.push(`Images non envoyées :\n${failed.slice(0, 10).join("\n")}`);
+        if (!created.length && !total) notes.unshift("Rien à importer dans ces fichiers.");
+        if (notes.length) alert(notes.join("\n\n"));
+      } catch (e) {
+        alert(`Import impossible : ${e instanceof Error ? e.message : e}`);
+      } finally {
+        setImporting(null);
+      }
+    },
+    [boxOf, fitRef, persist, setItems, uploadImages],
   );
 
   // ——— Rangement, ordre d'affichage ———
@@ -640,6 +780,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     }
     setView({ k, x: (width - (maxX - minX) * k) / 2 - minX * k, y: Math.max(pad, (height - (maxY - minY) * k) / 2) - minY * k });
   }, [boxOf, setView]);
+  fitRef.current = fit;
 
   // Vue d'ensemble à l'ouverture, dès que la zone du tableau a sa taille définitive.
   useLayoutEffect(() => {
@@ -672,6 +813,13 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     };
     if (JSON.stringify(next) !== JSON.stringify(geom)) setGeom(next);
   });
+
+  // Menu « Plus » de la barre du haut → fenêtre d'import.
+  useEffect(() => {
+    const open = () => setImportOpen(true);
+    window.addEventListener("board:import", open);
+    return () => window.removeEventListener("board:import", open);
+  }, []);
 
   // ——— Clavier, coller, fichiers glissés ———
 
@@ -715,6 +863,11 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     if (!canAdd) return;
     const files = [...e.dataTransfer.files];
     if (!files.length) return;
+    // Export Milanote (texte ou ZIP) déposé directement sur le tableau.
+    if (role === "admin" && files.some((f) => /\.(zip|md|markdown|txt)$/i.test(f.name))) {
+      void importMilanote(files);
+      return;
+    }
     const o = rootRef.current!.getBoundingClientRect();
     const v = viewRef.current;
     addImages(files, { x: (e.clientX - o.left - v.x) / v.k, y: (e.clientY - o.top - v.y) / v.k });
@@ -987,12 +1140,13 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
 
   const sel = selected ? items[selected] : null;
   const selEditable = sel ? canEdit(sel) : false;
-  const tools: { label: string; Icon: typeof NoteIcon; run: () => void; admin?: boolean; active?: boolean }[] = [
+  const tools: { label: string; Icon: typeof NoteIcon; run: () => void; admin?: boolean; active?: boolean; desktop?: boolean }[] = [
     { label: "Note", Icon: NoteIcon, run: () => addNote() },
     { label: "Image", Icon: ImageIcon, run: () => ensureName(() => fileRef.current?.click()) },
     { label: "Liste", Icon: ChecklistIcon, run: addTodo },
     { label: "Colonne", Icon: ColumnIcon, run: addColumn, admin: true },
     { label: "Flèche", Icon: ConnectorIcon, run: () => setArrowMode((m) => (m ? null : { from: null })), admin: true, active: Boolean(arrowMode) },
+    { label: "Importer", Icon: ImportIcon, run: () => setImportOpen(true), admin: true, desktop: true },
   ];
   const visibleTools = tools.filter((t) => !t.admin || role === "admin");
   const v = view;
@@ -1067,11 +1221,12 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           data-ui
           className="absolute z-[200000] bg-bg border border-line shadow-lg flex rounded-[4px] left-1/2 -translate-x-1/2 bottom-[max(env(safe-area-inset-bottom),12px)] sm:left-4 sm:translate-x-0 sm:top-4 sm:bottom-auto sm:flex-col"
         >
-          {visibleTools.map(({ label, Icon, run, active }) => (
+          {visibleTools.map(({ label, Icon, run, active, desktop }) => (
             <button
               key={label}
               onClick={run}
-              className={`flex flex-col items-center justify-center gap-1 w-[60px] h-[58px] text-[10px] tracking-wide transition-colors ${active ? "bg-emerald-500/15 text-emerald-600" : "text-muted hover:text-ink hover:bg-bg-soft"}`}
+              title={desktop ? "Importer un tableau Milanote" : undefined}
+              className={`${desktop ? "hidden sm:flex" : "flex"} flex-col items-center justify-center gap-1 w-[60px] h-[58px] text-[10px] tracking-wide transition-colors ${active ? "bg-emerald-500/15 text-emerald-600" : "text-muted hover:text-ink hover:bg-bg-soft"}`}
             >
               <Icon className="w-5 h-5" />
               {label}
@@ -1129,6 +1284,13 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
             Tableau vide. Ajoutez une note, une image ou une liste — ou glissez des photos ici.
             <span className="hidden sm:inline"> Double-clic n&apos;importe où pour écrire.</span>
           </p>
+        </div>
+      )}
+
+      {importOpen && <ImportDialog onCancel={() => setImportOpen(false)} onFiles={(f) => void importMilanote(f)} />}
+      {importing && (
+        <div data-ui className="absolute z-[200000] top-4 left-1/2 -translate-x-1/2 bg-ink text-bg text-xs px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> {importing}
         </div>
       )}
 
@@ -1254,6 +1416,69 @@ function NameDialog({ endpoint, onDone, onCancel }: { endpoint: string; onDone: 
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function ImportDialog({ onFiles, onCancel }: { onFiles: (files: File[]) => void; onCancel: () => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [over, setOver] = useState(false);
+  return (
+    <div data-ui className="absolute inset-0 z-[300000] flex items-center justify-center bg-black/40 p-4" onPointerDown={(e) => e.stopPropagation()} onClick={onCancel}>
+      <div className="w-full max-w-lg max-h-full overflow-y-auto bg-bg border border-line p-6 sm:p-8 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-4">
+          <p className="display text-2xl sm:text-3xl">Importer depuis Milanote</p>
+          <button className="icon-btn -mr-2 -mt-1" onClick={onCancel} aria-label="Fermer">
+            <CloseIcon />
+          </button>
+        </div>
+        <ol className="mt-6 space-y-4 text-sm leading-relaxed">
+          <li>
+            <span className="font-medium">1. Le texte.</span> Dans Milanote, ouvrez le tableau, cliquez sur <b>Export</b> en haut à
+            droite, puis <b>Markdown</b>. Un fichier <i>.md</i> se télécharge.
+          </li>
+          <li>
+            <span className="font-medium">2. Les images.</span> Toujours dans <b>Export</b>, choisissez <b>Generate ZIP</b>. Milanote
+            vous envoie un e-mail avec le lien : téléchargez le fichier <i>.zip</i>.
+          </li>
+          <li>
+            <span className="font-medium">3.</span> Déposez les deux fichiers ci-dessous (ou l&apos;un des deux).
+          </li>
+        </ol>
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setOver(true);
+          }}
+          onDragLeave={() => setOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setOver(false);
+            if (e.dataTransfer.files.length) onFiles([...e.dataTransfer.files]);
+          }}
+          onClick={() => input.current?.click()}
+          className={`mt-6 border border-dashed py-10 px-4 text-center cursor-pointer transition-colors ${over ? "border-emerald-500 bg-emerald-500/5" : "border-line hover:border-muted"}`}
+        >
+          <ImportIcon className="w-7 h-7 mx-auto text-muted" />
+          <p className="text-sm mt-3">Déposez le .md et le .zip ici</p>
+          <p className="text-xs text-muted mt-1">ou cliquez pour les choisir</p>
+        </div>
+        <input
+          ref={input}
+          type="file"
+          multiple
+          hidden
+          accept=".md,.markdown,.txt,.zip,image/*"
+          onChange={(e) => e.target.files?.length && onFiles([...e.target.files])}
+        />
+        <p className="text-xs text-muted mt-5 leading-relaxed">
+          Les titres deviennent des colonnes, les textes des notes, les cases à cocher des listes, et chaque dossier d&apos;images du
+          ZIP une colonne. Milanote n&apos;exporte ni la position exacte des cartes ni les flèches : tout arrive rangé en colonnes, à
+          droite de ce qui est déjà sur le tableau. Il ne reste qu&apos;à réorganiser.
+        </p>
+      </div>
     </div>
   );
 }

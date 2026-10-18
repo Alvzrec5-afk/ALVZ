@@ -75,6 +75,15 @@ export function BoardHeader({ board, galleries }: { board: Board; galleries: { i
                   Voir comme le client
                 </a>
               )}
+              <button
+                className="block w-full text-left px-4 py-3 hover:bg-bg"
+                onClick={() => {
+                  setPlus(false);
+                  window.dispatchEvent(new Event("board:import"));
+                }}
+              >
+                Importer depuis Milanote
+              </button>
               <button className="block w-full text-left px-4 py-3 hover:bg-bg" onClick={() => { setShare(true); setPlus(false); }}>
                 Partage et galerie reliée
               </button>
