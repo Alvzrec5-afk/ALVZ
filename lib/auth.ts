@@ -4,24 +4,44 @@ import { cache } from "react";
 import { createSessionClient } from "@/lib/supabase/server";
 
 /**
- * Vérifie la session une seule fois par requête (la mise en page et la page la partagent).
- * getClaims() contrôle la signature du jeton sur place, sans aller-retour vers Supabase Auth.
+ * Session lue une seule fois par requête. getClaims() contrôle la signature du jeton
+ * sur place, sans aller-retour vers Supabase Auth.
  */
-const getAdmin = cache(async () => {
+const getSession = cache(async () => {
   const supabase = await createSessionClient();
   const { data: auth } = await supabase.auth.getClaims();
   const id = auth?.claims?.sub;
-  if (!id) return { supabase, user: null, isAdmin: false };
-  const { data } = await supabase.from("admins").select("user_id").eq("user_id", id).maybeSingle();
-  return { supabase, user: { id }, isAdmin: Boolean(data) };
+  return { supabase, user: id ? { id } : null };
 });
 
-/** Pour les pages admin : redirige vers la connexion si besoin. */
+const isAdmin = cache(async (id: string) => {
+  const { supabase } = await getSession();
+  const { data } = await supabase.from("admins").select("user_id").eq("user_id", id).maybeSingle();
+  return Boolean(data);
+});
+
+async function getAdmin() {
+  const { supabase, user } = await getSession();
+  return { supabase, user, isAdmin: user ? await isAdmin(user.id) : false };
+}
+
+/**
+ * Pour les pages admin : il faut être connecté. Le contrôle « est bien l'admin »
+ * est fait par la mise en page (requireAdminLayout), rendue en même temps que la page :
+ * les requêtes de la page partent sans attendre ce contrôle (une attente de moins),
+ * et la base refuse de toute façon les données à un non-admin (règles RLS).
+ */
 export async function requireAdminPage() {
-  const { supabase, user, isAdmin } = await getAdmin();
+  const { supabase, user } = await getSession();
   if (!user) redirect("/admin/login");
-  if (!isAdmin) redirect("/admin/login?error=not-admin");
   return { supabase, user };
+}
+
+/** Mise en page du studio : redirige si le compte connecté n'est pas l'admin. */
+export async function requireAdminLayout() {
+  const { user, isAdmin: admin } = await getAdmin();
+  if (!user) redirect("/admin/login");
+  if (!admin) redirect("/admin/login?error=not-admin");
 }
 
 export class HttpError extends Error {

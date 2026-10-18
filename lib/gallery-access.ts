@@ -1,5 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { DESIGN_FIELDS, type GalleryDesign } from "@/lib/design";
 import { createServiceClient } from "@/lib/supabase/server";
 import { sign, unsign } from "@/lib/tokens";
@@ -22,12 +23,13 @@ export type PublicGallery = {
 
 export const GALLERY_FIELDS = `id, kind, slug, title, event_date, cover_photo_id, password_hash, expires_at, watermark, downloads_enabled, favorites_enabled, download_web_enabled, ${DESIGN_FIELDS}`;
 
-export async function findGalleryBySlug(slug: string) {
+/** Une seule lecture par requête (titre de l'onglet et page la partagent). */
+export const findGalleryBySlug = cache(async (slug: string) => {
   if (!/^[A-Za-z0-9_-]{3,64}$/.test(slug)) return null;
   const db = createServiceClient();
   const { data } = await db.from("galleries").select(GALLERY_FIELDS).eq("slug", slug).maybeSingle();
   return (data as PublicGallery | null) ?? null;
-}
+});
 
 export function isExpired(g: PublicGallery) {
   return g.expires_at !== null && new Date(g.expires_at).getTime() < Date.now();
