@@ -251,6 +251,7 @@ body {
 .fs-subtle { --g-font: var(--font-cormorant), serif; --g-weight: 400; --g-transform: uppercase; --g-tracking: 0.28em; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideIn { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes slideInLeft { from { transform: translateX(-100%); } to { transform: none; } }
 
 /* Logo : version blanche sur fonds sombres, version foncée sur Blanc et Sable */
 .logo-on-light { display: none; }
