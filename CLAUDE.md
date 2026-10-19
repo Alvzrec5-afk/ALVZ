@@ -92,7 +92,7 @@ encadré sur la liste des tableaux ; onglet « Banque d'images » dans « Images
 chaque photo envoyée par le studio dans un tableau y est copiée d'office ; corbeille sur les photos de la banque dans la fenêtre).
 Publié (19 oct.) : page **Accueil** (centre de contrôle : compteurs, stockage détaillé, plus gros projets, récents) ;
 jauge de stockage détaillée par catégorie via la fonction SQL `studio_overview()` (déjà en base).
-Publié aussi : l'Accueil est `/admin` (demandé par le propriétaire) ; la liste des galeries passe à
+Publié aussi : barre du haut du studio mobile fixe (`sticky`, sous l'heure de l'iPhone dans l'app) ; l'Accueil est `/admin` (demandé par le propriétaire) ; la liste des galeries passe à
 `/admin/galleries` (toujours « Galeries » dans le menu) ; `/admin/accueil` redirige vers `/admin`.
 Publié aussi : ouverture des tableaux plus rapide — fonctions SQL `board_path` / `board_tree` (déjà en base) pour le chemin
 et les planches en une requête ; ménage des cartes supprimées et réparation des cases vides (`repairEmptyImages`) lancés après l'affichage (`after`). Le modèle en base a déjà reçu « 5. STORYBOARD » (planches suivantes renumérotées 6 et 7).
