@@ -40,8 +40,9 @@ export function AdminShell({ children, signOut }: { children: React.ReactNode; s
 
   return (
     <div className="min-h-svh">
-      {/* Mobile : logo au milieu ; menu ☰ sur les pages principales (pas dans une galerie) */}
-      <header className="border-b border-line lg:hidden">
+      {/* Mobile : logo au milieu ; menu ☰ sur les pages principales (pas dans une galerie).
+          Barre fixe en haut (l'app iPhone n'a pas de barre Safari), décalée sous l'heure et la batterie. */}
+      <header className="border-b border-line lg:hidden sticky top-0 z-40 bg-bg pt-[env(safe-area-inset-top)]">
         <div className="px-3 h-16 grid grid-cols-[2.75rem_1fr_2.75rem] items-center">
           <span />
           <Link href="/admin" className="justify-self-center">
