@@ -57,6 +57,8 @@ export type BoardData = {
   sketch?: Sketch;
   /** Lien « Carte » : adresse ou lieu montré sur un plan (Google Maps). */
   place?: string;
+  /** Note « Document » : texte mis en forme (HTML nettoyé par le serveur), ouvert dans un éditeur plein écran. */
+  doc?: { title: string; html: string };
   /** Flèche : cartes reliées. */
   from?: string;
   to?: string;

@@ -14,6 +14,7 @@ import {
   TABLE_MAX_COLS,
   TABLE_MAX_ROWS,
   inkOn,
+  isHex,
   type BoardData,
   type BoardItem,
   type BoardItemInput,
@@ -32,6 +33,7 @@ import {
   BoardIcon,
   CameraIcon,
   DotsIcon,
+  DocIcon,
   FileIcon,
   GalleryIcon,
   MapIcon,
@@ -325,7 +327,9 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
   // Bouton « Images projet » (studio) : choix d'une photo ou vidéo du projet pour une nouvelle carte, à cet endroit.
   const [imagePick, setImagePick] = useState<{ at?: { x: number; y: number }; extra?: Partial<BoardItem> } | null>(null);
   const [slotOver, setSlotOver] = useState<string | null>(null); // case photo survolée par un fichier glissé
-  const [docOpen, setDocOpen] = useState<string | null>(null); // document ouvert en grand
+  const [docOpen, setDocOpen] = useState<string | null>(null); // document importé ouvert en grand
+  const [docEdit, setDocEdit] = useState<string | null>(null); // document écrit ouvert dans l'éditeur
+  const [colorPick, setColorPick] = useState<string | null>(null); // nuancier : sélecteur de couleur ouvert
   // Menu « … » de la barre d'outils (Croquis, Nuancier, Document…) : position du bouton qui l'ouvre.
   const [more, setMore] = useState<DOMRect | null>(null);
   const mediaRef = useRef<HTMLInputElement>(null);
@@ -783,16 +787,17 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       const it = create("link", { url: "", title: "", place: "" }, at, extra);
       setEditing({ id: it.id });
     });
-  /** Nuancier : cinq couleurs côte à côte, à renommer et changer. */
-  const addPalette = (at?: At) => {
-    const c = at ?? viewCenter();
-    const x0 = Math.round(c.x - (at ? 0 : (5 * 170 - 10) / 2));
-    const y0 = Math.round(c.y - (at ? 0 : 60));
-    const hexes = ["#e04a33", "#d98b5f", "#d4a017", "#4f7a4a", "#2f6690"];
-    const made = hexes.map((hex, i) => create("color", { hex, title: "" }, { x: x0 + i * 170, y: y0 }));
-    setSelected(null);
-    setGroup(made.map((m) => m.id));
+  /** Nuancier (comme Milanote) : une couleur, avec le sélecteur ouvert tout de suite. */
+  const addSwatch = (at?: At, extra?: Extra) => {
+    const it = create("color", { hex: "#8abbd6", title: "" }, at, { w: 190, ...extra });
+    setColorPick(it.id);
   };
+  /** Document écrit : une carte fermée (titre, nombre de mots) qui s'ouvre dans un éditeur de texte. */
+  const addDoc = (at?: At, extra?: Extra) =>
+    ensureName(() => {
+      const it = create("note", { text: "", color: "blanc", doc: { title: "Nouveau document", html: "" } }, at, { w: 200, ...extra });
+      setDocEdit(it.id);
+    });
   /** Choisir un fichier d'un genre précis (menu « … ») : vidéo, son ou document. */
   const pickMedia = (kind: MediaPick) =>
     ensureName(() => {
@@ -1400,7 +1405,8 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
   useEffect(() => {
     const root = rootRef.current!;
     const wheel = (e: WheelEvent) => {
-      if ((e.target as HTMLElement).closest("textarea")) return;
+      // Champs de texte et fenêtres ouvertes (document, choix de photos…) défilent normalement.
+      if ((e.target as HTMLElement).closest("textarea, [data-modal]")) return;
       e.preventDefault();
       const o = root.getBoundingClientRect();
       if (e.ctrlKey || e.metaKey) zoomAt(Math.exp(clamp(-e.deltaY, -60, 60) * 0.006), e.clientX - o.left, e.clientY - o.top);
@@ -1521,7 +1527,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      if (t.closest("input, textarea")) return;
+      if (t.closest("input, textarea, [contenteditable='true']")) return;
       // Pendant un croquis, le clavier sert à l'éditeur (Cmd + Z = annuler le trait), pas au tableau.
       if (document.querySelector("[data-sketch-editor]")) return;
       if (e.key === " ") spaceDown.current = true;
@@ -1570,7 +1576,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     };
     const paste = (e: ClipboardEvent) => {
       const t = e.target as HTMLElement;
-      if (t.closest?.("input, textarea") || !canAdd) return;
+      if (t.closest?.("input, textarea, [contenteditable='true']") || !canAdd) return;
       const pasted = e.clipboardData?.getData("text/plain") ?? "";
       let stored: string | null = null;
       try {
@@ -1600,7 +1606,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     // Cmd + C / X : les cartes copiées vont dans le vrai presse-papiers (collables dans un autre onglet).
     const copy = (e: ClipboardEvent) => {
       const t = e.target as HTMLElement;
-      if (t.closest?.("input, textarea") || !clipboard.current || !e.clipboardData) return;
+      if (t.closest?.("input, textarea, [contenteditable='true']") || !clipboard.current || !e.clipboardData) return;
       if (Date.now() - copyPending.current > 1000) return; // copie qui ne vient pas de Cmd + C sur des cartes
       copyPending.current = 0;
       e.clipboardData.setData("text/plain", clipboard.current);
@@ -1711,7 +1717,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
   const finishEdit = (it: BoardItem) => {
     setEditing((cur) => (cur?.id === it.id ? null : cur));
     const cur = itemsRef.current[it.id];
-    if (cur?.kind === "note" && !cur.data.text?.trim() && !cur.data.sketch) remove(it.id);
+    if (cur?.kind === "note" && !cur.data.text?.trim() && !cur.data.sketch && !cur.data.doc) remove(it.id);
     if (cur?.kind === "link" && (cur.data.place !== undefined ? !cur.data.place.trim() : !cur.data.url?.trim() && !cur.data.text)) remove(it.id);
   };
 
@@ -1720,6 +1726,10 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     setSelected(it.id);
     if (it.kind === "note" && it.data.sketch) {
       setSketching(it.id);
+      return;
+    }
+    if (it.kind === "note" && it.data.doc) {
+      setDocEdit(it.id);
       return;
     }
     setEditing({
@@ -1787,10 +1797,23 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           else if (it.kind !== "column" || (e.target as HTMLElement).closest("[data-col-head]")) startEdit(it);
         }}
       >
+        {it.kind === "note" && it.data.doc && (
+          // Document écrit : fermé sur le tableau ; double-clic ou « Ouvrir » pour l'éditer en grand.
+          <div className="flex items-center gap-3 px-3.5 py-3 min-w-0">
+            <DocIcon className="w-9 h-11 shrink-0" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs font-medium truncate">{it.data.doc.title || "Sans titre"}</span>
+              <span className="block text-[11px] opacity-60">{wordCount(it.data.doc.html)} mots</span>
+              <button data-nodrag onClick={() => setDocEdit(it.id)} className="mt-1 text-[11px] underline underline-offset-2 hover:opacity-70">
+                Ouvrir
+              </button>
+            </span>
+          </div>
+        )}
         {it.kind === "note" && it.data.sketch && (
           <SketchView sketch={it.data.sketch} />
         )}
-        {it.kind === "note" && (!it.data.sketch || it.data.text || ed) && (
+        {it.kind === "note" && !it.data.doc && (!it.data.sketch || it.data.text || ed) && (
           <div className={heading ? "px-1.5 py-1 font-semibold leading-tight" : "px-3.5 py-3"}>
             {ed ? (
               <AutoTextarea
@@ -2036,14 +2059,15 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     const hex = it.data.hex ?? "#c8a27a";
     return (
       <div>
-        <div className="relative w-full rounded-t-[2px]" style={{ background: hex, aspectRatio: "16 / 10" }}>
-          {ed && (
-            <input
-              type="color"
-              value={hex}
-              onChange={(e) => updateData(it.id, { hex: e.target.value })}
-              className="absolute right-2 bottom-2 w-9 h-9 cursor-pointer bg-transparent"
+        <div className="relative w-full rounded-t-[2px]" style={{ background: hex, aspectRatio: "16 / 10", color: inkOn(hex) }}>
+          <span className="absolute left-3 top-2.5 text-[12px] font-semibold tracking-wide uppercase">{hex}</span>
+          {canEdit(it) && (
+            <button
+              data-nodrag
+              onClick={() => setColorPick(it.id)}
+              className="absolute inset-0 w-full h-full cursor-pointer"
               aria-label="Choisir la couleur"
+              title="Choisir la couleur"
             />
           )}
         </div>
@@ -2053,7 +2077,6 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           ) : (
             <p className="truncate">{it.data.title || <span className="text-muted">Couleur</span>}</p>
           )}
-          <p className="text-[11px] text-muted uppercase tracking-wider">{hex}</p>
         </div>
       </div>
     );
@@ -2915,8 +2938,9 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
   /** Entrées du menu « … » (comme Milanote) ; `studio` : réservées au studio, `edit` : studio ou client autorisé à tout modifier. */
   const moreTools: { label: string; Icon: typeof NoteIcon; run: () => void; studio?: boolean; edit?: boolean; tint: string }[] = [
     { label: "Croquis", Icon: PencilIcon, run: () => addSketch(), tint: "#3a3a3a" },
-    { label: "Nuancier", Icon: PaletteIcon, run: () => addPalette(), edit: true, tint: "#c0395f" },
-    { label: "Document", Icon: FileIcon, run: () => pickMedia("document"), studio: true, tint: "#4a4a4a" },
+    { label: "Nuancier", Icon: PaletteIcon, run: () => addSwatch(), edit: true, tint: "#c0395f" },
+    { label: "Document", Icon: DocIcon, run: () => addDoc(), tint: "#4a4a4a" },
+    { label: "Importer doc", Icon: FileIcon, run: () => pickMedia("document"), studio: true, tint: "#6b6b6b" },
     { label: "Audio", Icon: AudioIcon, run: () => pickMedia("audio"), studio: true, tint: "#3f9b5a" },
     { label: "Carte", Icon: MapIcon, run: () => addMap(), tint: "#3b78c2" },
     { label: "Vidéo", Icon: FilmIcon, run: () => pickMedia("video"), studio: true, tint: "#2aa7b8" },
@@ -3188,6 +3212,35 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         />
       )}
       {docOpen && items[docOpen]?.src && <DocViewer item={items[docOpen]} onClose={() => setDocOpen(null)} />}
+      {docEdit && items[docEdit]?.data.doc && (
+        <DocEditor
+          key={`doc-${docEdit}`}
+          doc={items[docEdit].data.doc!}
+          editable={canEdit(items[docEdit])}
+          onChange={(doc) => {
+            const it = itemsRef.current[docEdit];
+            if (it) update(docEdit, { data: { ...it.data, doc } });
+          }}
+          onClose={() => setDocEdit(null)}
+        />
+      )}
+      {colorPick && items[colorPick]?.kind === "color" && (
+        <ColorPicker
+          key={`color-${colorPick}`}
+          anchor={rootRef.current?.querySelector(`[data-item="${colorPick}"]`)?.getBoundingClientRect() ?? null}
+          value={items[colorPick].data.hex ?? "#8abbd6"}
+          onChange={(hex) => {
+            const it = itemsRef.current[colorPick];
+            if (it) update(colorPick, { data: { ...it.data, hex } }, false);
+          }}
+          onClose={() => {
+            // Un seul enregistrement à la fermeture (pas un par mouvement du curseur).
+            const it = itemsRef.current[colorPick];
+            if (it) update(colorPick, { data: { ...it.data } });
+            setColorPick(null);
+          }}
+        />
+      )}
       {sketching && items[sketching]?.data.sketch && (
         <SketchEditor
           initial={items[sketching].data.sketch!}
@@ -4271,7 +4324,7 @@ function SlotPicker({
   }
 
   return (
-    <div data-ui className="absolute inset-0 z-[300000] flex items-center justify-center bg-black/50 p-3" onPointerDown={onClose}>
+    <div data-ui data-modal className="absolute inset-0 z-[300000] flex items-center justify-center bg-black/50 p-3" onPointerDown={onClose}>
       <div
         className="bg-bg text-ink border border-line shadow-2xl rounded-[6px] w-full max-w-[720px] max-h-[82vh] flex flex-col"
         onPointerDown={(e) => e.stopPropagation()}
@@ -4343,7 +4396,7 @@ function DocViewer({ item, onClose }: { item: BoardItem; onClose: () => void }) 
     return () => window.removeEventListener("keydown", key);
   }, []);
   return (
-    <div data-ui className="absolute inset-0 z-[300000] flex flex-col bg-black/80 p-2 sm:p-6" onPointerDown={(e) => e.stopPropagation()}>
+    <div data-ui data-modal className="absolute inset-0 z-[300000] flex flex-col bg-black/80 p-2 sm:p-6" onPointerDown={(e) => e.stopPropagation()}>
       <div className="flex items-center gap-2 mb-2 text-white">
         <FileIcon className="w-5 h-5 shrink-0 opacity-80" />
         <p className="text-sm truncate flex-1">{name}</p>
@@ -4371,6 +4424,332 @@ function DocViewer({ item, onClose }: { item: BoardItem; onClose: () => void }) 
             </a>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** Nombre de mots d'un document écrit (texte sans les balises). */
+function wordCount(html: string) {
+  const plain = html.replace(/<[^>]+>/g, " ").replace(/&nbsp;|&[a-z]+;/gi, " ").trim();
+  return plain ? plain.split(/\s+/).length : 0;
+}
+
+const hexToRgb = (hex: string) => {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255] as const;
+};
+const rgbToHex = (r: number, g: number, b: number) => `#${[r, g, b].map((v) => clamp(Math.round(v), 0, 255).toString(16).padStart(2, "0")).join("")}`;
+function rgbToHsv(r: number, g: number, b: number) {
+  const [rr, gg, bb] = [r / 255, g / 255, b / 255];
+  const max = Math.max(rr, gg, bb);
+  const d = max - Math.min(rr, gg, bb);
+  let h = 0;
+  if (d) h = max === rr ? ((gg - bb) / d) % 6 : max === gg ? (bb - rr) / d + 2 : (rr - gg) / d + 4;
+  return { h: (h * 60 + 360) % 360, s: max ? d / max : 0, v: max };
+}
+function hsvToRgb(h: number, s: number, v: number) {
+  const f = (n: number) => {
+    const k = (n + h / 60) % 6;
+    return 255 * (v - v * s * Math.max(0, Math.min(k, 4 - k, 1)));
+  };
+  return [f(5), f(3), f(1)] as const;
+}
+
+/**
+ * Sélecteur de couleur du nuancier (comme Milanote) : dégradé saturation / luminosité, barre de teinte,
+ * pipette (navigateurs qui la proposent), valeurs R, V, B et code HEX.
+ */
+function ColorPicker({ anchor, value, onChange, onClose }: { anchor: DOMRect | null; value: string; onChange: (hex: string) => void; onClose: () => void }) {
+  const [hsv, setHsv] = useState(() => rgbToHsv(...hexToRgb(value)));
+  const [hexText, setHexText] = useState(value);
+  const rgb = hsvToRgb(hsv.h, hsv.s, hsv.v);
+  const hex = rgbToHex(...rgb);
+  const set = (next: { h: number; s: number; v: number }) => {
+    setHsv(next);
+    const h = rgbToHex(...hsvToRgb(next.h, next.s, next.v));
+    setHexText(h);
+    onChange(h);
+  };
+  const fromHex = (h: string) => {
+    if (!isHex(h)) return;
+    const next = rgbToHsv(...hexToRgb(h.toLowerCase()));
+    setHsv(next);
+    onChange(h.toLowerCase());
+  };
+  const drag = (e: React.PointerEvent, area: "sv" | "hue") => {
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const at = (ev: { clientX: number; clientY: number }) => {
+      const x = clamp((ev.clientX - box.left) / box.width, 0, 1);
+      const y = clamp((ev.clientY - box.top) / box.height, 0, 1);
+      setHsv((cur) => {
+        const next = area === "hue" ? { ...cur, h: x * 359.9 } : { ...cur, s: x, v: 1 - y };
+        const h = rgbToHex(...hsvToRgb(next.h, next.s, next.v));
+        setHexText(h);
+        onChange(h);
+        return next;
+      });
+    };
+    at(e);
+    const move = (ev: PointerEvent) => at(ev);
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+  const eyeDropper = typeof window !== "undefined" && "EyeDropper" in window;
+  const pickScreen = async () => {
+    try {
+      const Ctor = (window as unknown as { EyeDropper: new () => { open: () => Promise<{ sRGBHex: string }> } }).EyeDropper;
+      const { sRGBHex } = await new Ctor().open();
+      setHexText(sRGBHex);
+      fromHex(sRGBHex);
+    } catch {
+      // annulé
+    }
+  };
+  const W = 300;
+  const left = anchor ? clamp(anchor.right + 12, 8, window.innerWidth - W - 8) : (window.innerWidth - W) / 2;
+  const top = anchor ? clamp(anchor.top, 8, window.innerHeight - 380) : 80;
+  const place = anchor && anchor.right + 12 + W > window.innerWidth ? { left: clamp(anchor.left - W - 12, 8, window.innerWidth - W - 8), top } : { left, top };
+  return (
+    <div data-ui data-modal className="fixed inset-0 z-[300000]" onPointerDown={onClose}>
+      <div
+        className="absolute bg-bg border border-line shadow-2xl rounded-[6px] overflow-hidden select-none"
+        style={{ width: W, ...place }}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <div
+          className="relative h-44 cursor-crosshair touch-none"
+          style={{ background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(${hsv.h} 100% 50%))` }}
+          onPointerDown={(e) => drag(e, "sv")}
+        >
+          <span
+            className="absolute w-4 h-4 -ml-2 -mt-2 rounded-full border-2 border-white shadow pointer-events-none"
+            style={{ left: `${hsv.s * 100}%`, top: `${(1 - hsv.v) * 100}%`, background: hex }}
+          />
+        </div>
+        <div className="p-3 space-y-3">
+          <div className="flex items-center gap-3">
+            {eyeDropper && (
+              <button onClick={pickScreen} className="w-8 h-8 flex items-center justify-center text-muted hover:text-ink" aria-label="Pipette" title="Prendre une couleur à l'écran">
+                <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="m14.5 6.5 3 3M4 20l1.5-4.5 9-9 3 3-9 9L4 20Z" />
+                  <path d="M16 5l1.5-1.5a2.1 2.1 0 0 1 3 3L19 8" />
+                </svg>
+              </button>
+            )}
+            <span className="w-9 h-9 rounded-full border border-line shrink-0" style={{ background: hex }} />
+            <div
+              className="relative flex-1 h-3 rounded-full cursor-pointer touch-none"
+              style={{ background: "linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)" }}
+              onPointerDown={(e) => drag(e, "hue")}
+            >
+              <span
+                className="absolute top-1/2 w-4 h-4 -ml-2 -mt-2 rounded-full border-2 border-white shadow pointer-events-none"
+                style={{ left: `${(hsv.h / 360) * 100}%`, background: `hsl(${hsv.h} 100% 50%)` }}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-2 text-center">
+            {(["R", "V", "B"] as const).map((label, i) => (
+              <label key={label} className="text-[10px] text-muted">
+                <input
+                  inputMode="numeric"
+                  value={Math.round(rgb[i])}
+                  onChange={(e) => {
+                    const n = clamp(Number(e.target.value.replace(/\D/g, "")) || 0, 0, 255);
+                    const next = [...rgb] as number[];
+                    next[i] = n;
+                    set(rgbToHsv(next[0], next[1], next[2]));
+                  }}
+                  className="w-full h-8 mb-1 text-center text-sm text-ink bg-transparent border border-line rounded-[3px] outline-none focus:border-ink"
+                />
+                {label}
+              </label>
+            ))}
+            <label className="text-[10px] text-muted">
+              <input
+                value={hexText}
+                onChange={(e) => {
+                  const v = e.target.value.trim();
+                  setHexText(v);
+                  fromHex(v.startsWith("#") ? v : `#${v}`);
+                }}
+                className="w-full h-8 mb-1 text-center text-[11px] uppercase text-ink bg-transparent border border-line rounded-[3px] outline-none focus:border-ink"
+              />
+              HEX
+            </label>
+          </div>
+          <button onClick={onClose} className="w-full h-9 rounded-full bg-ink text-bg text-[13px]">
+            Terminé
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Document écrit, en plein écran (comme Milanote) : titre, mise en forme (titres, gras, italique, barré,
+ * souligné, listes, retraits, alignement, lien), enregistrement automatique et export (PDF, Word, texte).
+ */
+function DocEditor({
+  doc,
+  editable,
+  onChange,
+  onClose,
+}: {
+  doc: { title: string; html: string };
+  editable: boolean;
+  onChange: (doc: { title: string; html: string }) => void;
+  onClose: () => void;
+}) {
+  const body = useRef<HTMLDivElement>(null);
+  const [title, setTitle] = useState(doc.title);
+  const [exportOpen, setExportOpen] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latest = useRef(doc);
+
+  useEffect(() => {
+    if (body.current) body.current.innerHTML = doc.html;
+    // Contenu chargé une seule fois : ensuite c'est l'éditeur qui fait foi.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const save = (now = false) => {
+    latest.current = { title: titleRef.current, html: body.current?.innerHTML ?? "" };
+    if (timer.current) clearTimeout(timer.current);
+    if (now) onChange(latest.current);
+    else timer.current = setTimeout(() => onChange(latest.current), 700);
+  };
+  const titleRef = useRef(title);
+  titleRef.current = title;
+  const close = () => {
+    if (editable) save(true);
+    onClose();
+  };
+  const closeRef = useRef(close);
+  closeRef.current = close;
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === "Escape" && closeRef.current();
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, []);
+
+  const cmd = (name: string, arg?: string) => {
+    body.current?.focus();
+    document.execCommand(name, false, arg);
+    save();
+  };
+  const tools: { label: string; run: () => void; icon: React.ReactNode }[] = [
+    { label: "Titre", run: () => cmd("formatBlock", "<h2>"), icon: <span className="text-[15px] font-semibold">H</span> },
+    { label: "Texte normal", run: () => cmd("formatBlock", "<p>"), icon: <span className="text-[13px]">¶</span> },
+    { label: "Gras", run: () => cmd("bold"), icon: <span className="text-[15px] font-bold">B</span> },
+    { label: "Italique", run: () => cmd("italic"), icon: <span className="text-[15px] italic font-serif">I</span> },
+    { label: "Barré", run: () => cmd("strikeThrough"), icon: <span className="text-[15px] line-through">S</span> },
+    { label: "Souligné", run: () => cmd("underline"), icon: <span className="text-[15px] underline">U</span> },
+    { label: "Liste à puces", run: () => cmd("insertUnorderedList"), icon: <span className="text-[13px]">• ≡</span> },
+    { label: "Liste numérotée", run: () => cmd("insertOrderedList"), icon: <span className="text-[12px]">1. ≡</span> },
+    { label: "Retrait", run: () => cmd("indent"), icon: <span className="text-[13px]">≡›</span> },
+    { label: "Moins de retrait", run: () => cmd("outdent"), icon: <span className="text-[13px]">‹≡</span> },
+    { label: "Aligner à gauche", run: () => cmd("justifyLeft"), icon: <span className="text-[13px]">⇤</span> },
+    { label: "Centrer", run: () => cmd("justifyCenter"), icon: <span className="text-[13px]">≡</span> },
+    {
+      label: "Lien",
+      run: () => {
+        const url = prompt("Adresse du lien (https://…)");
+        if (url && /^(https?:\/\/|mailto:)/i.test(url.trim())) cmd("createLink", url.trim());
+      },
+      icon: <LinkIcon className="w-4 h-4" />,
+    },
+  ];
+
+  const fileName = (title.trim() || "Document").replace(/[\\/:*?"<>|]+/g, " ");
+  const saveFile = (blob: Blob, ext: string) => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${fileName}.${ext}`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  };
+  const page = (html: string) =>
+    `<!doctype html><html><head><meta charset="utf-8"><title>${fileName}</title><style>body{font-family:-apple-system,Helvetica,Arial,sans-serif;max-width:720px;margin:40px auto;line-height:1.6;color:#111}h1,h2{line-height:1.25}</style></head><body><h1>${title.replace(/</g, "&lt;")}</h1>${html}</body></html>`;
+  const exportAs = (kind: "pdf" | "word" | "txt") => {
+    setExportOpen(false);
+    const html = body.current?.innerHTML ?? "";
+    if (kind === "txt") return saveFile(new Blob([`${title}\n\n${body.current?.innerText ?? ""}`], { type: "text/plain;charset=utf-8" }), "txt");
+    if (kind === "word") return saveFile(new Blob(["﻿", page(html)], { type: "application/msword" }), "doc");
+    // PDF : fenêtre d'impression du navigateur → « Enregistrer au format PDF ».
+    const w = window.open("", "_blank");
+    if (!w) return alert("Autorisez les fenêtres pour ce site afin d'exporter en PDF.");
+    w.document.write(page(html));
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 300);
+  };
+
+  return (
+    <div data-ui data-modal className="absolute inset-0 z-[300000] flex items-center justify-center bg-black/60 p-0 sm:p-6" onPointerDown={(e) => e.target === e.currentTarget && close()}>
+      <div className="bg-bg text-ink w-full max-w-[1000px] h-full flex flex-col sm:rounded-[6px] shadow-2xl overflow-hidden" onPointerDown={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-line">
+          <input
+            value={title}
+            readOnly={!editable}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              titleRef.current = e.target.value;
+              save();
+            }}
+            placeholder="Titre du document"
+            className="flex-1 min-w-0 bg-transparent text-base font-medium text-center outline-none"
+          />
+          <div className="relative">
+            <button onClick={() => setExportOpen((o) => !o)} className="h-9 px-3 text-[13px] text-muted hover:text-ink">
+              Exporter ▾
+            </button>
+            {exportOpen && (
+              <div className="absolute right-0 top-10 z-10 bg-bg border border-line shadow-lg rounded-[4px] py-1 w-44 text-[13px]">
+                <button onClick={() => exportAs("pdf")} className="block w-full text-left px-3 py-2 hover:bg-bg-soft">PDF (impression)</button>
+                <button onClick={() => exportAs("word")} className="block w-full text-left px-3 py-2 hover:bg-bg-soft">Word (.doc)</button>
+                <button onClick={() => exportAs("txt")} className="block w-full text-left px-3 py-2 hover:bg-bg-soft">Texte (.txt)</button>
+              </div>
+            )}
+          </div>
+          <button onClick={close} className="h-9 px-4 rounded-full bg-ink text-bg text-[13px]">
+            Fermer
+          </button>
+        </div>
+        <div className="flex-1 min-h-0 flex">
+          {editable && (
+            <div className="shrink-0 w-12 sm:w-14 border-r border-line overflow-y-auto py-2 flex flex-col items-center gap-1">
+              {tools.map((t) => (
+                <button
+                  key={t.label}
+                  onPointerDown={(e) => e.preventDefault()} // garde la sélection du texte
+                  onClick={t.run}
+                  title={t.label}
+                  aria-label={t.label}
+                  className="w-9 h-9 shrink-0 flex items-center justify-center rounded-[4px] text-muted hover:text-ink hover:bg-bg-soft"
+                >
+                  {t.icon}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex-1 min-w-0 overflow-y-auto">
+            <div
+              ref={body}
+              contentEditable={editable}
+              suppressContentEditableWarning
+              onInput={() => save()}
+              data-placeholder="Commencez à taper…"
+              className="doc-body min-h-full max-w-[720px] mx-auto px-6 sm:px-10 py-8 outline-none text-[15px] leading-relaxed select-text"
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

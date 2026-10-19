@@ -313,3 +313,11 @@ export const GalleryIcon = ({ className = "w-5 h-5" }: P) => (
     <circle cx="16.5" cy="10" r="1.2" />
   </svg>
 );
+/** Document écrit (page avec un « T » et des lignes, comme Milanote). */
+export const DocIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 28" className={className} {...base} aria-hidden>
+    <path d="M4 2.5h11l5 5v18H4z" />
+    <path d="M15 2.5v5h5" />
+    <path d="M7.5 13h3.5M9.25 13v5M13 14h4M13 17h4" />
+  </svg>
+);

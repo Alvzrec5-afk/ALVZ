@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import sanitizeHtml from "sanitize-html";
 import { cache } from "react";
 import {
   isHex,
@@ -236,6 +237,22 @@ function cleanData(kind: BoardKind, raw: BoardData): BoardData {
   return withTint(cleanKind(kind, d));
 }
 
+/**
+ * Document écrit : seules les mises en forme de l'éditeur sont gardées (titres, gras, listes, liens…),
+ * jamais de script ni de style libre — un client du tableau partagé peut l'ouvrir.
+ */
+function cleanDoc(doc: BoardData["doc"]): BoardData["doc"] {
+  if (!doc || typeof doc !== "object") return undefined;
+  const html = sanitizeHtml(typeof doc.html === "string" ? doc.html.slice(0, 300_000) : "", {
+    allowedTags: ["p", "div", "br", "h1", "h2", "h3", "b", "strong", "i", "em", "u", "s", "strike", "ul", "ol", "li", "blockquote", "a", "span"],
+    allowedAttributes: { a: ["href", "target", "rel"], "*": ["style"] },
+    allowedStyles: { "*": { "text-align": [/^(left|right|center|justify)$/] } },
+    allowedSchemes: ["http", "https", "mailto"],
+    transformTags: { a: sanitizeHtml.simpleTransform("a", { target: "_blank", rel: "noreferrer noopener" }) },
+  });
+  return { title: text(doc.title, 200) ?? "", html };
+}
+
 /** Croquis borné : 400 traits, 30 000 points en tout, coordonnées dans le cadre, arrondies au dixième. */
 function cleanSketch(k: BoardData["sketch"]): BoardData["sketch"] {
   if (!k || typeof k !== "object" || !Array.isArray(k.strokes)) return undefined;
@@ -274,6 +291,7 @@ function cleanKind(kind: BoardKind, d: BoardData): BoardData {
         hex: isHex(d.hex) ? d.hex.toLowerCase() : undefined,
         heading: d.heading === true ? true : undefined,
         sketch: cleanSketch(d.sketch),
+        doc: cleanDoc(d.doc),
       };
     case "image":
       return {

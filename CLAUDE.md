@@ -70,7 +70,7 @@ Détail complet (fichiers, tables, choix techniques) : **`docs/carte-du-code.md`
   « e-mail demandé avant téléchargement », vidéos `/g/<lien>/v/<id>` protégées contre les aspirateurs (URL demandées
   par le lecteur, `fromOwnPage`).
 - **Tableaux façon Milanote `/admin/boards`** (`components/board/board-canvas.tsx`, gros fichier : chercher par mot-clé) :
-  cartes note / titre / croquis / image (ou vidéo, son, document ≤ 50 Mo, studio) / plan Google Maps / liste / colonne / flèche (courbe) / planche / couleur / lien / grille / commentaire, couleurs,
+  cartes note / titre / croquis / document écrit / image (ou vidéo, son, document ≤ 50 Mo, studio) / plan Google Maps / liste / colonne / flèche (courbe) / planche / couleur / lien / grille / commentaire, couleurs,
   taille du texte, rognage, clic droit, copier-coller entre onglets, annuler, capture PNG, partage client `/t/<lien>`,
   modèle des nouveaux tableaux (7 planches, dont 5. STORYBOARD). Serveur : `lib/boards.ts` (`cleanData` filtre chaque champ de carte :
   **tout nouveau champ de `BoardData` doit y être ajouté**).
@@ -84,8 +84,8 @@ dessin par bandes + JPEG maison, « Enregistré » et flèches annuler cachés a
 Publié le 19 oct. : menu « … » (croquis, nuancier, document, audio, carte, vidéo, titre) ; cases photo vides :
 choix parmi les photos du projet + glisser-déposer.
 Publié aussi : bouton « Images projet » (photos et vidéos du projet) ; cases vides proposent aussi les vidéos.
-**Committé en local, pas encore publié :** documents des tableaux déplaçables, ouverts en grand dans le site
-(+ Télécharger). Le modèle en base a déjà reçu « 5. STORYBOARD » (planches suivantes renumérotées 6 et 7).
+Publié aussi (19 oct.) : documents importés déplaçables, ouverts en grand dans le site (+ Télécharger) ;
+menu « … » façon Milanote : Nuancier = une couleur + sélecteur, Document = document écrit (éditeur), Importer doc = fichier. Rien en attente en local. Le modèle en base a déjà reçu « 5. STORYBOARD » (planches suivantes renumérotées 6 et 7).
 
 - **À vérifier en vrai par le propriétaire** : menu « … » (plan Google Maps, envoi d'un PDF / MP3 vers Oracle), case photo vide (choix parmi les photos du projet) ;
   vidéo dans un tableau (envoi depuis l'iPhone, lecture, plein écran) ; capture d'un tableau **depuis l'iPhone** (nette au zoom ? photos présentes ? non testé sur vrai Safari) et avec de vraies photos Oracle (si elles sortent
