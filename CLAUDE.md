@@ -94,7 +94,7 @@ Publié (19 oct.) : page **Accueil** (centre de contrôle : compteurs, stockage 
 jauge de stockage détaillée par catégorie via la fonction SQL `studio_overview()` (déjà en base).
 Publié aussi : barre du haut du studio mobile fixe (`sticky`, sous l'heure de l'iPhone dans l'app) ; l'Accueil est `/admin` (demandé par le propriétaire) ; la liste des galeries passe à
 `/admin/galleries` (toujours « Galeries » dans le menu) ; `/admin/accueil` redirige vers `/admin`.
-**En local, non publié** : **site alvzrec.com géré depuis le studio** (option A choisie : le domaine reste sur l'ancien compte
+Publié (19 oct.) : **site alvzrec.com géré depuis le studio** (option A choisie : le domaine reste sur l'ancien compte
 Netlify). Page d'origine (un seul index.html, design inchangé) dans `lib/site-template.ts` ; elle lit son contenu sur
 `alvzgalleries.com/api/site` (CORS, cache CDN 5 min) puis lance ses scripts (`data-boot`), contenu d'origine si le studio ne
 répond pas. Studio → Site (`/admin/site`) : clips YouTube (coller le lien, titre/artiste repris de YouTube via oEmbed),
@@ -107,7 +107,8 @@ alvzrec.com vers `/site` si un jour le domaine est déplacé (option B). Inutili
 Publié aussi : ouverture des tableaux plus rapide — fonctions SQL `board_path` / `board_tree` (déjà en base) pour le chemin
 et les planches en une requête ; ménage des cartes supprimées et réparation des cases vides (`repairEmptyImages`) lancés après l'affichage (`after`). Le modèle en base a déjà reçu « 5. STORYBOARD » (planches suivantes renumérotées 6 et 7).
 
-- **À vérifier en vrai par le propriétaire** : Accueil `/admin` (chiffres, stockage détaillé), Banque d'images (copie d'office d'une photo envoyée, onglet, corbeille), ouverture d'une planche ; menu « … » (plan Google Maps, envoi d'un PDF / MP3 vers Oracle), case photo vide (choix parmi les photos du projet) ;
+- **À faire par le propriétaire** : poser une fois l'index.html (Studio → Site → Relier alvzrec.com) sur l'ancien compte Netlify, puis vérifier alvzrec.com (clips, photos, coulisses).
+- **À vérifier en vrai par le propriétaire** : Studio → Site (ajout d'un lien YouTube, envoi de photos), Accueil `/admin` (chiffres, stockage détaillé), Banque d'images (copie d'office d'une photo envoyée, onglet, corbeille), ouverture d'une planche ; menu « … » (plan Google Maps, envoi d'un PDF / MP3 vers Oracle), case photo vide (choix parmi les photos du projet) ;
   vidéo dans un tableau (envoi depuis l'iPhone, lecture, plein écran) ; capture d'un tableau **depuis l'iPhone** (nette au zoom ? photos présentes ? non testé sur vrai Safari) et avec de vraies photos Oracle (si elles sortent
   grises → CORS : passer les images par une route du site ou régler le bucket) ; défilement au doigt sur une grille ;
   Ctrl + clic sur Mac ; envoi d'un clip (H.264/4K) ; e-mail de test Gmail ; images « disparues » des tableaux
