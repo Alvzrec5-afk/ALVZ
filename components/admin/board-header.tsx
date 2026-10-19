@@ -28,6 +28,7 @@ type Board = {
   client_can_add: boolean;
   client_can_edit: boolean;
   is_template?: boolean;
+  is_library?: boolean;
 };
 
 /**
@@ -128,6 +129,10 @@ export function BoardHeader({
         {root.is_template ? (
           <p className="text-[12px] text-amber-500 truncate">
             Modèle : chaque nouveau tableau commence comme une copie de celui-ci{isSub ? ` · ${path.slice(0, -1).map((b) => b.title).join(" / ")}` : ""}
+          </p>
+        ) : root.is_library ? (
+          <p className="text-[12px] text-amber-500 truncate">
+            Banque d&apos;images : proposée dans « Images projet » de chaque tableau{isSub ? ` · ${path.slice(0, -1).map((b) => b.title).join(" / ")}` : ""}
           </p>
         ) : isSub ? (
           <nav className="flex items-center gap-1 text-[12px] text-muted min-w-0 overflow-hidden whitespace-nowrap">

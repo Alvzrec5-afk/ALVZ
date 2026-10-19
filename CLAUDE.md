@@ -86,7 +86,9 @@ choix parmi les photos du projet + glisser-déposer.
 Publié aussi : bouton « Images projet » (photos et vidéos du projet) ; cases vides proposent aussi les vidéos.
 Publié aussi (19 oct.) : documents importés déplaçables, ouverts en grand dans le site (+ Télécharger) ;
 menu « … » façon Milanote : Nuancier = une couleur + sélecteur, Document = document écrit (éditeur), Importer doc = fichier.
-Publié aussi : entrées du menu « … » glissables sur le tableau / dans une colonne. Rien en attente en local. Le modèle en base a déjà reçu « 5. STORYBOARD » (planches suivantes renumérotées 6 et 7).
+Publié aussi : entrées du menu « … » glissables sur le tableau / dans une colonne.
+**En local, non publié** : Banque d'images (tableau `boards.is_library`, colonne déjà ajoutée en base ; `/admin/boards/library`,
+encadré sur la liste des tableaux ; onglet « Banque d'images » dans « Images projet » et les cases photo vides). Le modèle en base a déjà reçu « 5. STORYBOARD » (planches suivantes renumérotées 6 et 7).
 
 - **À vérifier en vrai par le propriétaire** : menu « … » (plan Google Maps, envoi d'un PDF / MP3 vers Oracle), case photo vide (choix parmi les photos du projet) ;
   vidéo dans un tableau (envoi depuis l'iPhone, lecture, plein écran) ; capture d'un tableau **depuis l'iPhone** (nette au zoom ? photos présentes ? non testé sur vrai Safari) et avec de vraies photos Oracle (si elles sortent

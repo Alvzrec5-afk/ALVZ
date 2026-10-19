@@ -349,6 +349,9 @@ create index board_items_deleted_idx on public.board_items (board_id, deleted_at
 -- Modèle des nouveaux tableaux : un tableau spécial que le studio modifie ; chaque nouveau tableau en est une copie.
 alter table public.boards add column is_template boolean not null default false;
 
+-- Banque d'images : un tableau à part dont les images sont proposées dans « Images projet » de tous les tableaux.
+alter table public.boards add column is_library boolean not null default false;
+
 -- Couverture choisie pour un tableau (vignette de la liste des tableaux).
 alter table public.boards add column cover_key text;
 alter table public.boards add column cover_size bigint not null default 0;

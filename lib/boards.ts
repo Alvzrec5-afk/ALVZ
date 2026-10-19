@@ -659,6 +659,22 @@ export async function templateBoardId(db: SupabaseClient) {
   return created.id as string;
 }
 
+/**
+ * La « Banque d'images » : un tableau à part où le studio range les images qu'il réutilisera (une planche par thème).
+ * Ses photos et vidéos sont proposées dans « Images projet » et les cases photo de tous les tableaux.
+ */
+export async function libraryBoardId(db: SupabaseClient) {
+  const id = await existingLibraryId(db);
+  if (id) return id;
+  const { data: created, error } = await db
+    .from("boards")
+    .insert({ title: "Banque d'images", is_library: true, share_slug: newSlug() })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+  return created.id as string;
+}
+
 /** Efface pour de bon les cartes supprimées depuis plus de 24 h (images, planches et discussions comprises). */
 export async function purgeDeletedItems(db: SupabaseClient, boardId: string) {
   const limit = new Date(Date.now() - 24 * 3600_000).toISOString();
@@ -785,11 +801,30 @@ async function projectBoards(db: SupabaseClient, boardId: string) {
   return titles;
 }
 
-export type LibraryImage = { id: string; boardId: string; boardTitle: string; src: string; width: number; height: number; video?: boolean };
+/** Identifiant de la « Banque d'images », si elle existe déjà. */
+async function existingLibraryId(db: SupabaseClient) {
+  const { data } = await db
+    .from("boards")
+    .select("id")
+    .eq("is_library", true)
+    .is("parent_id", null)
+    .is("deleted_at", null)
+    .order("created_at")
+    .limit(1)
+    .maybeSingle();
+  return (data?.id as string | undefined) ?? null;
+}
 
-/** Photos et vidéos déjà posées dans le projet (toutes planches), pour remplir une case ou poser une carte. Tableau ouvert d'abord. */
-export async function projectImages(db: SupabaseClient, boardId: string): Promise<LibraryImage[]> {
-  const titles = await projectBoards(db, boardId);
+/** La « Banque d'images » et toutes ses planches (vide si elle n'a pas encore été créée). */
+async function libraryBoards(db: SupabaseClient) {
+  const id = await existingLibraryId(db);
+  return id ? projectBoards(db, id) : new Map<string, string>();
+}
+
+export type LibraryImage = { id: string; boardId: string; boardTitle: string; src: string; width: number; height: number; video?: boolean; library?: boolean };
+
+/** Photos et vidéos posées dans un ensemble de tableaux, triées (tableau `first` d'abord) et bornées à `max`. */
+async function imagesIn(db: SupabaseClient, titles: Map<string, string>, first: string, max: number, library: boolean): Promise<LibraryImage[]> {
   if (!titles.size) return [];
   const { data } = await db
     .from("board_items")
@@ -798,16 +833,16 @@ export async function projectImages(db: SupabaseClient, boardId: string): Promis
     .eq("kind", "image")
     .gt("size_bytes", 0)
     .is("deleted_at", null)
-    .limit(1000);
+    .limit(2000);
   const rows = (data ?? []).filter((r) => {
     const d = r.data as BoardData | null;
     return !d?.media;
   });
   // Une même photo collée plusieurs fois n'apparaît pas en double : on ne peut pas le savoir sans lire les fichiers,
-  // alors on se contente de trier (tableau ouvert, puis les autres planches) et de borner à 300.
-  rows.sort((a, b) => Number(b.board_id === boardId) - Number(a.board_id === boardId) || String(a.board_id).localeCompare(String(b.board_id)) || Number(b.z) - Number(a.z));
+  // alors on se contente de trier (tableau ouvert, puis les autres planches) et de borner.
+  rows.sort((a, b) => Number(b.board_id === first) - Number(a.board_id === first) || String(a.board_id).localeCompare(String(b.board_id)) || Number(b.z) - Number(a.z));
   return Promise.all(
-    rows.slice(0, 300).map(async (r) => {
+    rows.slice(0, max).map(async (r) => {
       const d = (r.data ?? {}) as BoardData;
       return {
         id: r.id as string,
@@ -817,12 +852,27 @@ export async function projectImages(db: SupabaseClient, boardId: string): Promis
         width: d.width ?? 4,
         height: d.height ?? 3,
         ...(d.video ? { video: true } : {}),
+        ...(library ? { library: true } : {}),
       };
     }),
   );
 }
 
-/** Remplit une case photo vide avec une copie d'une photo (ou vidéo) du même projet. */
+/**
+ * Photos et vidéos déjà posées dans le projet (toutes planches), pour remplir une case ou poser une carte. Tableau ouvert d'abord.
+ * Suivies de celles de la « Banque d'images » (`library: true`), sauf si le projet ouvert est la banque elle-même.
+ */
+export async function projectImages(db: SupabaseClient, boardId: string): Promise<LibraryImage[]> {
+  const [titles, bank] = await Promise.all([projectBoards(db, boardId), libraryBoards(db)]);
+  const inBank = [...titles.keys()].some((id) => bank.has(id));
+  const [own, extra] = await Promise.all([
+    imagesIn(db, titles, boardId, inBank ? 1000 : 300, inBank),
+    inBank ? Promise.resolve([]) : imagesIn(db, bank, "", 1000, true),
+  ]);
+  return [...own, ...extra];
+}
+
+/** Remplit une case photo vide avec une copie d'une photo (ou vidéo) du même projet ou de la Banque d'images. */
 export async function fillSlotFrom(db: SupabaseClient, boardId: string, itemId: string, fromId: string) {
   if (!isUuid(itemId) || !isUuid(fromId)) throw new Error("Requête invalide");
   const [{ data: slot }, { data: from }] = await Promise.all([
@@ -832,7 +882,8 @@ export async function fillSlotFrom(db: SupabaseClient, boardId: string, itemId: 
   if (!slot || slot.kind !== "image") throw new Error("Case photo introuvable");
   const src = from?.data as BoardData | null;
   if (!from || from.kind !== "image" || !(Number(from.size_bytes) > 0) || src?.media) throw new Error("Photo introuvable");
-  if (!(await projectBoards(db, boardId)).has(from.board_id as string)) throw new Error("Photo d'un autre projet");
+  const [project, bank] = await Promise.all([projectBoards(db, boardId), libraryBoards(db)]);
+  if (!project.has(from.board_id as string) && !bank.has(from.board_id as string)) throw new Error("Photo d'un autre projet");
   await copyObject(boardImageKey(from.board_id as string, fromId), boardImageKey(boardId, itemId));
   const data: BoardData = { ...((slot.data ?? {}) as BoardData), width: src?.width ?? 4, height: src?.height ?? 3, crop: undefined, video: src?.video ? true : undefined, media: undefined };
   const { error } = await db.from("board_items").update({ size_bytes: from.size_bytes, data: cleanData("image", data) }).eq("id", itemId);

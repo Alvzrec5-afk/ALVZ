@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireAdminPage } from "@/lib/auth";
 import { formatLongDate, toParisDateInput } from "@/lib/dates";
 import { presignGet } from "@/lib/storage";
-import { BoardIcon, PlusIcon } from "@/components/icons";
+import { BoardIcon, ImageIcon, PlusIcon } from "@/components/icons";
 import { BoardsList, type BoardRow } from "@/components/admin/boards-list";
 
 export const metadata = { title: "Tableaux" };
@@ -27,6 +27,7 @@ export default async function BoardsHome() {
     .is("parent_id", null)
     .is("deleted_at", null)
     .eq("is_template", false)
+    .eq("is_library", false)
     .order("updated_at", { ascending: false });
   if (error) throw new Error(`Impossible de charger les tableaux : ${error.message}`);
 
@@ -77,6 +78,21 @@ export default async function BoardsHome() {
           </span>
         </span>
         <span className="text-xs text-muted shrink-0">Modifier →</span>
+      </Link>
+
+      {/* Banque d'images : réserve d'images réutilisables, proposée dans « Images projet » de chaque tableau. */}
+      <Link
+        href="/admin/boards/library"
+        className="mt-3 flex items-center gap-4 border border-line px-5 py-4 hover:border-muted transition-colors max-w-2xl"
+      >
+        <ImageIcon className="w-6 h-6 text-muted shrink-0" />
+        <span className="flex-1 min-w-0">
+          <span className="block text-[15px]">Banque d&apos;images</span>
+          <span className="block text-xs text-muted mt-0.5">
+            Déposez-y les images à garder sous la main, rangées en planches. Dans un tableau, « Images projet » les propose.
+          </span>
+        </span>
+        <span className="text-xs text-muted shrink-0">Ouvrir →</span>
       </Link>
 
       {boards.length === 0 ? (

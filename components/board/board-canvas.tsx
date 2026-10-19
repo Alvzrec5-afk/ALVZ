@@ -4297,7 +4297,7 @@ function SketchEditor({ initial, onCancel, onDone }: { initial: Sketch; onCancel
   );
 }
 
-type LibraryImage = { id: string; boardId: string; boardTitle: string; src: string; width: number; height: number; video?: boolean };
+type LibraryImage = { id: string; boardId: string; boardTitle: string; src: string; width: number; height: number; video?: boolean; library?: boolean };
 
 /** Choisir une photo ou vidéo déjà posée dans le projet (toutes planches), ou importer depuis l'ordinateur. */
 function SlotPicker({
@@ -4315,6 +4315,7 @@ function SlotPicker({
 }) {
   const [images, setImages] = useState<LibraryImage[] | null>(null);
   const [error, setError] = useState("");
+  const [tab, setTab] = useState<"project" | "library" | null>(null);
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
@@ -4334,9 +4335,13 @@ function SlotPicker({
     };
   }, [endpoint]);
 
+  // Deux onglets : ce projet, puis la Banque d'images (ouverte d'office si le projet n'a encore aucune image).
+  const own = (images ?? []).filter((i) => !i.library);
+  const bank = (images ?? []).filter((i) => i.library);
+  const shown = tab ?? (images && !own.length && bank.length ? "library" : "project");
   // Regroupées par planche, dans l'ordre reçu (le tableau ouvert d'abord).
   const groups: { title: string; list: LibraryImage[] }[] = [];
-  for (const img of images ?? []) {
+  for (const img of shown === "library" ? bank : own) {
     const g = groups.find((x) => x.title === img.boardTitle);
     if (g) g.list.push(img);
     else groups.push({ title: img.boardTitle, list: [img] });
@@ -4358,13 +4363,36 @@ function SlotPicker({
             <CloseIcon className="w-5 h-5" />
           </button>
         </div>
+        <div className="flex gap-1 px-4 pt-3">
+          {(
+            [
+              ["project", "Ce projet", own.length],
+              ["library", "Banque d'images", bank.length],
+            ] as const
+          ).map(([key, label, count]) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`h-8 px-3 rounded-full text-[13px] ${shown === key ? "bg-bg-soft text-ink" : "text-muted hover:text-ink"}`}
+            >
+              {label}
+              {images ? <span className="ml-1.5 text-muted">{count}</span> : null}
+            </button>
+          ))}
+        </div>
         <div className="overflow-y-auto p-4 space-y-5">
           {error ? (
             <p className="text-sm text-danger">{error}</p>
           ) : !images ? (
-            <p className="text-sm text-muted">Chargement des photos et vidéos du projet…</p>
-          ) : !images.length ? (
-            <p className="text-sm text-muted">Aucune photo ni vidéo dans ce projet pour l&apos;instant : importez-en une depuis l&apos;ordinateur.</p>
+            <p className="text-sm text-muted">Chargement des photos et vidéos…</p>
+          ) : !groups.length ? (
+            shown === "library" ? (
+              <p className="text-sm text-muted">
+                La Banque d&apos;images est vide. Remplissez-la depuis la page Tableaux, encadré « Banque d&apos;images ».
+              </p>
+            ) : (
+              <p className="text-sm text-muted">Aucune photo ni vidéo dans ce projet pour l&apos;instant : importez-en une depuis l&apos;ordinateur.</p>
+            )
           ) : (
             groups.map((g) => (
               <section key={g.title}>
