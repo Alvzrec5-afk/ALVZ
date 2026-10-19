@@ -286,7 +286,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     [setGroup],
   );
   const [cropping, setCropping] = useState<string | null>(null); // image en cours de recadrage
-  const [capturing, setCapturing] = useState(false);
+  const [capturing, setCapturing] = useState<string | false>(false);
   const worldRef = useRef<HTMLDivElement>(null);
   // Menu du clic droit : position à l'écran (dans le tableau), point du tableau visé, carte visée.
   const [menu, setMenu] = useState<{ left: number; top: number; at: { x: number; y: number }; target: string | null } | null>(null);
@@ -1688,6 +1688,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
                     src={it.src}
                     alt={it.data.caption || ""}
                     draggable={false}
+                    data-cap="crop"
                     onLoad={() => setTick((t) => t + 1)}
                     className="absolute max-w-none pointer-events-none"
                     style={{
@@ -1703,6 +1704,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
                   src={it.src}
                   alt={it.data.caption || ""}
                   draggable={false}
+                  data-cap=""
                   onLoad={() => setTick((t) => t + 1)}
                   className="block w-full h-auto pointer-events-none"
                   style={{ aspectRatio: `${it.data.width ?? 4} / ${it.data.height ?? 3}` }}
@@ -2369,15 +2371,17 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
   };
 
   /**
-   * Capture du tableau entier, bien cadrée, en haute définition (PNG) : toutes les cartes,
-   * sans les barres d'outils, à la plus grande résolution que le navigateur accepte.
+   * Capture du tableau entier, bien cadrée, en haute définition : toutes les cartes, sans les barres d'outils.
+   * Assez grande pour zoomer net dans les photos, même sur iPhone (qui refuse les toiles de plus de ~16 Mpx) :
+   * on dessine alors le tableau par bandes, assemblées au fil de l'eau en un seul JPEG.
    */
   const capture = async () => {
     const world = worldRef.current;
-    const tops = Object.values(itemsRef.current).filter((i) => i.kind !== "arrow" && !i.parentId);
-    const boxes = tops.map((i) => boxOf(i.id)).filter((b): b is Box => Boolean(b));
+    const all = itemsRef.current;
+    const tops = Object.values(all).filter((i) => i.kind !== "arrow" && !i.parentId);
+    const boxes = tops.map((i) => ({ it: i, b: boxOf(i.id) })).filter((x): x is { it: BoardItem; b: Box } => Boolean(x.b));
     if (!world || !boxes.length) return;
-    setCapturing(true);
+    setCapturing("Capture en cours…");
     setSelected(null);
     setGroup([]);
     setEditing(null);
@@ -2385,40 +2389,120 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     try {
       const pad = 48;
-      const x0 = Math.min(...boxes.map((b) => b.x)) - pad;
-      const y0 = Math.min(...boxes.map((b) => b.y)) - pad;
-      const w = Math.ceil(Math.max(...boxes.map((b) => b.x + b.w)) + pad - x0);
-      const h = Math.ceil(Math.max(...boxes.map((b) => b.y + b.h)) + pad - y0);
-      // Assez de détails pour zoomer net dans les photos (posées en 1600 px, affichées bien plus petites) :
-      // jusqu'à 6 fois la taille à l'écran, dans la limite de ce que ce navigateur accepte.
-      const ratio = biggestCaptureRatio(w, h, 6);
-      const big = w * h * ratio * ratio > 30_000_000;
+      const x0 = Math.min(...boxes.map(({ b }) => b.x)) - pad;
+      const y0 = Math.min(...boxes.map(({ b }) => b.y)) - pad;
+      const w = Math.ceil(Math.max(...boxes.map(({ b }) => b.x + b.w)) + pad - x0);
+      const h = Math.ceil(Math.max(...boxes.map(({ b }) => b.y + b.h)) + pad - y0);
+      // Jusqu'à 6 fois la taille à l'écran (photos posées en 1600 px), 64 millions de pixels au plus.
+      let ratio = Math.max(1, Math.min(6, Math.sqrt(64_000_000 / (w * h)), 16384 / w));
+      let rows = 0;
+      // Hauteur de bande que ce navigateur accepte (on essaie vraiment : la limite change selon l'appareil).
+      for (;;) {
+        rows = maxCanvasRows(Math.round(w * ratio), isWebKit() ? 12_000_000 : 64_000_000);
+        if (rows >= 256 || ratio <= 1) break;
+        ratio = Math.max(1, ratio * 0.8);
+      }
+      if (!rows) throw new Error("Ce navigateur ne peut pas dessiner l'image");
+      const W = Math.round(w * ratio);
+      const H = Math.round(h * ratio);
+      const strips = Math.ceil(H / rows);
+
       const { toCanvas } = await import("html-to-image");
       const bg = getComputedStyle(rootRef.current!).backgroundColor;
-      const options = {
+      const base = {
         width: w,
-        height: h,
         pixelRatio: ratio,
         backgroundColor: bg,
-        style: { transform: `translate(${-x0}px, ${-y0}px)`, transformOrigin: "0 0" },
         filter: (n: HTMLElement) => !(n instanceof HTMLElement && n.dataset.ui !== undefined),
         imagePlaceholder: "data:image/gif;base64,R0lGODlhAQABAIAAAMLCwgAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==",
       };
-      // Toutes les photos chargées avant de dessiner.
       await Promise.all([...world.querySelectorAll("img")].map((img) => img.decode().catch(() => undefined)));
-      // Safari (iPhone, iPad, Mac) dessine les photos en noir au premier essai : on dessine une fois
-      // pour rien (il charge alors les photos), puis pour de bon.
+      // Safari dessine parfois les photos en noir au premier essai : un premier passage, tout petit, pour rien.
       if (isWebKit()) {
-        for (let i = 0; i < 2; i++) {
-          const warm = await toCanvas(world, options);
-          warm.width = warm.height = 0;
-          await new Promise((r) => setTimeout(r, 300));
-        }
+        const warm = await toCanvas(world, { ...base, pixelRatio: 0.25, height: h, style: { transform: `translate(${-x0}px, ${-y0}px)`, transformOrigin: "0 0" } });
+        warm.width = warm.height = 0;
       }
-      const canvas = await toCanvas(world, options);
-      // Très grande capture : JPEG haute qualité, sinon le PNG pèserait des dizaines de Mo.
-      const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, big ? "image/jpeg" : "image/png", 0.95));
-      canvas.width = canvas.height = 0;
+
+      // Photos des cartes image : redessinées par-dessus depuis leur fichier, en pleine netteté
+      // (et jamais noires), sauf si une autre carte passe au-dessus.
+      const wr = world.getBoundingClientRect();
+      const k = viewRef.current.k;
+      const toWorld = (r: DOMRect): Box => ({ x: (r.left - wr.left) / k - x0, y: (r.top - wr.top) / k - y0, w: r.width / k, h: r.height / k });
+      const hit = (a: Box, b: Box) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+      const topOf = (id: string) => {
+        let it = all[id];
+        while (it?.parentId && all[it.parentId]) it = all[it.parentId];
+        return it;
+      };
+      const photos = [...world.querySelectorAll<HTMLImageElement>("img[data-cap]")].flatMap((img) => {
+        const id = img.closest<HTMLElement>("[data-item]")?.dataset.item;
+        const top = id ? topOf(id) : undefined;
+        if (!top || !img.naturalWidth) return [];
+        const rect = toWorld(img.getBoundingClientRect());
+        const clip = toWorld((img.dataset.cap === "crop" ? img.parentElement! : img).getBoundingClientRect());
+        const covered = boxes.some(({ it, b }) => it.id !== top.id && it.z > top.z && hit({ ...b, x: b.x - x0, y: b.y - y0 }, clip));
+        return covered ? [] : [{ img, rect, clip }];
+      });
+
+      const jpeg = strips > 1 ? (await import("@/lib/client/jpeg-stream")).createJpegStream(92) : null;
+      jpeg?.begin(W, H);
+      let single: HTMLCanvasElement | null = null;
+      for (let i = 0; i < strips; i++) {
+        if (strips > 1) setCapturing(`Capture en cours… ${i + 1} / ${strips}`);
+        const r0 = i * rows;
+        const n = Math.min(rows, H - r0);
+        const top = r0 / ratio;
+        const canvas = await toCanvas(world, {
+          ...base,
+          height: n / ratio,
+          style: { transform: `translate(${-x0}px, ${-(y0 + top)}px)`, transformOrigin: "0 0" },
+        });
+        const ctx = canvas.getContext("2d")!;
+        const sx = canvas.width / w;
+        const sy = canvas.height / (n / ratio);
+        for (const p of photos) {
+          if (p.clip.y + p.clip.h < top || p.clip.y > top + n / ratio) continue;
+          const bmp = await createImageBitmap(p.img, {
+            resizeWidth: Math.max(1, Math.min(p.img.naturalWidth, Math.ceil(p.rect.w * ratio))),
+            resizeHeight: Math.max(1, Math.min(p.img.naturalHeight, Math.ceil(p.rect.h * ratio))),
+            resizeQuality: "high",
+          }).catch(() => null);
+          if (!bmp) continue;
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(p.clip.x * sx, (p.clip.y - top) * sy, p.clip.w * sx, p.clip.h * sy);
+          ctx.clip();
+          ctx.imageSmoothingQuality = "high";
+          try {
+            ctx.drawImage(bmp, p.rect.x * sx, (p.rect.y - top) * sy, p.rect.w * sx, p.rect.h * sy);
+          } catch {
+            // image d'un autre site non autorisée : on garde le rendu normal
+          }
+          ctx.restore();
+          bmp.close();
+        }
+        if (!jpeg) {
+          single = canvas;
+          break;
+        }
+        // Les lignes de la bande (la toile peut faire une ligne de moins à cause des arrondis).
+        const got = Math.min(n, canvas.height);
+        const data = ctx.getImageData(0, 0, canvas.width, got).data;
+        jpeg.addRows(data, canvas.width, got);
+        if (got < n) for (let j = got; j < n; j++) jpeg.addRows(data.subarray((got - 1) * canvas.width * 4), canvas.width, 1);
+        canvas.width = canvas.height = 0;
+        await new Promise((r) => setTimeout(r, 0));
+      }
+      let blob: Blob | null;
+      if (jpeg) {
+        setCapturing("Capture : assemblage de l'image…");
+        blob = jpeg.finish();
+      } else {
+        // Très grande capture : JPEG haute qualité, sinon le PNG pèserait des dizaines de Mo.
+        const big = W * H > 30_000_000;
+        blob = await new Promise<Blob | null>((r) => single!.toBlob(r, big ? "image/jpeg" : "image/png", 0.95));
+        single!.width = single!.height = 0;
+      }
       if (!blob) throw new Error("Image vide");
       const name = (document.title.split(/\s[—|-]\s/)[0] || "Tableau").replace(/[\\/:*?"<>|]+/g, " ").trim();
       const a = document.createElement("a");
@@ -2686,7 +2770,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
 
       {capturing && (
         <div data-ui className="absolute inset-0 z-[300002] flex items-center justify-center bg-black/30 pointer-events-none">
-          <p className="bg-bg text-sm px-4 py-2.5 rounded-full shadow-lg">Capture en cours…</p>
+          <p className="bg-bg text-sm px-4 py-2.5 rounded-full shadow-lg">{capturing}</p>
         </div>
       )}
 
@@ -2851,7 +2935,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           <button
             className="w-10 h-10 flex items-center justify-center hover:text-ink border-line sm:border-l border-b sm:border-b-0 disabled:opacity-40"
             onClick={() => void capture()}
-            disabled={capturing}
+            disabled={Boolean(capturing)}
             aria-label="Capture du tableau"
             title="Capture du tableau (image en haute définition, nette au zoom)"
           >
@@ -3472,29 +3556,31 @@ function isWebKit() {
 }
 
 /**
- * Plus grand agrandissement (jusqu'à `max`) pour une capture de `w` × `h` que ce navigateur sait dessiner :
- * on essaie vraiment la toile, car la limite change selon l'appareil (iPhone ~16 Mpx, ordinateur bien plus).
+ * Plus grande hauteur (en lignes, 16384 au plus) d'une toile de `width` pixels de large que ce navigateur
+ * sait vraiment dessiner, sans dépasser `maxArea` pixels — 0 si même 64 lignes échouent.
+ * On essaie pour de bon : la limite change selon l'appareil (iPhone ~16 Mpx, ordinateur bien plus).
  */
-function biggestCaptureRatio(w: number, h: number, max: number) {
-  let ratio = Math.min(max, 16384 / Math.max(w, h), Math.sqrt(150_000_000 / (w * h)));
-  while (ratio > 1) {
+function maxCanvasRows(width: number, maxArea: number) {
+  if (width > 16384) return 0;
+  let rows = Math.min(16384, Math.floor(maxArea / width));
+  while (rows >= 64) {
     const c = document.createElement("canvas");
-    c.width = Math.floor(w * ratio);
-    c.height = Math.floor(h * ratio);
+    c.width = width;
+    c.height = rows;
     let ok = false;
     try {
       const ctx = c.getContext("2d");
       if (ctx) {
         ctx.fillStyle = "#fff";
-        ctx.fillRect(c.width - 1, c.height - 1, 1, 1);
-        ok = ctx.getImageData(c.width - 1, c.height - 1, 1, 1).data[3] === 255;
+        ctx.fillRect(width - 1, rows - 1, 1, 1);
+        ok = ctx.getImageData(width - 1, rows - 1, 1, 1).data[3] === 255;
       }
     } catch {
       ok = false;
     }
     c.width = c.height = 0;
-    if (ok) return ratio;
-    ratio *= 0.8;
+    if (ok) return rows;
+    rows = Math.floor(rows * 0.75);
   }
-  return 1;
+  return 0;
 }

@@ -78,8 +78,10 @@ Taille du texte : `data.fontSize` (multiplie 13 px, `FONT_SIZES`, bouton « AA �
 `data.crop` (fractions, non destructif, `CropEditor` avec formats 1:1, 4:5…). Flèche courbe : `data.bend`
 (décalage perpendiculaire, poignée verte au milieu, double-clic = droite ; courbe quadratique dans `geom.arrows`).
 Capture : bouton appareil photo en bas à droite → `capture()` avec `html-to-image` (cadrage sur toutes les cartes,
-jusqu'à 6× la taille écran pour zoomer net, limite essayée sur le navigateur par `biggestCaptureRatio` ;
-au-delà de 30 Mpx : JPEG 95 %, sinon PNG ; sans barres d'outils). Au doigt, glisser sur une case de grille / case à cocher fait défiler.
+jusqu'à 6× la taille écran et 64 Mpx ; sans barres d'outils). Le navigateur est testé (`maxCanvasRows`) : si une seule
+toile ne suffit pas (iPhone ~12-16 Mpx), dessin **par bandes** assemblées au fil de l'eau par l'encodeur JPEG maison
+`lib/client/jpeg-stream.js` (d'après jpeg-js, licence BSD gardée). Les photos des cartes image (`img[data-cap]`)
+sont redessinées par-dessus depuis le fichier (nettes, jamais noires sous Safari) sauf si une carte plus haute les couvre.. Au doigt, glisser sur une case de grille / case à cocher fait défiler.
 Liste des tableaux (`boards-list.tsx`) : grille ou liste à petites vignettes (choix mémorisé, `boards-view`) ;
 vignette = couverture choisie (`boards.cover_key`, envoi via `/api/admin/boards/[id]/cover`, `setBoardCover`) sinon
 le nom du projet en grand. Menu ⋯ (`board-card-menu.tsx`) Renommer / Dupliquer / Choisir ou retirer la couverture / Supprimer ; « Dupliquer le tableau »
