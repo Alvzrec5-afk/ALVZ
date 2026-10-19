@@ -430,3 +430,6 @@ grant execute on function public.board_tree(uuid) to authenticated, service_role
 -- Site alvzrec.com géré depuis le studio (migrations « site_vitrine », « site_in_storage_usage », « site_alvzrec_content »,
 -- « site_thumbs_in_storage ») : tables site_settings, site_categories (slug), site_items (external_url, thumb_size),
 -- site_clips, site_messages ; storage_usage() et studio_overview() comptent les fichiers du site (bytes_site).
+
+-- Planches du projet d'un tableau (onglets de navigation) : migration « board_planches ».
+-- board_planches(target uuid) returns table (id, title, parent_id) — remonte au tableau principal puis descend (5 niveaux).

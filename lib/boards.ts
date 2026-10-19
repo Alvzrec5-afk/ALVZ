@@ -981,3 +981,10 @@ export async function fillSlotFrom(db: SupabaseClient, boardId: string, itemId: 
   if (error) throw new Error(error.message);
   return { src: await presignGet(boardImageKey(boardId, itemId)), width: data.width!, height: data.height!, video: Boolean(data.video), sizeBytes: Number(from.size_bytes) };
 }
+
+/** Planches du projet d'un tableau (toutes profondeurs), pour les onglets de navigation : une requête (`board_planches`). */
+export async function projectPlanches(db: SupabaseClient, boardId: string) {
+  const { data, error } = await db.rpc("board_planches", { target: boardId });
+  if (error || !Array.isArray(data)) return [];
+  return (data as { id: string; title: string; parent_id: string }[]).map((b) => ({ id: b.id, title: b.title, parentId: b.parent_id }));
+}

@@ -1,9 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { after } from "next/server";
 import { requireAdminPage } from "@/lib/auth";
-import { boardAncestors, isUuid, loadBoardItems, purgeDeletedItems, repairEmptyImages } from "@/lib/boards";
+import { boardAncestors, isUuid, loadBoardItems, projectPlanches, purgeDeletedItems, repairEmptyImages } from "@/lib/boards";
 import { BoardCanvas } from "@/components/board/board-canvas";
 import { BoardHeader } from "@/components/admin/board-header";
+import { BoardTabs } from "@/components/admin/board-tabs";
 
 export const metadata = { title: "Tableau" };
 export const dynamic = "force-dynamic";
@@ -19,11 +20,12 @@ export default async function BoardPage({
   if (!isUuid(id)) notFound();
   const { supabase } = await requireAdminPage();
   const fields = "id, title, gallery_id, share_slug, share_enabled, client_can_add, client_can_edit, is_template, is_library";
-  const [{ data: board }, items, { data: galleries }, path] = await Promise.all([
+  const [{ data: board }, items, { data: galleries }, path, planches] = await Promise.all([
     supabase.from("boards").select(fields).eq("id", id).maybeSingle(),
     loadBoardItems(supabase, id, { role: "admin" }),
     supabase.from("galleries").select("id, title, kind").is("deleted_at", null).order("created_at", { ascending: false }),
     boardAncestors(supabase, id),
+    projectPlanches(supabase, id), // onglets : passer d'une planche à l'autre en un clic
   ]);
   if (!board) notFound();
   if (path.some((b) => b.deleted_at)) redirect("/admin/trash");
@@ -46,6 +48,7 @@ export default async function BoardPage({
         path={path.map((b) => ({ id: b.id, title: b.title }))}
         galleries={(galleries ?? []) as { id: string; title: string; kind: string }[]}
       />
+      <BoardTabs root={{ id: path[0]?.id ?? board.id, title: path[0]?.title ?? board.title }} path={path} planches={planches} />
       <div className="flex-1 min-h-0">
         <BoardCanvas
           key={id}

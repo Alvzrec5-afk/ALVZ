@@ -96,6 +96,8 @@ Publié aussi : barre du haut du studio mobile fixe (`sticky`, sous l'heure de l
 `/admin/galleries` (toujours « Galeries » dans le menu) ; `/admin/accueil` redirige vers `/admin`.
 **En local, non publié** : « Images projet » des tableaux en panneau flottant (déplaçable, redimensionnable, reste ouvert,
 glisser une image sur le tableau à la souris).
+**En local aussi** : onglets des planches sous la barre d'un tableau (`components/admin/board-tabs.tsx`, fonction SQL `board_planches`
+déjà en base) : tableau principal + planches, un clic pour passer du moodboard à la shot list (studio seulement, pas la vue client).
 Publié (19 oct.) : nouvelle mise en page du site alvzrec (`lib/site-template.ts`, bloc CSS « MISE EN PAGE ») : ordinateur =
 clips en grille de 3 (extrait YouTube au survol seulement, plus de bascule 3D), photos sur 5 colonnes, Coulisses + Caméras côte à
 côte (section `.duo`), bouton « Réserver » (WhatsApp, traduit) dans la barre ; téléphone = clips sur une colonne plus serrés, moins de vide.

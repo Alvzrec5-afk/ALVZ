@@ -158,6 +158,9 @@ Copier / couper / coller (Cmd + C / X / V) : `copySelection` met les cartes (+ c
 entre elles) dans le presse-papiers avec la marque `ALVZ-BOARD:` ; `pasteCards` recrée tout avec de nouveaux ids,
 même dans un autre tableau ou un autre onglet (événement `copy` natif + `localStorage` `alvz-board-clip` en secours) ; `copyOf` dit au serveur de dupliquer l'image (CopyObject) ou la planche
 (`duplicateBoard` avec `parentId` / `id`). Studio seulement pour images et planches ; discussion non copiée.
+Onglets des planches (studio) : `BoardTabs` sous `BoardHeader` — tableau principal puis ses planches de premier niveau
+(tri par nom, numéros compris), lien direct ; dans une planche d'une planche, l'onglet de sa planche de départ est allumé.
+Données : `projectPlanches` → fonction SQL `board_planches(target)` (remonte au tableau principal, puis toutes ses planches).
 Navigation : dans un tableau (plein écran), bouton ☰ « Studio » à gauche de la barre (`board-header.tsx`).
 Page client `/t/…` vue par le studio connecté (`isStudioSession`, `lib/auth.ts`) : logo → /admin et bouton
 « Retour au studio » (ouvre le même tableau dans le studio) ; les clients ne voient rien de plus.
