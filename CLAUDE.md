@@ -90,9 +90,10 @@ Publié aussi : entrées du menu « … » glissables sur le tableau / dans une 
 Publié (19 oct.) : Banque d'images (tableau `boards.is_library`, colonne déjà ajoutée en base ; `/admin/boards/library`,
 encadré sur la liste des tableaux ; onglet « Banque d'images » dans « Images projet » et les cases photo vides ;
 chaque photo envoyée par le studio dans un tableau y est copiée d'office ; corbeille sur les photos de la banque dans la fenêtre).
-**En local, non publié** : page **Accueil** `/admin/accueil` (centre de contrôle : compteurs, stockage détaillé, plus gros
-projets, récents ; ouverte après connexion et par le logo ; la page Galeries reste `/admin`, le propriétaire ne veut pas
-qu'elle bouge) ; jauge de stockage détaillée par catégorie (Galeries, Vidéos) via la fonction SQL `studio_overview()` (déjà en base).
+Publié (19 oct.) : page **Accueil** (centre de contrôle : compteurs, stockage détaillé, plus gros projets, récents) ;
+jauge de stockage détaillée par catégorie via la fonction SQL `studio_overview()` (déjà en base).
+**En local, non publié** : l'Accueil devient `/admin` (demandé par le propriétaire) ; la liste des galeries passe à
+`/admin/galleries` (toujours « Galeries » dans le menu) ; `/admin/accueil` redirige vers `/admin`.
 Publié aussi : ouverture des tableaux plus rapide — fonctions SQL `board_path` / `board_tree` (déjà en base) pour le chemin
 et les planches en une requête ; ménage des cartes supprimées et réparation des cases vides (`repairEmptyImages`) lancés après l'affichage (`after`). Le modèle en base a déjà reçu « 5. STORYBOARD » (planches suivantes renumérotées 6 et 7).
 

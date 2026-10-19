@@ -149,7 +149,7 @@ export async function restoreFromTrash(kind: "gallery" | "board", id: string) {
   const { error } = await supabase.from(table).update({ deleted_at: null }).eq("id", id);
   if (error) return { error: error.message };
   revalidatePath("/admin/trash");
-  revalidatePath(kind === "gallery" ? "/admin" : "/admin/boards");
+  revalidatePath(kind === "gallery" ? "/admin/galleries" : "/admin/boards");
   revalidatePath("/admin/videos");
   return {};
 }

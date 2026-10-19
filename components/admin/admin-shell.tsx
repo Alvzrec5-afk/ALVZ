@@ -8,8 +8,8 @@ import { BackgroundStatus } from "./background";
 import { BoardIcon, HomeIcon, TrashIcon, CardIcon, CloseIcon, FilmIcon, ImageIcon, LogoutIcon, MegaphoneIcon, MenuIcon } from "@/components/icons";
 
 const NAV = [
-  { href: "/admin/accueil", label: "Accueil", Icon: HomeIcon, match: (p: string) => p.startsWith("/admin/accueil") },
-  { href: "/admin", label: "Galeries", Icon: ImageIcon, match: (p: string) => p === "/admin" || p.startsWith("/admin/galleries") },
+  { href: "/admin", label: "Accueil", Icon: HomeIcon, match: (p: string) => p === "/admin" },
+  { href: "/admin/galleries", label: "Galeries", Icon: ImageIcon, match: (p: string) => p.startsWith("/admin/galleries") },
   { href: "/admin/videos", label: "Vidéos", Icon: FilmIcon, match: (p: string) => p.startsWith("/admin/videos") },
   { href: "/admin/boards", label: "Tableaux", Icon: BoardIcon, match: (p: string) => p.startsWith("/admin/boards") },
   { href: "/admin/settings", label: "Coordonnées", Icon: CardIcon, match: (p: string) => p.startsWith("/admin/settings") },
@@ -44,7 +44,7 @@ export function AdminShell({ children, signOut }: { children: React.ReactNode; s
       <header className="border-b border-line lg:hidden">
         <div className="px-3 h-16 grid grid-cols-[2.75rem_1fr_2.75rem] items-center">
           <span />
-          <Link href="/admin/accueil" className="justify-self-center">
+          <Link href="/admin" className="justify-self-center">
             <Wordmark height={30} />
           </Link>
           {!galleryPage && (
@@ -81,7 +81,7 @@ export function AdminShell({ children, signOut }: { children: React.ReactNode; s
 
       {!galleryPage && (
         <aside className="hidden lg:flex fixed inset-y-0 left-0 w-64 flex-col border-r border-line bg-bg z-30">
-          <Link href="/admin/accueil" className="flex items-center gap-3 h-20 px-7 border-b border-line">
+          <Link href="/admin" className="flex items-center gap-3 h-20 px-7 border-b border-line">
             <Wordmark height={28} />
             <span className="eyebrow text-muted tracking-[0.2em]">studio</span>
           </Link>

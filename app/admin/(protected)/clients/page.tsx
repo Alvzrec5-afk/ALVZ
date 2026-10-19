@@ -15,7 +15,7 @@ export default async function ClientsPage() {
   ]);
   return (
     <div className="max-w-3xl">
-      <Link href="/admin" className="eyebrow text-muted hover:text-ink lg:hidden">← Galeries</Link>
+      <Link href="/admin" className="eyebrow text-muted hover:text-ink lg:hidden">← Accueil</Link>
       <h1 className="display text-4xl sm:text-5xl mt-6 lg:mt-0">Clients</h1>
       <p className="text-sm text-muted mt-4 leading-relaxed">
         Les adresses laissées dans vos galeries (sélection de favoris, téléchargements). Écrivez-leur depuis votre boîte mail :

@@ -22,7 +22,7 @@ export function LoginForm({ initialError }: { initialError: string | null }) {
       setLoading(false);
       return;
     }
-    router.replace("/admin/accueil");
+    router.replace("/admin");
   }
 
   return (

@@ -124,11 +124,11 @@ cartes) ; studio = logo ALVZ.REC, client = prénom + initiale ; API `…/comment
 partage « Le client peut tout modifier » (`boards.client_can_edit`, avec « ajouter ses idées ») : le client
 déplace / modifie / supprime toutes les cartes et a aussi Colonne, Couleur, Flèche (pas Planche ni Importer).
 
-**Accueil (`/admin/accueil`)** — `components/admin/studio-dashboard.tsx` : 8 compteurs (liens), `StorageMeter` avec
+**Accueil (`/admin`)** — `components/admin/studio-dashboard.tsx` : 8 compteurs (liens), `StorageMeter` avec
 `parts` (`storageParts`, couleurs `--series-1…4` de globals.css, vérifiées daltoniens), galeries les plus lourdes
 (`storageUsage().perGallery`), récents. Chiffres : `studioOverview()` (`lib/usage.ts`) → fonction SQL `studio_overview()`
-(jsonb ; espace calculé comme `storage_usage`, banque d'images = arbre du tableau `is_library`). Après connexion,
-`login-form` va sur `/admin/accueil` ; le logo aussi. La liste des galeries reste `/admin`.
+(jsonb ; espace calculé comme `storage_usage`, banque d'images = arbre du tableau `is_library`). Liste des galeries photo :
+`/admin/galleries` (page `galleries/page.tsx`) ; `/admin/accueil` (ancienne adresse) redirige vers `/admin`.
 
 **Corbeille (`/admin/trash`, menu Outils)** — supprimer une galerie, un projet vidéo ou un tableau (principal) met
 `deleted_at` (`trashGallery`, `deleteBoard`) ; restaurer = `deleted_at` à null ; « Supprimer définitivement » =

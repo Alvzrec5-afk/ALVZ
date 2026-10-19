@@ -40,7 +40,7 @@ export async function createGallery(_: FormState, form: FormData): Promise<FormS
     .single();
   if (error) return { error: error.message };
   if (kind === "photo") await supabase.from("collections").insert({ gallery_id: data.id, name: "Galerie", position: 0 });
-  revalidatePath(kind === "photo" ? "/admin" : "/admin/videos");
+  revalidatePath(kind === "photo" ? "/admin/galleries" : "/admin/videos");
   redirect(`/admin/galleries/${data.id}`);
 }
 
@@ -61,7 +61,7 @@ export async function updateGallerySettings(galleryId: string, patch: Record<str
     .eq("id", galleryId);
   if (error) return { error: error.message };
   revalidatePath(`/admin/galleries/${galleryId}`);
-  revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
   return {};
 }
 
@@ -73,7 +73,7 @@ export async function setGalleryPassword(galleryId: string, password: string | n
     .eq("id", galleryId);
   if (error) return { error: error.message };
   revalidatePath(`/admin/galleries/${galleryId}`);
-  revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
   return {};
 }
 
@@ -86,7 +86,7 @@ export async function setGalleryExpiry(galleryId: string, date: string | null) {
     .eq("id", galleryId);
   if (error) return { error: error.message };
   revalidatePath(`/admin/galleries/${galleryId}`);
-  revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
   return {};
 }
 
@@ -112,7 +112,7 @@ export async function setGallerySlug(galleryId: string, raw: string) {
   const { error } = await supabase.from("galleries").update({ slug }).eq("id", galleryId);
   if (error) return { error: error.code === "23505" ? "Ce lien est déjà utilisé par une autre galerie." : error.message };
   revalidatePath(`/admin/galleries/${galleryId}`);
-  revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
   return { slug };
 }
 
@@ -120,7 +120,7 @@ export async function setCover(galleryId: string, photoId: string) {
   const { supabase } = await requireAdminApi();
   await supabase.from("galleries").update({ cover_photo_id: photoId }).eq("id", galleryId);
   revalidatePath(`/admin/galleries/${galleryId}`);
-  revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
 }
 
 export async function addCollection(galleryId: string, name: string) {
@@ -219,7 +219,7 @@ export async function trashGallery(galleryId: string) {
   const { supabase } = await requireAdminApi();
   const { error } = await supabase.from("galleries").update({ deleted_at: new Date().toISOString() }).eq("id", galleryId);
   if (error) return { error: error.message };
-  revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
   revalidatePath("/admin/videos");
   revalidatePath("/admin/trash");
   return {};

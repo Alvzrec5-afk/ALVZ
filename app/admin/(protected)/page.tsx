@@ -1,65 +1,33 @@
 import { requireAdminPage } from "@/lib/auth";
-import { formatLongDate } from "@/lib/dates";
-import { presignGet, variantKey } from "@/lib/storage";
-import { StorageCheck } from "@/components/admin/storage-check";
-import { GalleryGrid, type GalleryCard } from "@/components/admin/gallery-grid";
-import { StorageMeter } from "@/components/admin/storage-meter";
-import { storageParts, storageUsage, studioOverview } from "@/lib/usage";
+import { storageUsage, studioOverview } from "@/lib/usage";
+import { StudioDashboard } from "@/components/admin/studio-dashboard";
 
-export const metadata = { title: "Galeries" };
+export const metadata = { title: "Accueil" };
 export const dynamic = "force-dynamic";
 
-type Row = {
-  id: string;
-  slug: string;
-  title: string;
-  event_date: string | null;
-  cover_photo_id: string | null;
-  password_hash: string | null;
-  expires_at: string | null;
-  created_at: string;
-  photos: { count: number }[];
-};
-
-export default async function AdminHome() {
+/** Accueil du studio (centre de contrôle) : chiffres, stockage détaillé, projets récents. */
+export default async function StudioHome() {
   const { supabase } = await requireAdminPage();
-  const [{ data, error }, usage, overview] = await Promise.all([
-    supabase
-      .from("galleries")
-      .select("id, slug, title, event_date, cover_photo_id, password_hash, expires_at, created_at, photos!photos_gallery_id_fkey(count)")
-      .eq("kind", "photo")
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false }),
-    storageUsage(supabase),
+  const [o, usage, { data: galleries }, { data: boards }] = await Promise.all([
     studioOverview(supabase),
+    storageUsage(supabase),
+    supabase.from("galleries").select("id, title, kind, created_at").is("deleted_at", null).order("created_at", { ascending: false }),
+    supabase
+      .from("boards")
+      .select("id, title, updated_at")
+      .is("parent_id", null)
+      .is("deleted_at", null)
+      .eq("is_template", false)
+      .eq("is_library", false)
+      .order("updated_at", { ascending: false })
+      .limit(4),
   ]);
-  if (error) throw new Error(`Impossible de charger les galeries : ${error.message}`);
-  const rows = (data ?? []) as Row[];
-
-  const galleries: GalleryCard[] = await Promise.all(
-    rows.map(async (g) => ({
-      id: g.id,
-      slug: g.slug,
-      title: g.title,
-      date: formatLongDate(g.event_date),
-      createdAt: g.created_at,
-      photoCount: g.photos[0]?.count ?? 0,
-      bytes: usage.perGallery.get(g.id) ?? 0,
-      locked: Boolean(g.password_hash),
-      expired: Boolean(g.expires_at && new Date(g.expires_at) < new Date()),
-      cover: g.cover_photo_id ? await presignGet(variantKey(g.id, g.cover_photo_id, "thumb")) : null,
-    })),
-  );
-
   return (
-    <div>
-      <GalleryGrid galleries={galleries} />
-      <div className="mt-20">
-        <StorageMeter used={usage.total} limit={usage.limit} parts={storageParts(overview)} />
-      </div>
-      <div className="mt-4 border-t border-line pt-8">
-        <StorageCheck />
-      </div>
-    </div>
+    <StudioDashboard
+      o={o}
+      usage={usage}
+      galleries={(galleries ?? []) as { id: string; title: string; kind: string; created_at: string }[]}
+      boards={(boards ?? []) as { id: string; title: string; updated_at: string }[]}
+    />
   );
 }

@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     const table = kind === "gallery" ? "galleries" : "collections";
     const { error: delError } = await supabase.from(table).delete().eq("id", id);
     if (delError) throw new Error(delError.message);
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return Response.json({ done: true });
   } catch (e) {
     return apiError(e);

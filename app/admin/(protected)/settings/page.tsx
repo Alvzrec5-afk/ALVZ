@@ -11,7 +11,7 @@ export default async function SettingsPage() {
   const { data } = await supabase.from("studio_settings").select("contact").eq("id", 1).maybeSingle();
   return (
     <div className="max-w-xl">
-      <Link href="/admin" className="eyebrow text-muted hover:text-ink lg:hidden">← Galeries</Link>
+      <Link href="/admin" className="eyebrow text-muted hover:text-ink lg:hidden">← Accueil</Link>
       <h1 className="display text-4xl sm:text-5xl mt-6 lg:mt-0">Carte de visite</h1>
       <p className="text-sm text-muted mt-4 leading-relaxed">
         Ces coordonnées apparaissent en bas de vos galeries, pour que vos clients et leurs proches puissent vous

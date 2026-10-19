@@ -27,13 +27,13 @@ export function StudioDashboard({ o, usage, galleries: list, boards }: Dashboard
   const max = biggest[0]?.bytes ?? 1;
 
   const tiles = [
-    { label: "Photos", value: o.photos, sub: `dans ${plural(o.photo_galleries, "galerie", "galeries")}`, href: "/admin" },
+    { label: "Photos", value: o.photos, sub: `dans ${plural(o.photo_galleries, "galerie", "galeries")}`, href: "/admin/galleries" },
     { label: "Vidéos", value: o.videos, sub: `dans ${plural(o.video_projects, "projet", "projets")}`, href: "/admin/videos" },
     { label: "Tableaux", value: o.boards, sub: "moodboards, tournages", href: "/admin/boards" },
     { label: "Banque d'images", value: o.library_images, sub: "images réutilisables", href: "/admin/boards/library" },
-    { label: "Téléchargements", value: o.downloads_30d, sub: "photos, 30 derniers jours", href: "/admin" },
+    { label: "Téléchargements", value: o.downloads_30d, sub: "photos, 30 derniers jours", href: "/admin/galleries" },
     { label: "Vues vidéo", value: o.video_views_30d, sub: "30 derniers jours", href: "/admin/videos" },
-    { label: "Favoris", value: o.favorites, sub: "aimées par vos clients", href: "/admin" },
+    { label: "Favoris", value: o.favorites, sub: "aimées par vos clients", href: "/admin/galleries" },
     { label: "Espace libre", value: null, text: formatBytes(Math.max(0, usage.limit - usage.total)), sub: `sur ${formatBytes(usage.limit)}`, href: "#stockage" },
   ];
 

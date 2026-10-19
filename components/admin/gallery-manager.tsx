@@ -68,7 +68,7 @@ export function GalleryManager(raw: Props) {
   const isVideo = gallery.kind === "video";
   // Projet vidéo : vidéos, design, paramètres. Galerie photo : photos, design, paramètres, activité.
   const tabs = TABS.filter((t) => (isVideo ? ["videos", "design", "settings"].includes(t.id) : t.id !== "videos"));
-  const home = isVideo ? "/admin/videos" : "/admin";
+  const home = isVideo ? "/admin/videos" : "/admin/galleries";
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>(isVideo ? "videos" : "photos");
   const [menu, setMenu] = useState(false);
   const [drawer, setDrawer] = useState(false);

@@ -8,8 +8,8 @@ import { ArrowLeft, BoardIcon, CardIcon, HomeIcon, ChevronDown, CloseIcon, FilmI
 
 /** Raccourcis vers le reste du studio (un tableau s'ouvre en plein écran, sans le menu de gauche). */
 const STUDIO = [
-  { href: "/admin/accueil", label: "Accueil", Icon: HomeIcon },
-  { href: "/admin", label: "Galeries", Icon: ImageIcon },
+  { href: "/admin", label: "Accueil", Icon: HomeIcon },
+  { href: "/admin/galleries", label: "Galeries", Icon: ImageIcon },
   { href: "/admin/videos", label: "Vidéos", Icon: FilmIcon },
   { href: "/admin/boards", label: "Tableaux", Icon: BoardIcon },
   { href: "/admin/settings", label: "Coordonnées", Icon: CardIcon },
