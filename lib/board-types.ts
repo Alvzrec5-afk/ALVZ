@@ -113,6 +113,8 @@ export type BoardItem = BoardItemInput & {
   mine: boolean;
   /** Image : URL de lecture temporaire. */
   src: string | null;
+  /** Document : URL temporaire qui force le téléchargement (`src` sert à l'ouvrir dans le site). */
+  download?: string | null;
   /** Carte « commentaire » : la discussion, dans l'ordre. */
   comments?: BoardComment[];
   /** Sous-tableau : nom, nombre de cartes et quelques images pour l'aperçu. */

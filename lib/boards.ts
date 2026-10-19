@@ -109,10 +109,11 @@ export async function loadBoardItems(
       data: r.data ?? {},
       author: r.author,
       mine: actor.role === "admin" || Boolean(actor.canEditAll) || (r.client_id !== null && r.client_id === actor.clientId),
-      src:
-        r.kind === "image" && r.size_bytes > 0
-          ? await presignGet(boardImageKey(boardId, r.id), r.data?.media === "document" ? { downloadName: r.data.fileName || "document" } : {})
-          : null,
+      src: r.kind === "image" && r.size_bytes > 0 ? await presignGet(boardImageKey(boardId, r.id)) : null,
+      download:
+        r.kind === "image" && r.size_bytes > 0 && r.data?.media === "document"
+          ? await presignGet(boardImageKey(boardId, r.id), { downloadName: r.data.fileName || "document" })
+          : undefined,
       sub: r.kind === "board" && r.data?.boardId ? subs.get(r.data.boardId) ?? null : undefined,
       comments: r.kind === "comment" ? comments.get(r.id) ?? [] : undefined,
     })),

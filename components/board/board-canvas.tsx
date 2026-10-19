@@ -48,6 +48,7 @@ import {
   BrushIcon,
   CloseIcon,
   ColumnIcon,
+  DownloadIcon,
   ConnectorIcon,
   FitIcon,
   ImageIcon,
@@ -324,6 +325,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
   // Bouton « Images projet » (studio) : choix d'une photo ou vidéo du projet pour une nouvelle carte, à cet endroit.
   const [imagePick, setImagePick] = useState<{ at?: { x: number; y: number }; extra?: Partial<BoardItem> } | null>(null);
   const [slotOver, setSlotOver] = useState<string | null>(null); // case photo survolée par un fichier glissé
+  const [docOpen, setDocOpen] = useState<string | null>(null); // document ouvert en grand
   // Menu « … » de la barre d'outils (Croquis, Nuancier, Document…) : position du bouton qui l'ouvre.
   const [more, setMore] = useState<DOMRect | null>(null);
   const mediaRef = useRef<HTMLInputElement>(null);
@@ -1814,16 +1816,25 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
                 <audio data-nodrag controls preload="metadata" src={it.src} className="block w-full h-9 mt-2" />
               </div>
             ) : it.src && it.data.media === "document" ? (
-              <a data-nodrag href={it.src} target="_blank" rel="noreferrer noopener" className="flex items-center gap-3 px-3.5 py-3 min-w-0 hover:opacity-80">
+              // Document : la carte reste fermée (et se déplace comme les autres) ; « Ouvrir » l'affiche en grand.
+              <div className="flex items-center gap-3 px-3.5 py-3 min-w-0">
                 <span className="relative w-10 h-12 shrink-0 border border-line rounded-[3px] flex items-end justify-center pb-1 text-[9px] font-semibold uppercase tracking-wide">
                   <FileIcon className="absolute top-1 w-4 h-4 opacity-60" />
                   {(it.data.fileName?.split(".").pop() ?? "").slice(0, 5)}
                 </span>
-                <span className="min-w-0">
+                <span className="min-w-0 flex-1">
                   <span className="block text-xs truncate">{it.data.fileName || "Document"}</span>
-                  <span className="block text-[11px] opacity-60">Ouvrir / télécharger</span>
+                  <span className="flex items-center gap-3 mt-1 text-[11px]">
+                    <button data-nodrag onClick={() => setDocOpen(it.id)} className="underline underline-offset-2 hover:opacity-70">
+                      Ouvrir
+                    </button>
+                    <a data-nodrag href={it.download ?? it.src} download={it.data.fileName || true} className="opacity-60 hover:opacity-100 flex items-center gap-1">
+                      <DownloadIcon className="w-3.5 h-3.5" />
+                      Télécharger
+                    </a>
+                  </span>
                 </span>
-              </a>
+              </div>
             ) : it.src ? (
               it.data.video ? (
                 // Petite vidéo : en boucle et sans le son ; le bouton l'ouvre en grand avec le son.
@@ -2820,7 +2831,17 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       {
         label: one?.data.video ? "Voir la vidéo en grand" : one?.data.media ? "Ouvrir le fichier" : "Voir l'image en grand",
         hidden: !(one?.kind === "image" && one.src),
-        run: close(() => window.open(one!.src!, "_blank", "noopener")),
+        run: close(() => (one?.data.media === "document" ? setDocOpen(one.id) : window.open(one!.src!, "_blank", "noopener"))),
+      },
+      {
+        label: "Télécharger le document",
+        hidden: !(one?.kind === "image" && one.src && one.data.media === "document"),
+        run: close(() => {
+          const a = document.createElement("a");
+          a.href = one!.download ?? one!.src!;
+          a.download = one!.data.fileName || "document";
+          a.click();
+        }),
       },
       { label: "Modifier", hidden: !one || one.kind === "arrow" || !canEdit(one), run: close(() => one && startEdit(one)) },
       { label: "Rogner l'image", hidden: !(one?.kind === "image" && one.src && !one.data.video && !one.data.media && canEdit(one)), run: close(() => one && setCropping(one.id)) },
@@ -3166,6 +3187,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           }}
         />
       )}
+      {docOpen && items[docOpen]?.src && <DocViewer item={items[docOpen]} onClose={() => setDocOpen(null)} />}
       {sketching && items[sketching]?.data.sketch && (
         <SketchEditor
           initial={items[sketching].data.sketch!}
@@ -4298,6 +4320,57 @@ function SlotPicker({
             ))
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Document ouvert en grand dans le site : PDF et textes dans le navigateur ; Word, Excel, PowerPoint
+ * via la visionneuse Office en ligne (elle lit le fichier par son adresse temporaire) ; sinon, téléchargement.
+ */
+function DocViewer({ item, onClose }: { item: BoardItem; onClose: () => void }) {
+  const name = item.data.fileName || "Document";
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  const src = item.src!;
+  const office = ["doc", "docx", "xls", "xlsx", "ppt", "pptx"].includes(ext) && /^https:/.test(src);
+  const inline = ["pdf", "txt", "csv", "md"].includes(ext);
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === "Escape" && close.current();
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, []);
+  return (
+    <div data-ui className="absolute inset-0 z-[300000] flex flex-col bg-black/80 p-2 sm:p-6" onPointerDown={(e) => e.stopPropagation()}>
+      <div className="flex items-center gap-2 mb-2 text-white">
+        <FileIcon className="w-5 h-5 shrink-0 opacity-80" />
+        <p className="text-sm truncate flex-1">{name}</p>
+        <a href={item.download ?? src} download={name} className="h-9 px-4 rounded-full bg-white/10 hover:bg-white/20 text-[13px] flex items-center gap-2">
+          <DownloadIcon className="w-4 h-4" />
+          Télécharger
+        </a>
+        <button onClick={onClose} className="h-9 px-4 rounded-full bg-white text-black text-[13px] font-medium">
+          Fermer
+        </button>
+      </div>
+      <div className="flex-1 min-h-0 bg-white rounded-[4px] overflow-hidden">
+        {inline || office ? (
+          <iframe
+            title={name}
+            src={office ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(src)}` : src}
+            className="w-full h-full border-0"
+          />
+        ) : (
+          <div className="h-full flex flex-col items-center justify-center gap-3 p-6 text-center text-neutral-700">
+            <p className="text-sm">Ce type de fichier ({ext.toUpperCase() || "inconnu"}) ne peut pas s&apos;afficher dans le navigateur.</p>
+            <a href={item.download ?? src} download={name} className="h-10 px-5 rounded-full bg-black text-white text-[13px] flex items-center gap-2">
+              <DownloadIcon className="w-4 h-4" />
+              Télécharger
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );

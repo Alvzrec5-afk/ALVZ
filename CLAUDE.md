@@ -84,7 +84,8 @@ dessin par bandes + JPEG maison, « Enregistré » et flèches annuler cachés a
 Publié le 19 oct. : menu « … » (croquis, nuancier, document, audio, carte, vidéo, titre) ; cases photo vides :
 choix parmi les photos du projet + glisser-déposer.
 Publié aussi : bouton « Images projet » (photos et vidéos du projet) ; cases vides proposent aussi les vidéos.
-Rien en attente en local. Le modèle en base a déjà reçu « 5. STORYBOARD » (planches suivantes renumérotées 6 et 7).
+**Committé en local, pas encore publié :** documents des tableaux déplaçables, ouverts en grand dans le site
+(+ Télécharger). Le modèle en base a déjà reçu « 5. STORYBOARD » (planches suivantes renumérotées 6 et 7).
 
 - **À vérifier en vrai par le propriétaire** : menu « … » (plan Google Maps, envoi d'un PDF / MP3 vers Oracle), case photo vide (choix parmi les photos du projet) ;
   vidéo dans un tableau (envoi depuis l'iPhone, lecture, plein écran) ; capture d'un tableau **depuis l'iPhone** (nette au zoom ? photos présentes ? non testé sur vrai Safari) et avec de vraies photos Oracle (si elles sortent

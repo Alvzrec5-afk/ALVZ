@@ -87,7 +87,9 @@ et vidéos du projet (`LibraryImage.video`) ; un choix crée une carte avec
 Menu « … » de la barre (`moreTools`, panneau `more`) : **Croquis** = note avec `data.sketch` (traits, `SketchEditor` /
 `SketchView`, `cleanSketch` côté serveur) ; **Nuancier** = 5 cartes couleur côte à côte ; **Document** / **Audio** = carte
 `image` avec `data.media` (« document » | « audio »), `fileName`, `fileType` (50 Mo, studio, `readBoardFile`, extensions
-`BOARD_DOCUMENT_EXTENSIONS`, document servi en téléchargement) ; **Carte** = lien avec `data.place` (plan Google Maps
+`BOARD_DOCUMENT_EXTENSIONS`) ; document : carte déplaçable, « Ouvrir » = `DocViewer` en grand (PDF / texte dans le
+navigateur, Word / Excel / PowerPoint via la visionneuse Office en ligne, sinon téléchargement), `src` = lecture, `download` =
+URL qui force le téléchargement ; **Carte** = lien avec `data.place` (plan Google Maps
 intégré, « Explorer » pour le manipuler ; `place` gardé même vide) ; **Vidéo** = sélecteur vidéo ; **Titre** = note
 `data.heading` (grand texte sans fond). Champ de fichier `mediaRef` + `mediaPick` ; genre deviné par `mediaKindOf`.
 Vidéos (studio) : carte `image` avec `data.video = true` (mp4 / mov / webm, 50 Mo au plus, `MAX_BOARD_VIDEO_BYTES`
