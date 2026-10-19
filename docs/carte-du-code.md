@@ -81,6 +81,11 @@ Case photo vide (`data-slot`) : clic → `SlotPicker` (photos déjà posées dan
 `projectImages` via `GET /api/admin/boards/[id]/library`, la planche ouverte d'abord) ou « Importer depuis l'ordinateur »
 (`fillTarget` + `fileRef`). Choisir une photo = copie Oracle côté serveur (`fillSlotFrom`, `POST …/library`). Une photo
 (ou vidéo) glissée depuis l'ordinateur sur la case la remplit (`onDrop`, surlignage `slotOver`).
+Bouton « Images projet » : **panneau flottant** (`SlotPicker floating`) déplaçable par sa barre du haut, redimensionnable
+par le coin en bas à droite (place et taille gardées dans `localStorage` `alvz-image-panel`, `clampPanel`), qui ne se ferme
+qu'avec sa croix (ni clic à côté ni Échap) ; le bouton de la barre l'ouvre / le ferme ; ↻ recharge la liste. Clic sur une image =
+carte au milieu de l'écran (`placeLibraryImage`) ; à la souris, glisser une image sur le tableau ou dans une colonne la pose là
+(`startToolDrag` avec vignette dans le fantôme ; au doigt, glisser fait défiler la liste). Avant :
 Bouton « Images projet » (studio, à côté d'« Image » qui reste l'import classique) : même fenêtre (`imagePick`), photos
 et vidéos du projet (`LibraryImage.video`) ; un choix crée une carte avec
 `copyOf` (le serveur copie le fichier, comme un collage) ; « Importer depuis l'ordinateur » garde l'endroit (`imageDrop`).

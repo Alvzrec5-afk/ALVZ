@@ -94,6 +94,8 @@ Publié (19 oct.) : page **Accueil** (centre de contrôle : compteurs, stockage 
 jauge de stockage détaillée par catégorie via la fonction SQL `studio_overview()` (déjà en base).
 Publié aussi : barre du haut du studio mobile fixe (`sticky`, sous l'heure de l'iPhone dans l'app) ; l'Accueil est `/admin` (demandé par le propriétaire) ; la liste des galeries passe à
 `/admin/galleries` (toujours « Galeries » dans le menu) ; `/admin/accueil` redirige vers `/admin`.
+**En local, non publié** : « Images projet » des tableaux en panneau flottant (déplaçable, redimensionnable, reste ouvert,
+glisser une image sur le tableau à la souris).
 Publié (19 oct.) : nouvelle mise en page du site alvzrec (`lib/site-template.ts`, bloc CSS « MISE EN PAGE ») : ordinateur =
 clips en grille de 3 (extrait YouTube au survol seulement, plus de bascule 3D), photos sur 5 colonnes, Coulisses + Caméras côte à
 côte (section `.duo`), bouton « Réserver » (WhatsApp, traduit) dans la barre ; téléphone = clips sur une colonne plus serrés, moins de vide.

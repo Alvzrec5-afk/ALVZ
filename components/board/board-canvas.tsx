@@ -342,7 +342,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
   const [playing, setPlaying] = useState<string | null>(null);
   const [replies, setReplies] = useState<Record<string, string>>({});
   const [groupPalette, setGroupPalette] = useState(false);
-  const [toolGhost, setToolGhost] = useState<{ label: string; Icon: typeof NoteIcon; x: number; y: number } | null>(null);
+  const [toolGhost, setToolGhost] = useState<{ label: string; Icon: typeof NoteIcon; x: number; y: number; src?: string } | null>(null);
   const suppressToolClick = useRef(false);
   const [editing, setEditing] = useState<Editing>(null);
   const [arrowMode, setArrowMode] = useState<{ from: string | null } | null>(null);
@@ -2927,7 +2927,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         }),
     },
     // Studio : reprendre une photo ou vidéo déjà posée ailleurs dans le projet (moodboard…), sans changer de planche.
-    { label: "Images projet", Icon: GalleryIcon, run: () => setImagePick({}), drop: (at, extra) => setImagePick({ at, extra }), admin: true },
+    { label: "Images projet", Icon: GalleryIcon, run: () => setImagePick((p) => (p ? null : {})), drop: (at, extra) => setImagePick({ at, extra }), admin: true },
     { label: "Liste", Icon: ChecklistIcon, run: () => addTodo(), drop: addTodo },
     { label: "Tableau", Icon: TableIcon, run: () => addTable(), drop: addTable },
     { label: "Planche", Icon: BoardIcon, run: () => addBoard(), drop: addBoard, admin: true },
@@ -2953,8 +2953,12 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
   const moreTools = moreList.filter((t) => (!t.studio || role === "admin") && (!t.edit || role === "admin" || clientEditAll));
   const visibleTools = tools.filter((t) => (!t.admin || role === "admin") && (!t.edit || role === "admin" || clientEditAll));
 
+  /** Nouvelle carte avec une photo ou vidéo du projet / de la banque : le serveur copie le fichier (comme un copier-coller). */
+  const placeLibraryImage = (img: LibraryImage, at?: At, extra?: Extra) =>
+    create("image", { caption: "", width: img.width, height: img.height, ...(img.video ? { video: true } : {}) }, at, { src: img.src, copyOf: img.id, ...extra });
+
   /** Glisser un outil de la barre jusqu'au tableau (un simple clic marche toujours). */
-  const startToolDrag = (e: React.PointerEvent, tool: Tool) => {
+  const startToolDrag = (e: React.PointerEvent, tool: Tool, ghostSrc?: string) => {
     if (!tool.drop || e.button !== 0) return;
     const startX = e.clientX;
     const startY = e.clientY;
@@ -2967,7 +2971,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         dragging = true;
         setMore(null); // le menu « … » se ferme pour laisser voir le tableau
       }
-      setToolGhost({ label: tool.label, Icon: tool.Icon, x: ev.clientX, y: ev.clientY });
+      setToolGhost({ label: tool.label, Icon: tool.Icon, x: ev.clientX, y: ev.clientY, src: ghostSrc });
     };
     const up = (ev: PointerEvent) => {
       cleanup();
@@ -3177,21 +3181,36 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         }}
       />
       {imagePick && (
+        // Panneau flottant (déplaçable, redimensionnable) : il reste ouvert jusqu'à ce qu'on le ferme.
+        // Un clic sur une image la pose sur le tableau ; on peut aussi la glisser à l'endroit voulu (ou dans une colonne).
         <SlotPicker
+          floating
           endpoint={imageEndpoint.replace(/\/image$/, "/library")}
-          title="Photos et vidéos du projet"
+          title="Images projet"
           onClose={() => setImagePick(null)}
           onImport={() => {
             if (imagePick.at) imageDrop.current = { at: imagePick.at, extra: imagePick.extra };
-            setImagePick(null);
             fileRef.current?.click();
           }}
           onPick={(img) => {
+            if (suppressToolClick.current) {
+              suppressToolClick.current = false;
+              return;
+            }
+            // Première image : à l'endroit où l'outil a été lâché ; les suivantes au milieu de l'écran.
             const { at, extra } = imagePick;
-            setImagePick(null);
-            // Nouvelle carte : le serveur copie le fichier de la photo choisie (comme un copier-coller).
-            create("image", { caption: "", width: img.width, height: img.height, ...(img.video ? { video: true } : {}) }, at, { src: img.src, copyOf: img.id, ...extra });
+            if (at) setImagePick({});
+            placeLibraryImage(img, at, extra);
           }}
+          onDragOut={(e, img) =>
+            // À la souris seulement : au doigt, glisser fait défiler la liste (un toucher pose l'image).
+            e.pointerType === "mouse" &&
+            startToolDrag(
+              e,
+              { label: img.video ? "Vidéo" : "Image", Icon: ImageIcon, run: () => {}, drop: (at, extra) => placeLibraryImage(img, at, extra) },
+              img.video ? undefined : img.src,
+            )
+          }
         />
       )}
       {slotPick && items[slotPick] && (
@@ -3376,7 +3395,12 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           className="fixed z-[300000] pointer-events-none -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-1 w-[70px] py-2.5 bg-bg border-2 border-emerald-500 shadow-2xl rounded-[4px] text-[10px] text-ink"
           style={{ left: toolGhost.x, top: toolGhost.y }}
         >
-          <toolGhost.Icon className="w-5 h-5" />
+          {toolGhost.src ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={toolGhost.src} alt="" className="w-14 h-14 object-cover rounded-[2px]" />
+          ) : (
+            <toolGhost.Icon className="w-5 h-5" />
+          )}
           {toolGhost.label}
         </div>
       )}
@@ -4300,20 +4324,52 @@ function SketchEditor({ initial, onCancel, onDone }: { initial: Sketch; onCancel
 type LibraryImage = { id: string; boardId: string; boardTitle: string; src: string; width: number; height: number; video?: boolean; library?: boolean };
 
 /** Choisir une photo ou vidéo déjà posée dans le projet (toutes planches), ou importer depuis l'ordinateur. */
+/** Place et taille du panneau flottant « Images projet », gardées d'une ouverture à l'autre (cet appareil seulement). */
+const PANEL_KEY = "alvz-image-panel";
+type PanelBox = { x: number; y: number; w: number; h: number };
+function clampPanel(b: PanelBox): PanelBox {
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  const w = Math.min(Math.max(260, b.w), W - 8);
+  const h = Math.min(Math.max(220, b.h), H - 8);
+  return { w, h, x: Math.min(Math.max(4, b.x), W - w - 4), y: Math.min(Math.max(4, b.y), H - h - 4) };
+}
+function initialPanel(): PanelBox {
+  if (typeof window === "undefined") return { x: 16, y: 76, w: 400, h: 560 };
+  try {
+    const saved = JSON.parse(localStorage.getItem(PANEL_KEY) ?? "null") as PanelBox | null;
+    if (saved && [saved.x, saved.y, saved.w, saved.h].every(Number.isFinite)) return clampPanel(saved);
+  } catch {}
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  // Ordinateur : à droite ; téléphone : en bas, sur toute la largeur.
+  return W < 640 ? clampPanel({ x: 4, y: H * 0.48, w: W - 8, h: H * 0.5 }) : clampPanel({ x: W - 400 - 16, y: 76, w: 400, h: Math.min(560, H - 100) });
+}
+
 function SlotPicker({
   endpoint,
   title = "Choisir une photo",
   onClose,
   onImport,
   onPick,
+  floating,
+  onDragOut,
 }: {
   endpoint: string;
   title?: string;
   onClose: () => void;
   onImport: () => void;
   onPick: (img: LibraryImage) => void;
+  /** Panneau flottant : déplaçable, redimensionnable, ne se ferme qu'avec sa croix (pas en cliquant à côté ni avec Échap). */
+  floating?: boolean;
+  /** Début d'un glisser d'une image vers le tableau (panneau flottant). */
+  onDragOut?: (e: React.PointerEvent, img: LibraryImage) => void;
 }) {
   const [images, setImages] = useState<LibraryImage[] | null>(null);
+  const [reload, setReload] = useState(0);
+  const [box, setBox] = useState<PanelBox | null>(() => (floating ? initialPanel() : null));
+  const boxRef = useRef(box);
+  boxRef.current = box;
   const [error, setError] = useState("");
   const [tab, setTab] = useState<"project" | "library" | null>(null);
   const [inLibrary, setInLibrary] = useState(false);
@@ -4321,6 +4377,7 @@ function SlotPicker({
   close.current = onClose;
   useEffect(() => {
     let alive = true;
+    if (reload) setImages(null);
     fetch(endpoint, { cache: "no-store" })
       .then(async (r) => {
         const json = await r.json().catch(() => ({}));
@@ -4330,13 +4387,48 @@ function SlotPicker({
         setInLibrary(Boolean(json.inLibrary));
       })
       .catch((e) => alive && setError(e instanceof Error ? e.message : String(e)));
-    const key = (e: KeyboardEvent) => e.key === "Escape" && close.current();
+    const key = (e: KeyboardEvent) => e.key === "Escape" && !floating && close.current();
     window.addEventListener("keydown", key);
     return () => {
       alive = false;
       window.removeEventListener("keydown", key);
     };
-  }, [endpoint]);
+  }, [endpoint, reload, floating]);
+
+  // Panneau gardé dans la fenêtre quand elle change de taille.
+  useEffect(() => {
+    if (!floating) return;
+    const fit = () => setBox((b) => (b ? clampPanel(b) : b));
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [floating]);
+
+  /** Déplacer (barre du haut) ou agrandir (coin en bas à droite) le panneau flottant. */
+  const startPanel = (e: React.PointerEvent, mode: "move" | "resize") => {
+    const b = boxRef.current;
+    if (!b || e.button !== 0) return;
+    if (mode === "move" && (e.target as HTMLElement).closest("button")) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const sx = e.clientX;
+    const sy = e.clientY;
+    const move = (ev: PointerEvent) => {
+      const dx = ev.clientX - sx;
+      const dy = ev.clientY - sy;
+      setBox(clampPanel(mode === "move" ? { ...b, x: b.x + dx, y: b.y + dy } : { ...b, w: b.w + dx, h: b.h + dy }));
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      try {
+        if (boxRef.current) localStorage.setItem(PANEL_KEY, JSON.stringify(boxRef.current));
+      } catch {}
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  };
 
   /** Retire une photo de la Banque d'images (pas depuis la banque elle-même : sa carte resterait affichée). */
   const remove = async (img: LibraryImage) => {
@@ -4362,22 +4454,30 @@ function SlotPicker({
     else groups.push({ title: img.boardTitle, list: [img] });
   }
 
-  return (
-    <div data-ui data-modal className="absolute inset-0 z-[300000] flex items-center justify-center bg-black/50 p-3" onPointerDown={onClose}>
-      <div
-        className="bg-bg text-ink border border-line shadow-2xl rounded-[6px] w-full max-w-[720px] max-h-[82vh] flex flex-col"
-        onPointerDown={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-line">
-          <p className="text-sm font-medium flex-1">{title}</p>
-          <button onClick={onImport} className="h-9 px-4 rounded-full bg-ink text-bg text-[13px] flex items-center gap-2">
-            <UploadIcon className="w-4 h-4" />
-            Importer depuis l&apos;ordinateur
-          </button>
-          <button onClick={onClose} aria-label="Fermer" className="w-9 h-9 flex items-center justify-center text-muted hover:text-ink">
-            <CloseIcon className="w-5 h-5" />
-          </button>
-        </div>
+  const header = (
+    <div
+      className={`flex items-center gap-2 px-3 py-2.5 border-b border-line ${floating ? "cursor-move touch-none" : ""}`}
+      onPointerDown={floating ? (e) => startPanel(e, "move") : undefined}
+    >
+      <p className="text-sm font-medium flex-1 truncate">{title}</p>
+      {floating && (
+        <button onClick={() => setReload((n) => n + 1)} aria-label="Actualiser" title="Actualiser" className="w-8 h-8 flex items-center justify-center text-muted hover:text-ink">
+          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+            <path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" />
+          </svg>
+        </button>
+      )}
+      <button onClick={onImport} title="Importer depuis l'ordinateur" className={`h-8 rounded-full bg-ink text-bg text-[13px] flex items-center gap-2 ${floating ? "w-8 justify-center" : "px-4"}`}>
+        <UploadIcon className="w-4 h-4" />
+        {!floating && <>Importer depuis l&apos;ordinateur</>}
+      </button>
+      <button onClick={onClose} aria-label="Fermer" className="w-8 h-8 flex items-center justify-center text-muted hover:text-ink">
+        <CloseIcon className="w-5 h-5" />
+      </button>
+    </div>
+  );
+  const body = (
+    <>
         <div className="flex gap-1 px-4 pt-3">
           {(
             [
@@ -4395,7 +4495,7 @@ function SlotPicker({
             </button>
           ))}
         </div>
-        <div className="overflow-y-auto p-4 space-y-5">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-5">
           {error ? (
             <p className="text-sm text-danger">{error}</p>
           ) : !images ? (
@@ -4412,10 +4512,15 @@ function SlotPicker({
             groups.map((g) => (
               <section key={g.title}>
                 <p className="text-[11px] uppercase tracking-widest text-muted mb-2">{g.title || "Sans titre"}</p>
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                <div className={floating ? "grid gap-2 grid-cols-[repeat(auto-fill,minmax(84px,1fr))]" : "grid grid-cols-3 sm:grid-cols-5 gap-2"}>
                   {g.list.map((img) => (
                     <div key={img.id} className="relative group">
-                      <button onClick={() => onPick(img)} className="relative block w-full aspect-square overflow-hidden rounded-[3px] bg-bg-soft hover:ring-2 hover:ring-emerald-500">
+                      <button
+                        onClick={() => onPick(img)}
+                        onPointerDown={onDragOut ? (e) => onDragOut(e, img) : undefined}
+                        onDragStart={(e) => e.preventDefault()}
+                        className={`relative block w-full aspect-square overflow-hidden rounded-[3px] bg-bg-soft hover:ring-2 hover:ring-emerald-500 ${onDragOut ? "cursor-grab active:cursor-grabbing" : ""}`}
+                      >
                         {img.video ? (
                           <>
                             <video src={img.src} muted playsInline preload="metadata" className="absolute inset-0 w-full h-full object-cover" />
@@ -4447,6 +4552,43 @@ function SlotPicker({
             ))
           )}
         </div>
+    </>
+  );
+
+  if (floating && box)
+    return (
+      <div
+        data-ui
+        data-modal
+        className="fixed z-[290000] bg-bg text-ink border border-line shadow-2xl rounded-[6px] flex flex-col overflow-hidden"
+        style={{ left: box.x, top: box.y, width: box.w, height: box.h }}
+        onPointerDown={(e) => e.stopPropagation()}
+        onWheel={(e) => e.stopPropagation()}
+      >
+        {header}
+        {body}
+        <p className="px-3 pb-2 pt-1 text-[11px] text-muted border-t border-line">Cliquez sur une image pour la poser, ou glissez-la sur le tableau.</p>
+        <div
+          onPointerDown={(e) => startPanel(e, "resize")}
+          className="absolute right-0 bottom-0 w-5 h-5 cursor-nwse-resize touch-none text-muted"
+          aria-label="Agrandir ou réduire"
+          title="Agrandir ou réduire"
+        >
+          <svg viewBox="0 0 20 20" className="w-full h-full" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden>
+            <path d="M18 9L9 18M18 14l-4 4" />
+          </svg>
+        </div>
+      </div>
+    );
+
+  return (
+    <div data-ui data-modal className="absolute inset-0 z-[300000] flex items-center justify-center bg-black/50 p-3" onPointerDown={onClose}>
+      <div
+        className="bg-bg text-ink border border-line shadow-2xl rounded-[6px] w-full max-w-[720px] max-h-[82vh] flex flex-col"
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        {header}
+        {body}
       </div>
     </div>
   );
