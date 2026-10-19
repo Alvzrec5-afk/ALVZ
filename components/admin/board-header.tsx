@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { deleteBoard, duplicateBoard, regenerateBoardLink, updateBoard } from "@/app/admin/board-actions";
-import { ArrowLeft, BoardIcon, CardIcon, HomeIcon, ChevronDown, CloseIcon, FilmIcon, ImageIcon, MegaphoneIcon, MenuIcon, TrashIcon } from "@/components/icons";
+import { ArrowLeft, BoardIcon, CardIcon, GlobeIcon, HomeIcon, ChevronDown, CloseIcon, FilmIcon, ImageIcon, MegaphoneIcon, MenuIcon, TrashIcon } from "@/components/icons";
 
 /** Raccourcis vers le reste du studio (un tableau s'ouvre en plein écran, sans le menu de gauche). */
 const STUDIO = [
@@ -12,6 +12,7 @@ const STUDIO = [
   { href: "/admin/galleries", label: "Galeries", Icon: ImageIcon },
   { href: "/admin/videos", label: "Vidéos", Icon: FilmIcon },
   { href: "/admin/boards", label: "Tableaux", Icon: BoardIcon },
+  { href: "/admin/site", label: "Site", Icon: GlobeIcon },
   { href: "/admin/settings", label: "Coordonnées", Icon: CardIcon },
   { href: "/admin/clients", label: "Clients & e-mails", Icon: MegaphoneIcon },
   { href: "/admin/trash", label: "Corbeille", Icon: TrashIcon },

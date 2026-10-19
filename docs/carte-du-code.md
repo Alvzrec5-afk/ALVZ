@@ -130,6 +130,16 @@ déplace / modifie / supprime toutes les cartes et a aussi Colonne, Couleur, Fl�
 (jsonb ; espace calculé comme `storage_usage`, banque d'images = arbre du tableau `is_library`). Liste des galeries photo :
 `/admin/galleries` (page `galleries/page.tsx`) ; `/admin/accueil` (ancienne adresse) redirige vers `/admin`.
 
+**Site alvzrec.com (`/admin/site`)** — la page d'origine du site (ancien compte Netlify) est gardée telle quelle dans
+`lib/site-template.ts` (`String.raw`, ni accent grave ni `${` dedans). Ses deux scripts d'origine sont en `type="text/plain"
+data-boot` ; un petit script final récupère le contenu (`window.SITE_INLINE` si servie par `/site`, sinon `fetch` de
+`https://alvzgalleries.com/api/site`, repli sur le contenu d'origine après 6 s ou en cas d'erreur), pose `window.SITE`, remplit
+les `img[data-slot]` (bts1-3, kit) puis exécute les scripts. `lib/site.ts` : `loadSiteContent`, `siteData`, `fillSiteHtml`,
+`siteFileForOldAccount` (téléchargé par `/api/admin/site/page`), `youtubeId`, `youtubeInfo` (oEmbed, « Artiste - Titre (Clip) »).
+Actions `app/admin/site-actions.ts` (clips, photos, échange de place `swapSitePhotos`, emplacements fixes `slot`). Interface
+`components/admin/site-manager.tsx`. Photos : `site/items/<id>.jpg` + `-thumb.jpg` (Oracle), comptées dans `storage_usage` et
+la catégorie « Site » de la jauge (5e couleur `--series-5`).
+
 **Corbeille (`/admin/trash`, menu Outils)** — supprimer une galerie, un projet vidéo ou un tableau (principal) met
 `deleted_at` (`trashGallery`, `deleteBoard`) ; restaurer = `deleted_at` à null ; « Supprimer définitivement » =
 ancienne purge (`/api/admin/purge` par lots, `purgeTrashedBoard`) ; au-delà de 30 jours, effacement à l'ouverture

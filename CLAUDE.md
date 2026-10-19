@@ -94,6 +94,16 @@ Publié (19 oct.) : page **Accueil** (centre de contrôle : compteurs, stockage 
 jauge de stockage détaillée par catégorie via la fonction SQL `studio_overview()` (déjà en base).
 Publié aussi : barre du haut du studio mobile fixe (`sticky`, sous l'heure de l'iPhone dans l'app) ; l'Accueil est `/admin` (demandé par le propriétaire) ; la liste des galeries passe à
 `/admin/galleries` (toujours « Galeries » dans le menu) ; `/admin/accueil` redirige vers `/admin`.
+**En local, non publié** : **site alvzrec.com géré depuis le studio** (option A choisie : le domaine reste sur l'ancien compte
+Netlify). Page d'origine (un seul index.html, design inchangé) dans `lib/site-template.ts` ; elle lit son contenu sur
+`alvzgalleries.com/api/site` (CORS, cache CDN 5 min) puis lance ses scripts (`data-boot`), contenu d'origine si le studio ne
+répond pas. Studio → Site (`/admin/site`) : clips YouTube (coller le lien, titre/artiste repris de YouTube via oEmbed),
+photos par catégorie (sport, portrait, evenement, bapteme, mariage ; envoi Oracle 2400 px + vignette 1024 px), 3 coulisses + 1 matériel,
+WhatsApp = Coordonnées. Le propriétaire doit **une fois** télécharger l'index.html (lien dans Studio → Site) et le glisser sur
+l'ancien compte (Deploys). Tables `site_categories` (slug), `site_items` (external_url = photos imgur d'origine), `site_clips`,
+déjà en base et remplies avec le contenu d'origine. `/site` sert aussi la page (contenu dans la page) et `next.config` renvoie
+alvzrec.com vers `/site` si un jour le domaine est déplacé (option B). Inutilisés pour l'instant : colonnes hero/textes de
+`site_settings` et table `site_messages` (premier essai).
 Publié aussi : ouverture des tableaux plus rapide — fonctions SQL `board_path` / `board_tree` (déjà en base) pour le chemin
 et les planches en une requête ; ménage des cartes supprimées et réparation des cases vides (`repairEmptyImages`) lancés après l'affichage (`after`). Le modèle en base a déjà reçu « 5. STORYBOARD » (planches suivantes renumérotées 6 et 7).
 

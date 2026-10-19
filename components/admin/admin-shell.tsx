@@ -5,13 +5,14 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Wordmark } from "@/components/wordmark";
 import { BackgroundStatus } from "./background";
-import { BoardIcon, HomeIcon, TrashIcon, CardIcon, CloseIcon, FilmIcon, ImageIcon, LogoutIcon, MegaphoneIcon, MenuIcon } from "@/components/icons";
+import { BoardIcon, GlobeIcon, HomeIcon, TrashIcon, CardIcon, CloseIcon, FilmIcon, ImageIcon, LogoutIcon, MegaphoneIcon, MenuIcon } from "@/components/icons";
 
 const NAV = [
   { href: "/admin", label: "Accueil", Icon: HomeIcon, match: (p: string) => p === "/admin" },
   { href: "/admin/galleries", label: "Galeries", Icon: ImageIcon, match: (p: string) => p.startsWith("/admin/galleries") },
   { href: "/admin/videos", label: "Vidéos", Icon: FilmIcon, match: (p: string) => p.startsWith("/admin/videos") },
   { href: "/admin/boards", label: "Tableaux", Icon: BoardIcon, match: (p: string) => p.startsWith("/admin/boards") },
+  { href: "/admin/site", label: "Site", Icon: GlobeIcon, match: (p: string) => p.startsWith("/admin/site") },
   { href: "/admin/settings", label: "Coordonnées", Icon: CardIcon, match: (p: string) => p.startsWith("/admin/settings") },
 ];
 const TOOLS = [

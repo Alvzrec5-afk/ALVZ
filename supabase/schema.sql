@@ -426,3 +426,7 @@ grant execute on function public.board_tree(uuid) to authenticated, service_role
 
 -- Accueil du studio : tous les chiffres en une requête (comptes et espace par catégorie ; somme = storage_usage()).
 -- Texte complet de la fonction : voir la migration « studio_overview » (catégories : photos, vidéos, tableaux, banque d'images).
+
+-- Site alvzrec.com géré depuis le studio (migrations « site_vitrine », « site_in_storage_usage », « site_alvzrec_content »,
+-- « site_thumbs_in_storage ») : tables site_settings, site_categories (slug), site_items (external_url, thumb_size),
+-- site_clips, site_messages ; storage_usage() et studio_overview() comptent les fichiers du site (bytes_site).

@@ -55,6 +55,13 @@ export const LockIcon = ({ className = "w-5 h-5" }: P) => (
     <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
   </svg>
 );
+export const GlobeIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M3.5 12h17" />
+    <path d="M12 3.5c2.4 2.4 3.6 5.2 3.6 8.5s-1.2 6.1-3.6 8.5c-2.4-2.4-3.6-5.2-3.6-8.5S9.6 5.9 12 3.5z" />
+  </svg>
+);
 export const HomeIcon = ({ className = "w-5 h-5" }: P) => (
   <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
     <path d="M4 10.5L12 4l8 6.5" />

@@ -30,10 +30,13 @@ export type StudioOverview = {
   downloads_30d: number;
   video_views_30d: number;
   favorites: number;
+  site_items: number;
+  site_messages_unread: number;
   bytes_photos: number;
   bytes_videos: number;
   bytes_boards: number;
   bytes_library: number;
+  bytes_site: number;
 };
 
 /** Chiffres de l'accueil du studio, en une requête (fonction SQL `studio_overview`). */
@@ -51,5 +54,6 @@ export function storageParts(o: StudioOverview) {
     { label: "Vidéos", bytes: o.bytes_videos },
     { label: "Tableaux", bytes: o.bytes_boards },
     { label: "Banque d'images", bytes: o.bytes_library },
+    { label: "Site", bytes: o.bytes_site },
   ];
 }

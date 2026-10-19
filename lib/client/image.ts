@@ -197,3 +197,21 @@ export function readBoardFile(file: File, media: "audio" | "document", maxBytes:
   if (file.size > maxBytes) throw new Error(`Fichier trop lourd (${Math.round(file.size / 1024 / 1024)} Mo, ${Math.round(maxBytes / 1024 / 1024)} Mo au plus)`);
   return { blob: file as Blob, type, width: 4, height: 1, fileName: file.name.slice(0, 200) };
 }
+
+/** Photo du site vitrine : grande version (2400 px, visionneuse) et vignette (1024 px, grille et défilé d'accueil). */
+export async function makeSiteImage(file: File) {
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  } catch {
+    throw new Error("Format d'image non lisible par ce navigateur");
+  }
+  try {
+    const c = scaleDown(bitmap, bitmap.width, bitmap.height, 2400);
+    const t = scaleDown(c, c.width, c.height, 1024);
+    const [blob, thumb] = await Promise.all([encodeUnder(c, 1_200_000), encodeUnder(t, 300_000)]);
+    return { blob, thumb, width: c.width, height: c.height };
+  } finally {
+    bitmap.close();
+  }
+}

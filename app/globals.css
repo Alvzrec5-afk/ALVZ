@@ -324,6 +324,7 @@ body {
   --series-2: #eb6834;
   --series-3: #1baf7a;
   --series-4: #eda100;
+  --series-5: #e87ba4;
 }
 [data-theme="dark"],
 [data-theme="noir"],
@@ -332,6 +333,7 @@ body {
   --series-2: #d95926;
   --series-3: #199e70;
   --series-4: #c98500;
+  --series-5: #d55181;
 }
 @media (prefers-color-scheme: dark) {
   [data-theme="auto"] {
@@ -339,5 +341,6 @@ body {
     --series-2: #d95926;
     --series-3: #199e70;
     --series-4: #c98500;
+    --series-5: #d55181;
   }
 }
