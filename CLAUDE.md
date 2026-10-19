@@ -79,10 +79,10 @@ Détail complet (fichiers, tables, choix techniques) : **`docs/carte-du-code.md`
 
 ## En attente / idées discutées
 
-État au 18-19 oct. 2026 : tout est publié (dernier code : rognage, flèches courbes, taille du texte, capture,
-clic droit). Capture nette au zoom + correctif photos noires sur iPhone : **committé en local, pas encore publié** (19 oct.).
+État au 19 oct. 2026 : tout est publié (dernier code : capture nette au zoom jusqu'à 6×, correctif photos noires
+sur iPhone, « Enregistré » et flèches annuler cachés au téléphone). Rien en attente en local.
 
-- **À vérifier en vrai par le propriétaire** : capture d'un tableau avec de vraies photos Oracle (si elles sortent
+- **À vérifier en vrai par le propriétaire** : capture d'un tableau **depuis l'iPhone** (photos noires corrigées ? non testé sur Safari) et avec de vraies photos Oracle (si elles sortent
   grises → CORS : passer les images par une route du site ou régler le bucket) ; défilement au doigt sur une grille ;
   Ctrl + clic sur Mac ; envoi d'un clip (H.264/4K) ; e-mail de test Gmail ; images « disparues » des tableaux
   revenues (réparation automatique `objectSize`).

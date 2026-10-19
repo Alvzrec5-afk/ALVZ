@@ -2808,12 +2808,13 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       {/* Zoom et état de l'enregistrement */}
       <div data-ui className="absolute z-[200000] right-3 bottom-[max(env(safe-area-inset-bottom),12px)] sm:bottom-4 sm:right-4 flex flex-col items-end gap-2">
         {(role === "admin" || canAdd) && (
-          <span className={`text-[11px] px-2 ${status.state === "error" ? "text-danger" : "text-muted"}`}>
+          // Au téléphone : seulement en cas d'erreur (sinon ça gêne).
+          <span className={`text-[11px] px-2 ${status.state === "error" ? "text-danger" : "text-muted hidden sm:inline"}`}>
             {status.state === "saving" ? "Enregistrement…" : status.state === "error" ? status.message : "Enregistré"}
           </span>
         )}
         {(role === "admin" || canAdd) && (
-          <div className="flex bg-bg border border-line shadow-sm rounded-[4px] text-muted">
+          <div className="hidden sm:flex bg-bg border border-line shadow-sm rounded-[4px] text-muted">
             <button
               className="w-10 h-10 flex items-center justify-center hover:text-ink disabled:opacity-30"
               onClick={undo}
