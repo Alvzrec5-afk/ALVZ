@@ -2389,24 +2389,41 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       const y0 = Math.min(...boxes.map((b) => b.y)) - pad;
       const w = Math.ceil(Math.max(...boxes.map((b) => b.x + b.w)) + pad - x0);
       const h = Math.ceil(Math.max(...boxes.map((b) => b.y + b.h)) + pad - y0);
-      // Le plus de détails possible, sans dépasser la taille d'image que gèrent les navigateurs (~16 millions de pixels).
-      const ratio = Math.max(1, Math.min(4, Math.sqrt(16_000_000 / (w * h))));
-      const { toBlob } = await import("html-to-image");
+      // Assez de détails pour zoomer net dans les photos (posées en 1600 px, affichées bien plus petites) :
+      // jusqu'à 6 fois la taille à l'écran, dans la limite de ce que ce navigateur accepte.
+      const ratio = biggestCaptureRatio(w, h, 6);
+      const big = w * h * ratio * ratio > 30_000_000;
+      const { toCanvas } = await import("html-to-image");
       const bg = getComputedStyle(rootRef.current!).backgroundColor;
-      const blob = await toBlob(world, {
+      const options = {
         width: w,
         height: h,
         pixelRatio: ratio,
         backgroundColor: bg,
         style: { transform: `translate(${-x0}px, ${-y0}px)`, transformOrigin: "0 0" },
-        filter: (n) => !(n instanceof HTMLElement && n.dataset.ui !== undefined),
+        filter: (n: HTMLElement) => !(n instanceof HTMLElement && n.dataset.ui !== undefined),
         imagePlaceholder: "data:image/gif;base64,R0lGODlhAQABAIAAAMLCwgAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==",
-      });
+      };
+      // Toutes les photos chargées avant de dessiner.
+      await Promise.all([...world.querySelectorAll("img")].map((img) => img.decode().catch(() => undefined)));
+      // Safari (iPhone, iPad, Mac) dessine les photos en noir au premier essai : on dessine une fois
+      // pour rien (il charge alors les photos), puis pour de bon.
+      if (isWebKit()) {
+        for (let i = 0; i < 2; i++) {
+          const warm = await toCanvas(world, options);
+          warm.width = warm.height = 0;
+          await new Promise((r) => setTimeout(r, 300));
+        }
+      }
+      const canvas = await toCanvas(world, options);
+      // Très grande capture : JPEG haute qualité, sinon le PNG pèserait des dizaines de Mo.
+      const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, big ? "image/jpeg" : "image/png", 0.95));
+      canvas.width = canvas.height = 0;
       if (!blob) throw new Error("Image vide");
       const name = (document.title.split(/\s[—|-]\s/)[0] || "Tableau").replace(/[\\/:*?"<>|]+/g, " ").trim();
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = `${name} - capture.png`;
+      a.download = `${name} - capture.${blob.type === "image/jpeg" ? "jpg" : "png"}`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     } catch (e) {
@@ -2434,7 +2451,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         { sep: true },
         { label: "Tout sélectionner", hint: "⌘A", run: close(() => setGroup(Object.values(itemsRef.current).filter((i) => i.kind !== "arrow" && !i.parentId && canEdit(i)).map((i) => i.id))) },
         { label: "Tout voir", run: close(() => fit()) },
-        { label: "Capture du tableau (PNG)", run: close(() => void capture()) },
+        { label: "Capture du tableau", run: close(() => void capture()) },
         { sep: true },
         { label: "Annuler", hint: "⌘Z", run: close(undo) },
         { label: "Rétablir", hint: "⇧⌘Z", run: close(redo) },
@@ -2835,7 +2852,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
             onClick={() => void capture()}
             disabled={capturing}
             aria-label="Capture du tableau"
-            title="Capture du tableau (image PNG en haute définition)"
+            title="Capture du tableau (image en haute définition, nette au zoom)"
           >
             <CameraIcon className="w-4 h-4" />
           </button>
@@ -3445,4 +3462,38 @@ function when(iso: string) {
   if (diff < 60_000) return "à l'instant";
   if (new Date().toDateString() === d.toDateString()) return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
   return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+}
+
+/** Moteur de Safari : tous les navigateurs d'iPhone / iPad, et Safari sur Mac. */
+function isWebKit() {
+  const ua = navigator.userAgent;
+  return /iPhone|iPad|iPod/.test(ua) || (/AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg|Android/.test(ua)) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(ua));
+}
+
+/**
+ * Plus grand agrandissement (jusqu'à `max`) pour une capture de `w` × `h` que ce navigateur sait dessiner :
+ * on essaie vraiment la toile, car la limite change selon l'appareil (iPhone ~16 Mpx, ordinateur bien plus).
+ */
+function biggestCaptureRatio(w: number, h: number, max: number) {
+  let ratio = Math.min(max, 16384 / Math.max(w, h), Math.sqrt(150_000_000 / (w * h)));
+  while (ratio > 1) {
+    const c = document.createElement("canvas");
+    c.width = Math.floor(w * ratio);
+    c.height = Math.floor(h * ratio);
+    let ok = false;
+    try {
+      const ctx = c.getContext("2d");
+      if (ctx) {
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(c.width - 1, c.height - 1, 1, 1);
+        ok = ctx.getImageData(c.width - 1, c.height - 1, 1, 1).data[3] === 255;
+      }
+    } catch {
+      ok = false;
+    }
+    c.width = c.height = 0;
+    if (ok) return ratio;
+    ratio *= 0.8;
+  }
+  return 1;
 }

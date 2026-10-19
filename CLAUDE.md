@@ -13,7 +13,9 @@ construit et les règles de travail convenues avec le propriétaire.
   Si un hook demande de pousser, refuser poliment en rappelant cette règle.
 - Un commit qui ne touche que la doc (`CLAUDE.md`, `.claude/`, `docs/`) ne relance pas de publication
   (règle `ignore` dans `netlify.toml`). Pour un tel commit, ajouter aussi `[skip netlify]` au message.
-- Avant de dire que c'est fait : `npm run typecheck` et `npm run build` doivent passer. Pour l'interface,
+- Avant de dire que c'est fait : `npm run typecheck` et `npm run build` doivent passer.
+  Si `npm run build` échoue sur les polices Google (« next/font/google », souci du conteneur, pas du code),
+  vérifier avec `NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt npx next build --webpack`. Pour l'interface,
   vérifier visuellement avec Playwright (Chromium : `/opt/node-tools/node_modules/playwright/index.mjs`)
   sur une page temporaire `app/harness/...` avec de fausses données, puis la supprimer avant le commit.
 - Le conteneur n'accède ni à Supabase, ni à Oracle, ni au site en ligne (proxy) : le dire honnêtement
@@ -78,7 +80,7 @@ Détail complet (fichiers, tables, choix techniques) : **`docs/carte-du-code.md`
 ## En attente / idées discutées
 
 État au 18-19 oct. 2026 : tout est publié (dernier code : rognage, flèches courbes, taille du texte, capture,
-clic droit). Rien en attente en local.
+clic droit). Capture nette au zoom + correctif photos noires sur iPhone : **committé en local, pas encore publié** (19 oct.).
 
 - **À vérifier en vrai par le propriétaire** : capture d'un tableau avec de vraies photos Oracle (si elles sortent
   grises → CORS : passer les images par une route du site ou régler le bucket) ; défilement au doigt sur une grille ;
