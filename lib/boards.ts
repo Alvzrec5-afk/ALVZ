@@ -741,9 +741,9 @@ async function projectBoards(db: SupabaseClient, boardId: string) {
   return titles;
 }
 
-export type LibraryImage = { id: string; boardId: string; boardTitle: string; src: string; width: number; height: number };
+export type LibraryImage = { id: string; boardId: string; boardTitle: string; src: string; width: number; height: number; video?: boolean };
 
-/** Photos déjà posées dans le projet (toutes planches), pour remplir une case photo vide. Celles du tableau ouvert d'abord. */
+/** Photos et vidéos déjà posées dans le projet (toutes planches), pour remplir une case ou poser une carte. Tableau ouvert d'abord. */
 export async function projectImages(db: SupabaseClient, boardId: string): Promise<LibraryImage[]> {
   const titles = await projectBoards(db, boardId);
   if (!titles.size) return [];
@@ -757,7 +757,7 @@ export async function projectImages(db: SupabaseClient, boardId: string): Promis
     .limit(1000);
   const rows = (data ?? []).filter((r) => {
     const d = r.data as BoardData | null;
-    return !d?.video && !d?.media;
+    return !d?.media;
   });
   // Une même photo collée plusieurs fois n'apparaît pas en double : on ne peut pas le savoir sans lire les fichiers,
   // alors on se contente de trier (tableau ouvert, puis les autres planches) et de borner à 300.
@@ -772,12 +772,13 @@ export async function projectImages(db: SupabaseClient, boardId: string): Promis
         src: await presignGet(boardImageKey(r.board_id as string, r.id as string)),
         width: d.width ?? 4,
         height: d.height ?? 3,
+        ...(d.video ? { video: true } : {}),
       };
     }),
   );
 }
 
-/** Remplit une case photo vide avec une copie d'une photo du même projet. */
+/** Remplit une case photo vide avec une copie d'une photo (ou vidéo) du même projet. */
 export async function fillSlotFrom(db: SupabaseClient, boardId: string, itemId: string, fromId: string) {
   if (!isUuid(itemId) || !isUuid(fromId)) throw new Error("Requête invalide");
   const [{ data: slot }, { data: from }] = await Promise.all([
@@ -786,12 +787,12 @@ export async function fillSlotFrom(db: SupabaseClient, boardId: string, itemId: 
   ]);
   if (!slot || slot.kind !== "image") throw new Error("Case photo introuvable");
   const src = from?.data as BoardData | null;
-  if (!from || from.kind !== "image" || !(Number(from.size_bytes) > 0) || src?.video || src?.media) throw new Error("Photo introuvable");
+  if (!from || from.kind !== "image" || !(Number(from.size_bytes) > 0) || src?.media) throw new Error("Photo introuvable");
   if (!(await projectBoards(db, boardId)).has(from.board_id as string)) throw new Error("Photo d'un autre projet");
   await copyObject(boardImageKey(from.board_id as string, fromId), boardImageKey(boardId, itemId));
-  const data: BoardData = { ...((slot.data ?? {}) as BoardData), width: src?.width ?? 4, height: src?.height ?? 3, crop: undefined, video: undefined, media: undefined };
+  const data: BoardData = { ...((slot.data ?? {}) as BoardData), width: src?.width ?? 4, height: src?.height ?? 3, crop: undefined, video: src?.video ? true : undefined, media: undefined };
   const { error } = await db.from("board_items").update({ size_bytes: from.size_bytes, data: cleanData("image", data) }).eq("id", itemId);
   if (error) throw new Error(error.message);
   await db.from("boards").update({ updated_at: new Date().toISOString() }).eq("id", boardId);
-  return { src: await presignGet(boardImageKey(boardId, itemId)), width: data.width!, height: data.height!, sizeBytes: Number(from.size_bytes) };
+  return { src: await presignGet(boardImageKey(boardId, itemId)), width: data.width!, height: data.height!, video: Boolean(data.video), sizeBytes: Number(from.size_bytes) };
 }

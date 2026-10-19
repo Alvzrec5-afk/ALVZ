@@ -33,6 +33,7 @@ import {
   CameraIcon,
   DotsIcon,
   FileIcon,
+  GalleryIcon,
   MapIcon,
   StoryboardIcon,
   TypeIcon,
@@ -320,6 +321,8 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
   const [cropping, setCropping] = useState<string | null>(null); // image en cours de recadrage
   const [sketching, setSketching] = useState<string | null>(null); // croquis en cours de dessin
   const [slotPick, setSlotPick] = useState<string | null>(null); // case photo vide : choix d'une photo du projet
+  // Bouton « Images projet » (studio) : choix d'une photo ou vidéo du projet pour une nouvelle carte, à cet endroit.
+  const [imagePick, setImagePick] = useState<{ at?: { x: number; y: number }; extra?: Partial<BoardItem> } | null>(null);
   const [slotOver, setSlotOver] = useState<string | null>(null); // case photo survolée par un fichier glissé
   // Menu « … » de la barre d'outils (Croquis, Nuancier, Document…) : position du bouton qui l'ouvre.
   const [more, setMore] = useState<DOMRect | null>(null);
@@ -2866,6 +2869,8 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           fileRef.current?.click();
         }),
     },
+    // Studio : reprendre une photo ou vidéo déjà posée ailleurs dans le projet (moodboard…), sans changer de planche.
+    { label: "Images projet", Icon: GalleryIcon, run: () => setImagePick({}), drop: (at, extra) => setImagePick({ at, extra }), admin: true },
     { label: "Liste", Icon: ChecklistIcon, run: () => addTodo(), drop: addTodo },
     { label: "Tableau", Icon: TableIcon, run: () => addTable(), drop: addTable },
     { label: "Planche", Icon: BoardIcon, run: () => addBoard(), drop: addBoard, admin: true },
@@ -3097,6 +3102,24 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           });
         }}
       />
+      {imagePick && (
+        <SlotPicker
+          endpoint={imageEndpoint.replace(/\/image$/, "/library")}
+          title="Photos et vidéos du projet"
+          onClose={() => setImagePick(null)}
+          onImport={() => {
+            if (imagePick.at) imageDrop.current = { at: imagePick.at, extra: imagePick.extra };
+            setImagePick(null);
+            fileRef.current?.click();
+          }}
+          onPick={(img) => {
+            const { at, extra } = imagePick;
+            setImagePick(null);
+            // Nouvelle carte : le serveur copie le fichier de la photo choisie (comme un copier-coller).
+            create("image", { caption: "", width: img.width, height: img.height, ...(img.video ? { video: true } : {}) }, at, { src: img.src, copyOf: img.id, ...extra });
+          }}
+        />
+      )}
       {slotPick && items[slotPick] && (
         <SlotPicker
           endpoint={imageEndpoint.replace(/\/image$/, "/library")}
@@ -3112,7 +3135,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
             const it = itemsRef.current[id];
             if (!it) return;
             uploading.current.add(id);
-            update(id, { src: img.src, data: { ...it.data, width: img.width, height: img.height, crop: undefined } }, false);
+            update(id, { src: img.src, data: { ...it.data, width: img.width, height: img.height, crop: undefined, video: img.video || undefined } }, false);
             try {
               const res = await fetch(imageEndpoint.replace(/\/image$/, "/library"), {
                 method: "POST",
@@ -3122,7 +3145,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
               const json = await res.json().catch(() => ({}));
               if (!res.ok) throw new Error(json.error || `Erreur ${res.status}`);
               const latest = itemsRef.current[id];
-              if (latest) update(id, { src: json.src, data: { ...latest.data, width: json.width, height: json.height } }, false);
+              if (latest) update(id, { src: json.src, data: { ...latest.data, width: json.width, height: json.height, video: json.video || undefined } }, false);
             } catch (e) {
               update(id, { src: null, data: it.data }, false);
               alert(`Photo non placée : ${e instanceof Error ? e.message : e}`);
@@ -4170,16 +4193,18 @@ function SketchEditor({ initial, onCancel, onDone }: { initial: Sketch; onCancel
   );
 }
 
-type LibraryImage = { id: string; boardId: string; boardTitle: string; src: string; width: number; height: number };
+type LibraryImage = { id: string; boardId: string; boardTitle: string; src: string; width: number; height: number; video?: boolean };
 
-/** Case photo vide : choisir une photo déjà posée dans le projet (toutes planches), ou importer depuis l'ordinateur. */
+/** Choisir une photo ou vidéo déjà posée dans le projet (toutes planches), ou importer depuis l'ordinateur. */
 function SlotPicker({
   endpoint,
+  title = "Choisir une photo",
   onClose,
   onImport,
   onPick,
 }: {
   endpoint: string;
+  title?: string;
   onClose: () => void;
   onImport: () => void;
   onPick: (img: LibraryImage) => void;
@@ -4220,7 +4245,7 @@ function SlotPicker({
         onPointerDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 px-4 py-3 border-b border-line">
-          <p className="text-sm font-medium flex-1">Choisir une photo</p>
+          <p className="text-sm font-medium flex-1">{title}</p>
           <button onClick={onImport} className="h-9 px-4 rounded-full bg-ink text-bg text-[13px] flex items-center gap-2">
             <UploadIcon className="w-4 h-4" />
             Importer depuis l&apos;ordinateur
@@ -4233,9 +4258,9 @@ function SlotPicker({
           {error ? (
             <p className="text-sm text-danger">{error}</p>
           ) : !images ? (
-            <p className="text-sm text-muted">Chargement des photos du projet…</p>
+            <p className="text-sm text-muted">Chargement des photos et vidéos du projet…</p>
           ) : !images.length ? (
-            <p className="text-sm text-muted">Aucune photo dans ce projet pour l&apos;instant : importez-en une depuis l&apos;ordinateur.</p>
+            <p className="text-sm text-muted">Aucune photo ni vidéo dans ce projet pour l&apos;instant : importez-en une depuis l&apos;ordinateur.</p>
           ) : (
             groups.map((g) => (
               <section key={g.title}>
@@ -4243,8 +4268,19 @@ function SlotPicker({
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                   {g.list.map((img) => (
                     <button key={img.id} onClick={() => onPick(img)} className="relative aspect-square overflow-hidden rounded-[3px] bg-bg-soft hover:ring-2 hover:ring-emerald-500">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={img.src} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                      {img.video ? (
+                        <>
+                          <video src={img.src} muted playsInline preload="metadata" className="absolute inset-0 w-full h-full object-cover" />
+                          <span className="absolute right-1.5 bottom-1.5 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center">
+                            <svg viewBox="0 0 24 24" className="w-3 h-3 ml-0.5" fill="currentColor" aria-hidden>
+                              <path d="M7 4.5v15l12-7.5z" />
+                            </svg>
+                          </span>
+                        </>
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={img.src} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                      )}
                     </button>
                   ))}
                 </div>

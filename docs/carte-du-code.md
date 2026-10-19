@@ -81,6 +81,9 @@ Case photo vide (`data-slot`) : clic → `SlotPicker` (photos déjà posées dan
 `projectImages` via `GET /api/admin/boards/[id]/library`, la planche ouverte d'abord) ou « Importer depuis l'ordinateur »
 (`fillTarget` + `fileRef`). Choisir une photo = copie Oracle côté serveur (`fillSlotFrom`, `POST …/library`). Une photo
 (ou vidéo) glissée depuis l'ordinateur sur la case la remplit (`onDrop`, surlignage `slotOver`).
+Bouton « Images projet » (studio, à côté d'« Image » qui reste l'import classique) : même fenêtre (`imagePick`), photos
+et vidéos du projet (`LibraryImage.video`) ; un choix crée une carte avec
+`copyOf` (le serveur copie le fichier, comme un collage) ; « Importer depuis l'ordinateur » garde l'endroit (`imageDrop`).
 Menu « … » de la barre (`moreTools`, panneau `more`) : **Croquis** = note avec `data.sketch` (traits, `SketchEditor` /
 `SketchView`, `cleanSketch` côté serveur) ; **Nuancier** = 5 cartes couleur côte à côte ; **Document** / **Audio** = carte
 `image` avec `data.media` (« document » | « audio »), `fileName`, `fileType` (50 Mo, studio, `readBoardFile`, extensions

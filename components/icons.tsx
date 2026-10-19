@@ -304,3 +304,12 @@ export const StoryboardIcon = ({ className = "w-5 h-5" }: P) => (
     <path d="M2.5 15h5.5M9.25 15h5.5M16 15h5.5M2.5 17.5h4M9.25 17.5h4M16 17.5h4" />
   </svg>
 );
+/** Photos déjà rangées dans le projet (plusieurs images empilées). */
+export const GalleryIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <rect x="6.5" y="6.5" width="14" height="12" rx="1.2" />
+    <path d="M3.5 15.5v-10a1.5 1.5 0 0 1 1.5-1.5h12" />
+    <path d="m6.5 16 4-4 3 3 2-2 5 5" />
+    <circle cx="16.5" cy="10" r="1.2" />
+  </svg>
+);
