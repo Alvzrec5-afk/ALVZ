@@ -96,7 +96,10 @@ Rien en attente en local. Le modèle en base a déjà reçu « 5. STORYBOARD » 
   SPF/DKIM/DMARC).
 - Tableaux, idées : aperçu des liens (Pinterest, Instagram), cocher les listes du studio côté client, temps réel au
   lieu du rafraîchissement, appui long au téléphone = menu du clic droit (iPhone n'a pas de clic droit).
-- Lenteur : surtout la distance Netlify (USA) ↔ Supabase (Irlande) + réveil des fonctions.
+- Lenteur : surtout la distance Netlify (USA) ↔ Supabase (Irlande) + réveil des fonctions. Mesures du 19 oct. :
+  enregistrement d'un tableau ~1,4 s, envoi photo galerie prepare 1,8 s / complete 1,2 s, réveil ~3-4 s.
+  Fait et publié (19 oct.) : déclencheur `board_items_touch_board` (la base date le tableau, déjà appliqué en base),
+  rafraîchissement par version (`boardVersion`, `?v=`), `adminApiWith` (contrôle admin en parallèle), envois photo en parallèle.
   Changer la région Netlify = offre Pro seulement. Option proposée, non décidée : déplacer la base
   Supabase en us-east-1 (nouveau projet, recopie des données, 3 variables Netlify à changer).
 - Côté propriétaire : supprimer le compte de test `e2e-test@alvz.invalid` dans Supabase et vérifier

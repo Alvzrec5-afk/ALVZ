@@ -63,6 +63,19 @@ export class HttpError extends Error {
   }
 }
 
+/**
+ * Routes API admin : le contrôle « est bien l'admin » part en même temps que `work` (un aller-retour
+ * de moins vers la base, en Irlande). Sans risque : les règles RLS refusent de toute façon lectures et
+ * écritures à un compte qui n'est pas l'admin ; le résultat n'est rendu qu'après le contrôle.
+ */
+export async function adminApiWith<T>(work: (supabase: Awaited<ReturnType<typeof createSessionClient>>) => PromiseLike<T>) {
+  const { supabase, user } = await getSession();
+  if (!user) throw new HttpError(401, "Non connecté");
+  const [admin, result] = await Promise.all([isAdmin(user.id), work(supabase)]);
+  if (!admin) throw new HttpError(403, "Accès refusé");
+  return { supabase, user, result };
+}
+
 /** Pour les routes API admin : lève une erreur 401/403. */
 export async function requireAdminApi() {
   const { supabase, user, isAdmin } = await getAdmin();

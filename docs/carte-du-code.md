@@ -158,3 +158,14 @@ Le Chromium du conteneur ne sait pas encoder/décoder le H.264 : tester la chaî
 `videos`, `video_comments`, `video_events`, `boards`, `board_items`, fonction `storage_usage()` (compte aussi les
 images des tableaux). Schéma de référence :
 `supabase/schema.sql` (à tenir à jour après chaque migration).
+
+
+## Vitesse (19 oct. 2026)
+
+- `adminApiWith(work)` (`lib/auth.ts`) : le contrôle « est l'admin » part en même temps que les lectures (RLS protège).
+- Déclencheur SQL `board_items_touch_board` : toute modification de carte met à jour `boards.updated_at` (plus d'écriture
+  manuelle dans `applyBoardOps`). `boardVersion` = plus récente date du tableau et de ses planches.
+- Rafraîchissement : `GET …?v=<version>` répond `{ unchanged: true }` sans relire les cartes ; rechargement complet au moins
+  une fois par heure (adresses d'images valables 3 h). Réparation des cases vides chez Oracle seulement à l'ouverture
+  (`loadBoardItems(…, { repair: true })`).
+- Envoi photo de galerie : vérifications (galerie, doublon, stockage, collection) en parallèle.

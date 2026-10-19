@@ -377,3 +377,16 @@ alter table public.galleries add column if not exists download_email_required bo
 
 -- Téléchargements vidéo : e-mail du visiteur (s'il l'a indiqué).
 alter table public.video_events add column if not exists email text;
+
+-- Toute modification d'une carte date son tableau (une seule écriture par transaction) :
+-- évite un aller-retour à chaque enregistrement et sert de « version » au rafraîchissement.
+create or replace function private.touch_board() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  update public.boards set updated_at = now()
+  where id = coalesce(new.board_id, old.board_id) and updated_at < now();
+  return null;
+end $$;
+create trigger board_items_touch_board
+  after insert or update or delete on public.board_items
+  for each row execute function private.touch_board();

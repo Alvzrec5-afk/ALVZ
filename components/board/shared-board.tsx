@@ -12,7 +12,7 @@ export async function SharedBoard({ slug, subId }: { slug: string; subId?: strin
   if (!shared) notFound();
   const { root, board, path } = shared;
   const [items, visitor, studio] = await Promise.all([
-    loadBoardItems(createServiceClient(), board.id, await clientActor(root)),
+    loadBoardItems(createServiceClient(), board.id, await clientActor(root), { repair: true }),
     boardVisitor(root),
     isStudioSession(), // c'est le studio qui regarde « comme le client » : chemin de retour
   ]);

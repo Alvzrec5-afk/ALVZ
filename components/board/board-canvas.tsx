@@ -1646,13 +1646,23 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
 
   // ——— Rafraîchissement : nouvelles cartes du client / du studio ———
 
+  // Version du tableau déjà reçue : tant qu'elle ne bouge pas, le serveur répond « rien de neuf » sans tout relire.
+  // Rechargement complet au moins une fois par heure : les adresses des images expirent au bout de 3 h.
+  const version = useRef("");
+  const fullAt = useRef(Date.now());
   const refresh = useCallback(async () => {
     if (document.visibilityState !== "visible" || Date.now() - lastActivity.current > IDLE_STOP_MS) return;
     if (dragId) return;
     try {
-      const res = await fetch(endpoint, { cache: "no-store" });
+      if (Date.now() - fullAt.current > 60 * 60_000) version.current = "";
+      const url = version.current ? `${endpoint}${endpoint.includes("?") ? "&" : "?"}v=${encodeURIComponent(version.current)}` : endpoint;
+      const res = await fetch(url, { cache: "no-store" });
       if (!res.ok) return;
-      const { items: server } = (await res.json()) as { items: BoardItem[] };
+      const json = (await res.json()) as { items?: BoardItem[]; v?: string; unchanged?: boolean };
+      if (json.unchanged || !json.items) return;
+      version.current = json.v ?? "";
+      fullAt.current = Date.now();
+      const server = json.items;
       const local = itemsRef.current;
       const next: Items = {};
       const keep = (id: string) => sync.isPending(id) || uploading.current.has(id) || editing?.id === id || dragId === id;

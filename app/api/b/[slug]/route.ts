@@ -1,5 +1,5 @@
 import type { BoardOp } from "@/lib/board-types";
-import { applyBoardOps, resolveSharedBoard, clientActor, loadBoardItems } from "@/lib/boards";
+import { applyBoardOps, boardVersion, resolveSharedBoard, clientActor, loadBoardItems } from "@/lib/boards";
 import { createServiceClient } from "@/lib/supabase/server";
 
 type Ctx = { params: Promise<{ slug: string }> };
@@ -12,7 +12,12 @@ export async function GET(req: Request, { params }: Ctx) {
   if (!shared) return notFound();
   const { root, board } = shared;
   try {
-    return Response.json({ items: await loadBoardItems(createServiceClient(), board.id, await clientActor(root)) });
+    const db = createServiceClient();
+    // `?v=` : version déjà connue → une seule petite lecture tant que rien n'a changé.
+    const known = new URL(req.url).searchParams.get("v");
+    const v = await boardVersion(db, board.id);
+    if (known && v === known) return Response.json({ unchanged: true, v });
+    return Response.json({ v, items: await loadBoardItems(db, board.id, await clientActor(root)) });
   } catch (e) {
     return Response.json({ error: e instanceof Error ? e.message : "Erreur" }, { status: 500 });
   }

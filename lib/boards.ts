@@ -53,13 +53,39 @@ export function boardImageKey(boardId: string, itemId: string) {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (v: unknown): v is string => typeof v === "string" && UUID.test(v);
 
-export async function loadBoardItems(db: SupabaseClient, boardId: string, actor: Actor): Promise<BoardItem[]> {
-  const { data, error } = await db.from("board_items").select(BOARD_ITEM_FIELDS).eq("board_id", boardId).is("deleted_at", null).limit(MAX_ITEMS);
+/**
+ * « Version » d'un tableau : sa dernière modification ou celle d'une de ses planches (datées par la base
+ * à chaque changement de carte). Le rafraîchissement ne recharge tout que si elle a bougé.
+ */
+export async function boardVersion(db: SupabaseClient, boardId: string) {
+  const { data } = await db
+    .from("boards")
+    .select("updated_at")
+    .or(`id.eq.${boardId},parent_id.eq.${boardId}`)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data?.updated_at as string | undefined) ?? "";
+}
+
+export async function loadBoardItems(
+  db: SupabaseClient,
+  boardId: string,
+  actor: Actor,
+  /** Ouverture du tableau : on vérifie aussi chez Oracle les cases photo vides (pas à chaque rafraîchissement). */
+  opts: { repair?: boolean } = {},
+): Promise<BoardItem[]> {
+  // Cartes, aperçus des planches et discussions demandés en même temps (chaque aller-retour vers la base compte).
+  const [{ data, error }, subs, allComments] = await Promise.all([
+    db.from("board_items").select(BOARD_ITEM_FIELDS).eq("board_id", boardId).is("deleted_at", null).limit(MAX_ITEMS),
+    subBoardPreviews(db, boardId),
+    loadComments(db, boardId, actor),
+  ]);
   if (error) throw new Error(`Impossible de charger le tableau : ${error.message}`);
   const rows = (data ?? []) as Row[];
   // Image envoyée mais dont la taille n'a pas été enregistrée (ancien souci d'enregistrement) :
   // si le fichier est bien chez Oracle, la carte le retrouve au lieu d'afficher une case vide.
-  const empty = rows.filter((r) => r.kind === "image" && !(Number(r.size_bytes) > 0)).slice(0, 40);
+  const empty = opts.repair ? rows.filter((r) => r.kind === "image" && !(Number(r.size_bytes) > 0)).slice(0, 40) : [];
   await Promise.all(
     empty.map(async (r) => {
       const size = await objectSize(boardImageKey(boardId, r.id));
@@ -69,10 +95,7 @@ export async function loadBoardItems(db: SupabaseClient, boardId: string, actor:
       }
     }),
   );
-  const [subs, comments] = await Promise.all([
-    subBoardPreviews(db, boardId),
-    rows.some((r) => r.kind === "comment") ? loadComments(db, boardId, actor) : new Map<string, BoardComment[]>(),
-  ]);
+  const comments = rows.some((r) => r.kind === "comment") ? allComments : new Map<string, BoardComment[]>();
   return Promise.all(
     rows.map(async (r) => ({
       id: r.id,
@@ -147,6 +170,8 @@ export async function deleteBoardComment(db: SupabaseClient, boardId: string, co
   if (actor.role === "client") q = q.eq("client_id", actor.clientId);
   const { error } = await q;
   if (error) throw new Error(error.message);
+  // Les discussions ne sont pas des cartes : on date le tableau à la main (pour le rafraîchissement des autres).
+  await db.from("boards").update({ updated_at: new Date().toISOString() }).eq("id", boardId);
 }
 
 /** Aperçu des sous-tableaux d'un tableau : nom, nombre de cartes, 4 images au plus. */
@@ -490,7 +515,7 @@ export async function applyBoardOps(
     if (delError) throw new Error(delError.message);
     if (deletedSubBoards.length) await db.from("boards").update({ deleted_at: now }).in("id", deletedSubBoards).eq("parent_id", boardId);
   }
-  await db.from("boards").update({ updated_at: now }).eq("id", boardId);
+  // La date du tableau (sa « version ») est mise à jour par la base elle-même (déclencheur sur les cartes).
 }
 
 /**
@@ -793,6 +818,5 @@ export async function fillSlotFrom(db: SupabaseClient, boardId: string, itemId: 
   const data: BoardData = { ...((slot.data ?? {}) as BoardData), width: src?.width ?? 4, height: src?.height ?? 3, crop: undefined, video: src?.video ? true : undefined, media: undefined };
   const { error } = await db.from("board_items").update({ size_bytes: from.size_bytes, data: cleanData("image", data) }).eq("id", itemId);
   if (error) throw new Error(error.message);
-  await db.from("boards").update({ updated_at: new Date().toISOString() }).eq("id", boardId);
   return { src: await presignGet(boardImageKey(boardId, itemId)), width: data.width!, height: data.height!, video: Boolean(data.video), sizeBytes: Number(from.size_bytes) };
 }

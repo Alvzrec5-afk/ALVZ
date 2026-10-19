@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { apiError, requireAdminApi } from "@/lib/auth";
+import { adminApiWith, apiError } from "@/lib/auth";
 import { formatBytes } from "@/lib/format";
 import { storageUsage } from "@/lib/usage";
 import {
@@ -25,11 +25,13 @@ type Body = {
   takenAt: string | null;
 };
 
-async function findOrCreateCollection(supabase: SupabaseClient, galleryId: string, name: string) {
-  const find = () =>
-    supabase.from("collections").select("id").eq("gallery_id", galleryId).eq("name", name).maybeSingle();
-  const existing = await find();
-  if (existing.data) return existing.data.id as string;
+const findCollection = (supabase: SupabaseClient, galleryId: string, name: string) =>
+  supabase.from("collections").select("id").eq("gallery_id", galleryId).eq("name", name).maybeSingle();
+
+/** `found` : résultat de la recherche déjà faite (en même temps que les autres vérifications). */
+async function findOrCreateCollection(supabase: SupabaseClient, galleryId: string, name: string, found: string | null) {
+  const find = () => findCollection(supabase, galleryId, name);
+  if (found) return found;
   const { data: last } = await supabase
     .from("collections")
     .select("position")
@@ -58,7 +60,6 @@ function extensionOf(filename: string) {
 
 export async function POST(req: Request) {
   try {
-    const { supabase } = await requireAdminApi();
     const body = (await req.json()) as Body;
     if (!/^[a-f0-9]{64}$/.test(body.hash) || !body.galleryId || !body.filename || !(body.size > 0)) {
       return Response.json({ error: "Requête invalide" }, { status: 400 });
@@ -66,20 +67,28 @@ export async function POST(req: Request) {
     const collectionName = (body.collectionName || "Galerie").trim().slice(0, 120) || "Galerie";
     const takenAt = body.takenAt && !Number.isNaN(Date.parse(body.takenAt)) ? body.takenAt : null;
 
-    const { data: gallery } = await supabase.from("galleries").select("id").eq("id", body.galleryId).maybeSingle();
+    // Toutes les vérifications partent en même temps (la base est loin : chaque attente compte).
+    const {
+      supabase,
+      result: [{ data: gallery }, { data: existing }, usage, { data: collection }],
+    } = await adminApiWith((db) =>
+      Promise.all([
+        db.from("galleries").select("id").eq("id", body.galleryId).maybeSingle(),
+        // Détection des doublons : même contenu (empreinte SHA-256) déjà présent dans la galerie.
+        db
+          .from("photos")
+          .select("id, status, original_ext, multipart_upload_id, size_bytes")
+          .eq("gallery_id", body.galleryId)
+          .eq("content_hash", body.hash)
+          .maybeSingle(),
+        storageUsage(db),
+        findCollection(db, body.galleryId, collectionName),
+      ]),
+    );
     if (!gallery) return Response.json({ error: "Galerie introuvable" }, { status: 404 });
-
-    // Détection des doublons : même contenu (empreinte SHA-256) déjà présent dans la galerie.
-    const { data: existing } = await supabase
-      .from("photos")
-      .select("id, status, original_ext, multipart_upload_id, size_bytes")
-      .eq("gallery_id", body.galleryId)
-      .eq("content_hash", body.hash)
-      .maybeSingle();
     if (existing?.status === "ready") return Response.json({ duplicate: true });
 
     // Limite de stockage : on refuse l'envoi plutôt que de dépasser l'offre Oracle.
-    const usage = await storageUsage(supabase);
     const estimate = body.size + 1_200_000; // original + déclinaisons
     if (usage.total + estimate > usage.limit) {
       return Response.json(
@@ -88,7 +97,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const collectionId = await findOrCreateCollection(supabase, body.galleryId, collectionName);
+    const collectionId = await findOrCreateCollection(supabase, body.galleryId, collectionName, (collection?.id as string | undefined) ?? null);
     const ext = extensionOf(body.filename);
     const contentType = body.type || "application/octet-stream";
     const row = {

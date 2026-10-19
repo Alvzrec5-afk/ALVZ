@@ -20,7 +20,7 @@ export default async function BoardPage({
   const fields = "id, title, gallery_id, share_slug, share_enabled, client_can_add, client_can_edit, is_template";
   const [{ data: board }, items, { data: galleries }, path] = await Promise.all([
     supabase.from("boards").select(fields).eq("id", id).maybeSingle(),
-    loadBoardItems(supabase, id, { role: "admin" }),
+    loadBoardItems(supabase, id, { role: "admin" }, { repair: true }),
     supabase.from("galleries").select("id, title, kind").is("deleted_at", null).order("created_at", { ascending: false }),
     boardAncestors(supabase, id),
     purgeDeletedItems(supabase, id), // cartes supprimées il y a plus de 24 h
