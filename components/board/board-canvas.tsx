@@ -2462,7 +2462,11 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         const sy = canvas.height / (n / ratio);
         for (const p of photos) {
           if (p.clip.y + p.clip.h < top || p.clip.y > top + n / ratio) continue;
-          const bmp = await createImageBitmap(p.img, {
+          // Fichier relu par fetch (comme html-to-image) : une image d'un autre site (Oracle) prise directement
+          // dans la page « salirait » la toile et bloquerait la capture.
+          const file = await fetch(p.img.currentSrc || p.img.src).then((r) => (r.ok ? r.blob() : null)).catch(() => null);
+          if (!file) continue;
+          const bmp = await createImageBitmap(file, {
             resizeWidth: Math.max(1, Math.min(p.img.naturalWidth, Math.ceil(p.rect.w * ratio))),
             resizeHeight: Math.max(1, Math.min(p.img.naturalHeight, Math.ceil(p.rect.h * ratio))),
             resizeQuality: "high",
@@ -2473,11 +2477,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           ctx.rect(p.clip.x * sx, (p.clip.y - top) * sy, p.clip.w * sx, p.clip.h * sy);
           ctx.clip();
           ctx.imageSmoothingQuality = "high";
-          try {
-            ctx.drawImage(bmp, p.rect.x * sx, (p.rect.y - top) * sy, p.rect.w * sx, p.rect.h * sy);
-          } catch {
-            // image d'un autre site non autorisée : on garde le rendu normal
-          }
+          ctx.drawImage(bmp, p.rect.x * sx, (p.rect.y - top) * sy, p.rect.w * sx, p.rect.h * sy);
           ctx.restore();
           bmp.close();
         }
