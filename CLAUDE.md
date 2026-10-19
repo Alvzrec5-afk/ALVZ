@@ -94,6 +94,10 @@ Publié (19 oct.) : page **Accueil** (centre de contrôle : compteurs, stockage 
 jauge de stockage détaillée par catégorie via la fonction SQL `studio_overview()` (déjà en base).
 Publié aussi : barre du haut du studio mobile fixe (`sticky`, sous l'heure de l'iPhone dans l'app) ; l'Accueil est `/admin` (demandé par le propriétaire) ; la liste des galeries passe à
 `/admin/galleries` (toujours « Galeries » dans le menu) ; `/admin/accueil` redirige vers `/admin`.
+Publié (19 oct.) : nouvelle mise en page du site alvzrec (`lib/site-template.ts`, bloc CSS « MISE EN PAGE ») : ordinateur =
+clips en grille de 3 (extrait YouTube au survol seulement, plus de bascule 3D), photos sur 5 colonnes, Coulisses + Caméras côte à
+côte (section `.duo`), bouton « Réserver » (WhatsApp, traduit) dans la barre ; téléphone = clips sur une colonne plus serrés, moins de vide.
+Le propriétaire doit reposer l'index.html sur l'ancien compte pour que alvzrec.com change (design modifié).
 Publié (19 oct.) : **site alvzrec.com géré depuis le studio** (option A choisie : le domaine reste sur l'ancien compte
 Netlify). Page d'origine (un seul index.html, design inchangé) dans `lib/site-template.ts` ; elle lit son contenu sur
 `alvzgalleries.com/api/site` (CORS, cache CDN 5 min) puis lance ses scripts (`data-boot`), contenu d'origine si le studio ne

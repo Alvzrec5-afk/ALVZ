@@ -330,6 +330,43 @@ export const SITE_HTML = String.raw`<!DOCTYPE html>
     .hero-sub, .hero-ctas { opacity: 1; }
     .grain { display: none; }
   }
+
+  /* ===== MISE EN PAGE (octobre 2026) ===== */
+  /* Ordinateur : clips en grille de 3, photos sur 5 colonnes, coulisses et matériel côte à côte, bouton Réserver en haut. */
+  .book { padding: 10px 18px; font-size: 14px; }
+  @media (min-width: 861px) {
+    .block { padding: clamp(64px, 8vw, 112px) 0; }
+    .vlist { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 44px 22px; }
+    .vcard { justify-items: start; text-align: left; gap: 12px; }
+    .vmeta { justify-items: start; }
+    .vmeta .clip-artist, .vmeta .clip-kind { text-align: left; }
+    .vmeta .clip-title { font-size: clamp(26px, 2.3vw, 34px); }
+    .vframe img { animation: none; }
+    .gallery { columns: 5 200px; column-gap: 10px; }
+    .duo { display: grid; grid-template-columns: 1.35fr 1fr; gap: 56px; align-items: start; }
+    .duo .bts-grid { height: clamp(380px, 38vw, 560px); }
+    .duo .kit { grid-template-columns: 1fr; gap: 24px; }
+    .duo .kit-photo { aspect-ratio: 16/10; }
+    .duo .spec li { padding: 16px 0; }
+    .duo .spec .v { font-size: clamp(30px, 3vw, 44px); }
+    .duo .head { margin-bottom: 28px; }
+    .duo .head h2 { font-size: clamp(44px, 5vw, 72px); }
+    .float-cta { display: none; }
+  }
+  /* Téléphone : clips sur une colonne mais plus serrés, titres à gauche, moins de vide entre les parties. */
+  @media (max-width: 860px) {
+    .book { display: none; }
+    .block { padding: 72px 0; }
+    .head { margin-bottom: 28px; }
+    .vlist { gap: 36px; }
+    .vcard { justify-items: start; text-align: left; gap: 10px; }
+    .vmeta { justify-items: start; }
+    .vmeta .clip-artist, .vmeta .clip-kind { text-align: left; }
+    .vmeta .clip-title { font-size: clamp(28px, 8vw, 40px); }
+    .duo > div + div { margin-top: 72px; }
+    .contact { padding: 88px 0 40px; }
+    .foot { margin-top: 64px; }
+  }
 </style>
 </head>
 <body>
@@ -369,6 +406,7 @@ export const SITE_HTML = String.raw`<!DOCTYPE html>
         <a href="#prestations" data-i18n="nav_offers">Prestations</a>
         <a href="#contact" data-i18n="nav_contact">Contact</a>
       </nav>
+      <a class="btn btn-red book" data-wa="hello" target="_blank" rel="noopener" data-i18n="book">Réserver</a>
       <div class="lang" role="group" aria-label="Langue">
         <button type="button" data-lang="fr" aria-pressed="true">FR</button>
         <button type="button" data-lang="en" aria-pressed="false">EN</button>
@@ -443,8 +481,9 @@ export const SITE_HTML = String.raw`<!DOCTYPE html>
   </section>
 
   <section class="block surface" id="coulisses">
-    <div class="wrap">
-      <div class="head reveal">
+    <div class="wrap duo">
+      <div>
+        <div class="head reveal">
         <h2 data-i18n="bts_title">Coulisses</h2>
         <p data-i18n="bts_sub">Sur le plateau, entre deux prises.</p>
       </div>
@@ -453,12 +492,9 @@ export const SITE_HTML = String.raw`<!DOCTYPE html>
         <figure><img data-slot="bts2" src="https://i.imgur.com/9aEFGnn.jpeg" alt="Tournage ALVZ REC, entre deux prises" loading="lazy"></figure>
         <figure><img data-slot="bts3" src="https://i.imgur.com/MCTCyM1.jpeg" alt="Tournage ALVZ REC, mise en place" loading="lazy"></figure>
       </div>
-    </div>
-  </section>
-
-  <section class="block" id="materiel">
-    <div class="wrap">
-      <div class="head reveal"><h2 data-i18n="kit_title">Caméras et drone</h2></div>
+      </div>
+      <div id="materiel">
+        <div class="head reveal"><h2 data-i18n="kit_title">Caméras et drone</h2></div>
       <div class="kit">
         <div class="kit-photo"><img data-slot="kit" src="https://i.imgur.com/lO3nYfC.jpeg" alt="Le matériel de tournage ALVZ REC" loading="lazy"></div>
         <ul class="spec">
@@ -466,6 +502,7 @@ export const SITE_HTML = String.raw`<!DOCTYPE html>
           <li><span class="k" data-i18n="kit_a67">Caméra APS-C</span><span class="v">Sony a6700</span></li>
           <li><span class="k" data-i18n="kit_drone">Drone</span><span class="v">DJI Neo 2</span></li>
         </ul>
+      </div>
       </div>
     </div>
   </section>
@@ -548,7 +585,7 @@ export const SITE_HTML = String.raw`<!DOCTYPE html>
       contact_cta: 'Écrire sur WhatsApp', footer: 'Vidéo et photo',
       cat_evenement: 'Événements', o_evenement: 'Événement', o_evenement_d: 'Anniversaires, soirées et fêtes de famille, avec un décor et des invités mis en valeur.',
       wa_evenement: 'Salut ! Je viens de ton site, je voudrais un devis pour un événement.',
-      open_yt: 'Ouvrir sur YouTube', close: 'Fermer'
+      open_yt: 'Ouvrir sur YouTube', close: 'Fermer', book: 'Réserver'
     },
     en: {
       nav_video: 'Video', nav_photo: 'Photo', nav_offers: 'Services', nav_contact: 'Contact',
@@ -579,7 +616,7 @@ export const SITE_HTML = String.raw`<!DOCTYPE html>
       contact_cta: 'Message on WhatsApp', footer: 'Video and photo',
       cat_evenement: 'Events', o_evenement: 'Event', o_evenement_d: 'Birthdays, parties and family celebrations, with the setting and the guests at their best.',
       wa_evenement: 'Hi! I found your website and I would like a quote for an event.',
-      open_yt: 'Open on YouTube', close: 'Close'
+      open_yt: 'Open on YouTube', close: 'Close', book: 'Book'
     },
     pt: {
       nav_video: 'Vídeo', nav_photo: 'Foto', nav_offers: 'Serviços', nav_contact: 'Contacto',
@@ -610,7 +647,7 @@ export const SITE_HTML = String.raw`<!DOCTYPE html>
       contact_cta: 'Escrever no WhatsApp', footer: 'Vídeo e foto',
       cat_evenement: 'Eventos', o_evenement: 'Evento', o_evenement_d: 'Aniversários, festas e celebrações de família, com o cenário e os convidados em destaque.',
       wa_evenement: 'Olá! Vi o teu site e queria um orçamento para um evento.',
-      open_yt: 'Abrir no YouTube', close: 'Fechar'
+      open_yt: 'Abrir no YouTube', close: 'Fechar', book: 'Reservar'
     }
   };
 
@@ -912,7 +949,24 @@ export const SITE_HTML = String.raw`<!DOCTYPE html>
           } else if (rec) { rec.visible = false; clearTimeout(rec.tm); rec.box.classList.remove('on'); rec.frame.classList.remove('playing'); if (rec.ok) setTimeout(function () { if (!rec.visible) rec.p.pauseVideo(); }, 380); }
         });
       }, { rootMargin: '150px 0px' });
-      cardsEls.forEach(function (c) { vio.observe(c); });
+      /* Ordinateur (grille) : l'extrait ne joue qu'au survol. Téléphone : quand la carte est à l'écran. */
+      var hoverMode = window.matchMedia('(hover: hover) and (pointer: fine) and (min-width: 861px)').matches;
+      if (hoverMode) {
+        cardsEls.forEach(function (card) {
+          card.addEventListener('mouseenter', function () {
+            var rec = card.__yt;
+            if (!rec) { if (apiReady) build(card); else if (pending.indexOf(card) < 0) pending.push(card); }
+            else { rec.visible = true; if (rec.ok) rec.p.playVideo(); }
+          });
+          card.addEventListener('mouseleave', function () {
+            var rec = card.__yt;
+            var i = pending.indexOf(card); if (i >= 0) pending.splice(i, 1);
+            if (!rec) return;
+            rec.visible = false; clearTimeout(rec.tm); rec.box.classList.remove('on'); rec.frame.classList.remove('playing');
+            if (rec.ok) setTimeout(function () { if (!rec.visible) rec.p.pauseVideo(); }, 380);
+          });
+        });
+      } else cardsEls.forEach(function (c) { vio.observe(c); });
       var prevReady = window.onYouTubeIframeAPIReady;
       window.onYouTubeIframeAPIReady = function () { if (prevReady) prevReady(); apiReady = true; pending.forEach(build); pending = []; };
       if (window.YT && window.YT.Player) { apiReady = true; }
@@ -933,19 +987,10 @@ export const SITE_HTML = String.raw`<!DOCTYPE html>
       });
     }
 
-    var frames = [].slice.call(document.querySelectorAll('.vframe'));
     var hero = document.querySelector('.hero'), contact = document.getElementById('contact'), fc = document.getElementById('floatCta');
     function loop(t) {
       if (lenis) lenis.raf(t);
       var vh = window.innerHeight;
-      if (!reduce) frames.forEach(function (f) {
-        var r = f.getBoundingClientRect();
-        if (r.bottom < -100 || r.top > vh + 100) return;
-        var c = (r.top + r.height / 2 - vh / 2) / vh;
-        c = Math.max(-1, Math.min(1, c));
-        f.style.transform = 'perspective(1200px) rotateX(' + (c * 16).toFixed(2) + 'deg) scale(' + (1 - Math.abs(c) * 0.1).toFixed(3) + ')';
-        f.style.opacity = (1 - Math.abs(c) * 0.5).toFixed(2);
-      });
       var past = window.scrollY > hero.offsetHeight * 0.8;
       var near = contact.getBoundingClientRect().top < vh * 0.9;
       fc.classList.toggle('show', past && !near);
