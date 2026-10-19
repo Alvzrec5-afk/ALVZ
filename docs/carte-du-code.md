@@ -88,6 +88,10 @@ Banque d'images : tableau à part `boards.is_library` (`libraryBoardId`, page `/
 modèle, absent de la liste des tableaux). Ses images (et celles de ses planches, `libraryBoards`) arrivent après celles du
 projet dans `projectImages` avec `library: true` ; `SlotPicker` les montre dans l'onglet « Banque d'images » ;
 `fillSlotFrom` accepte une photo de la banque ; un choix = copie du fichier (`copyOf`), la banque n'est pas modifiée.
+Copie d'office : `applyBoardOps` repère les photos tout juste envoyées par le studio (taille qui passe de 0 à > 0, pas une
+copie `copyOf`, ni vidéo ni document) et `addToLibrary` les copie (fichier Oracle + carte) dans la banque, en grille de
+`LIBRARY_COLUMNS` ; rien si le tableau est la banque. Corbeille dans l'onglet banque de `SlotPicker` (sauf ouvert depuis la
+banque, `inLibrary`) → `DELETE …/library` → `deleteLibraryImage` (fichier et carte effacés pour de bon ; les tableaux gardent leur copie).
 Menu « … » de la barre (`moreTools`, panneau `more`, chaque entrée glissable sur le tableau ou dans une colonne comme
 les outils de la barre : `drop`, `startToolDrag`, `mediaDrop` pour les fichiers) : **Croquis** = note avec `data.sketch` (traits, `SketchEditor` /
 `SketchView`, `cleanSketch` côté serveur) ; **Nuancier** = une carte couleur (code HEX sur la couleur) + `ColorPicker` (dégradé, teinte, pipette `EyeDropper`, R V B,

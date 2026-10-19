@@ -88,7 +88,8 @@ Publié aussi (19 oct.) : documents importés déplaçables, ouverts en grand da
 menu « … » façon Milanote : Nuancier = une couleur + sélecteur, Document = document écrit (éditeur), Importer doc = fichier.
 Publié aussi : entrées du menu « … » glissables sur le tableau / dans une colonne.
 **En local, non publié** : Banque d'images (tableau `boards.is_library`, colonne déjà ajoutée en base ; `/admin/boards/library`,
-encadré sur la liste des tableaux ; onglet « Banque d'images » dans « Images projet » et les cases photo vides). Le modèle en base a déjà reçu « 5. STORYBOARD » (planches suivantes renumérotées 6 et 7).
+encadré sur la liste des tableaux ; onglet « Banque d'images » dans « Images projet » et les cases photo vides ;
+chaque photo envoyée par le studio dans un tableau y est copiée d'office ; corbeille sur les photos de la banque dans la fenêtre). Le modèle en base a déjà reçu « 5. STORYBOARD » (planches suivantes renumérotées 6 et 7).
 
 - **À vérifier en vrai par le propriétaire** : menu « … » (plan Google Maps, envoi d'un PDF / MP3 vers Oracle), case photo vide (choix parmi les photos du projet) ;
   vidéo dans un tableau (envoi depuis l'iPhone, lecture, plein écran) ; capture d'un tableau **depuis l'iPhone** (nette au zoom ? photos présentes ? non testé sur vrai Safari) et avec de vraies photos Oracle (si elles sortent

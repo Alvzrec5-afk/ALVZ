@@ -4316,6 +4316,7 @@ function SlotPicker({
   const [images, setImages] = useState<LibraryImage[] | null>(null);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<"project" | "library" | null>(null);
+  const [inLibrary, setInLibrary] = useState(false);
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
@@ -4324,7 +4325,9 @@ function SlotPicker({
       .then(async (r) => {
         const json = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(json.error || `Erreur ${r.status}`);
-        if (alive) setImages(json.images ?? []);
+        if (!alive) return;
+        setImages(json.images ?? []);
+        setInLibrary(Boolean(json.inLibrary));
       })
       .catch((e) => alive && setError(e instanceof Error ? e.message : String(e)));
     const key = (e: KeyboardEvent) => e.key === "Escape" && close.current();
@@ -4334,6 +4337,18 @@ function SlotPicker({
       window.removeEventListener("keydown", key);
     };
   }, [endpoint]);
+
+  /** Retire une photo de la Banque d'images (pas depuis la banque elle-même : sa carte resterait affichée). */
+  const remove = async (img: LibraryImage) => {
+    if (!confirm("Supprimer cette photo de la Banque d'images ? Les tableaux qui l'utilisent la gardent.")) return;
+    setImages((list) => list?.filter((i) => i.id !== img.id) ?? null);
+    const res = await fetch(endpoint, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fromId: img.id }) });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      setImages((list) => (list ? [...list, img] : list));
+      setError(json.error || `Erreur ${res.status}`);
+    }
+  };
 
   // Deux onglets : ce projet, puis la Banque d'images (ouverte d'office si le projet n'a encore aucune image).
   const own = (images ?? []).filter((i) => !i.library);
@@ -4399,21 +4414,33 @@ function SlotPicker({
                 <p className="text-[11px] uppercase tracking-widest text-muted mb-2">{g.title || "Sans titre"}</p>
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                   {g.list.map((img) => (
-                    <button key={img.id} onClick={() => onPick(img)} className="relative aspect-square overflow-hidden rounded-[3px] bg-bg-soft hover:ring-2 hover:ring-emerald-500">
-                      {img.video ? (
-                        <>
-                          <video src={img.src} muted playsInline preload="metadata" className="absolute inset-0 w-full h-full object-cover" />
-                          <span className="absolute right-1.5 bottom-1.5 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center">
-                            <svg viewBox="0 0 24 24" className="w-3 h-3 ml-0.5" fill="currentColor" aria-hidden>
-                              <path d="M7 4.5v15l12-7.5z" />
-                            </svg>
-                          </span>
-                        </>
-                      ) : (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={img.src} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                    <div key={img.id} className="relative group">
+                      <button onClick={() => onPick(img)} className="relative block w-full aspect-square overflow-hidden rounded-[3px] bg-bg-soft hover:ring-2 hover:ring-emerald-500">
+                        {img.video ? (
+                          <>
+                            <video src={img.src} muted playsInline preload="metadata" className="absolute inset-0 w-full h-full object-cover" />
+                            <span className="absolute right-1.5 bottom-1.5 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center">
+                              <svg viewBox="0 0 24 24" className="w-3 h-3 ml-0.5" fill="currentColor" aria-hidden>
+                                <path d="M7 4.5v15l12-7.5z" />
+                              </svg>
+                            </span>
+                          </>
+                        ) : (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={img.src} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                        )}
+                      </button>
+                      {img.library && !inLibrary && (
+                        <button
+                          onClick={() => remove(img)}
+                          aria-label="Supprimer de la Banque d'images"
+                          title="Supprimer de la Banque d'images"
+                          className="absolute left-1.5 top-1.5 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-danger sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                        >
+                          <TrashIcon className="w-3.5 h-3.5" />
+                        </button>
                       )}
-                    </button>
+                    </div>
                   ))}
                 </div>
               </section>

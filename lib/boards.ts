@@ -398,6 +398,7 @@ export async function applyBoardOps(
     : { data: [] };
   const sourceOf = new Map((sources ?? []).map((r) => [r.id as string, r]));
   const imageCopies: { from: string; to: string }[] = [];
+  const uploads: { id: string; data: BoardData; size: number }[] = [];
   const boardCopies: { from: string; to: string; title: string }[] = [];
 
   // Colonnes créées dans ce même envoi : on peut déjà y ranger des cartes.
@@ -459,6 +460,18 @@ export async function applyBoardOps(
     const imageSrc = !row && it.kind === "image" && it.copyOf ? sourceOf.get(it.copyOf) : undefined;
     if (imageSrc?.kind === "image" && Number(imageSrc.size_bytes) > 0) {
       imageCopies.push({ from: boardImageKey(imageSrc.board_id as string, imageSrc.id as string), to: boardImageKey(boardId, it.id) });
+    }
+    // Photo tout juste envoyée par le studio (pas une copie) : elle ira aussi dans la Banque d'images.
+    if (
+      actor.role === "admin" &&
+      it.kind === "image" &&
+      !imageSrc &&
+      !data.video &&
+      !data.media &&
+      !(Number(row?.size_bytes) > 0) &&
+      Number(it.sizeBytes) > 0
+    ) {
+      uploads.push({ id: it.id, data, size: Math.round(num(it.sizeBytes, 0, MAX_BOARD_IMAGE_BYTES)) });
     }
     puts.push({
       id: it.id,
@@ -534,7 +547,60 @@ export async function applyBoardOps(
     if (delError) throw new Error(delError.message);
     if (deletedSubBoards.length) await db.from("boards").update({ deleted_at: now }).in("id", deletedSubBoards).eq("parent_id", boardId);
   }
+  if (uploads.length) await addToLibrary(db, boardId, uploads).catch(() => undefined);
   // La date du tableau (sa « version ») est mise à jour par la base elle-même (déclencheur sur les cartes).
+}
+
+/**
+ * Copie dans la Banque d'images les photos qu'on vient d'envoyer dans un tableau (sauf dans la banque elle-même),
+ * rangées en grille à la suite des précédentes. Un échec ne bloque jamais l'enregistrement du tableau.
+ */
+async function addToLibrary(db: SupabaseClient, boardId: string, uploads: { id: string; data: BoardData; size: number }[]) {
+  if ((await libraryBoards(db)).has(boardId)) return;
+  const libraryId = await libraryBoardId(db);
+  const { count } = await db.from("board_items").select("id", { count: "exact", head: true }).eq("board_id", libraryId);
+  const start = count ?? 0;
+  const copied = await Promise.all(
+    uploads.slice(0, Math.max(0, MAX_ITEMS - start)).map(async (u) => {
+      const id = crypto.randomUUID();
+      const ok = await copyObject(boardImageKey(boardId, u.id), boardImageKey(libraryId, id)).then(
+        () => true,
+        () => false,
+      );
+      return ok ? { id, u } : null;
+    }),
+  );
+  const rows = copied
+    .filter((c) => c !== null)
+    .map(({ id, u }, i) => {
+      const n = start + i;
+      return {
+        id,
+        board_id: libraryId,
+        kind: "image",
+        x: (n % LIBRARY_COLUMNS) * 260,
+        y: Math.floor(n / LIBRARY_COLUMNS) * 340,
+        w: 240,
+        z: n,
+        parent_id: null,
+        position: 0,
+        data: cleanData("image", { width: u.data.width, height: u.data.height, caption: "" }),
+        size_bytes: u.size,
+        author: null,
+        client_id: null,
+      };
+    });
+  if (rows.length) await db.from("board_items").insert(rows);
+}
+
+/** Supprime pour de bon une photo de la Banque d'images (fichier compris). Les tableaux qui l'utilisent gardent leur copie. */
+export async function deleteLibraryImage(db: SupabaseClient, itemId: string) {
+  if (!isUuid(itemId)) throw new Error("Requête invalide");
+  const { data: row } = await db.from("board_items").select("id, board_id, kind").eq("id", itemId).maybeSingle();
+  if (!row || row.kind !== "image" || !(await libraryBoards(db)).has(row.board_id as string)) throw new Error("Photo introuvable dans la Banque d'images");
+  await deleteKeys([boardImageKey(row.board_id as string, itemId)]);
+  const { error } = await db.from("board_items").delete().eq("id", itemId);
+  if (error) throw new Error(error.message);
 }
 
 /**
@@ -801,6 +867,9 @@ async function projectBoards(db: SupabaseClient, boardId: string) {
   return titles;
 }
 
+/** Photos copiées d'office dans la Banque d'images : nombre par rangée. */
+const LIBRARY_COLUMNS = 8;
+
 /** Identifiant de la « Banque d'images », si elle existe déjà. */
 async function existingLibraryId(db: SupabaseClient) {
   const { data } = await db
@@ -862,14 +931,14 @@ async function imagesIn(db: SupabaseClient, titles: Map<string, string>, first: 
  * Photos et vidéos déjà posées dans le projet (toutes planches), pour remplir une case ou poser une carte. Tableau ouvert d'abord.
  * Suivies de celles de la « Banque d'images » (`library: true`), sauf si le projet ouvert est la banque elle-même.
  */
-export async function projectImages(db: SupabaseClient, boardId: string): Promise<LibraryImage[]> {
+export async function projectImages(db: SupabaseClient, boardId: string): Promise<{ images: LibraryImage[]; inLibrary: boolean }> {
   const [titles, bank] = await Promise.all([projectBoards(db, boardId), libraryBoards(db)]);
   const inBank = [...titles.keys()].some((id) => bank.has(id));
   const [own, extra] = await Promise.all([
     imagesIn(db, titles, boardId, inBank ? 1000 : 300, inBank),
     inBank ? Promise.resolve([]) : imagesIn(db, bank, "", 1000, true),
   ]);
-  return [...own, ...extra];
+  return { images: [...own, ...extra], inLibrary: inBank };
 }
 
 /** Remplit une case photo vide avec une copie d'une photo (ou vidéo) du même projet ou de la Banque d'images. */
