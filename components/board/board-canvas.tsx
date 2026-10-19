@@ -799,8 +799,11 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       setDocEdit(it.id);
     });
   /** Choisir un fichier d'un genre précis (menu « … ») : vidéo, son ou document. */
-  const pickMedia = (kind: MediaPick) =>
+  // Endroit visé quand l'entrée du menu « … » a été glissée sur le tableau (sinon : au milieu).
+  const mediaDrop = useRef<{ at: At; extra?: Extra } | null>(null);
+  const pickMedia = (kind: MediaPick, at?: At, extra?: Extra) =>
     ensureName(() => {
+      mediaDrop.current = at ? { at, extra } : null;
       setMediaPick(kind);
       // Laisse React mettre à jour les formats acceptés avant d'ouvrir le sélecteur.
       requestAnimationFrame(() => mediaRef.current?.click());
@@ -2936,16 +2939,18 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     { label: "Plus", Icon: DotsIcon, run: () => {}, more: true, active: Boolean(more) },
   ];
   /** Entrées du menu « … » (comme Milanote) ; `studio` : réservées au studio, `edit` : studio ou client autorisé à tout modifier. */
-  const moreTools: { label: string; Icon: typeof NoteIcon; run: () => void; studio?: boolean; edit?: boolean; tint: string }[] = [
-    { label: "Croquis", Icon: PencilIcon, run: () => addSketch(), tint: "#3a3a3a" },
-    { label: "Nuancier", Icon: PaletteIcon, run: () => addSwatch(), edit: true, tint: "#c0395f" },
-    { label: "Document", Icon: DocIcon, run: () => addDoc(), tint: "#4a4a4a" },
-    { label: "Importer doc", Icon: FileIcon, run: () => pickMedia("document"), studio: true, tint: "#6b6b6b" },
-    { label: "Audio", Icon: AudioIcon, run: () => pickMedia("audio"), studio: true, tint: "#3f9b5a" },
-    { label: "Carte", Icon: MapIcon, run: () => addMap(), tint: "#3b78c2" },
-    { label: "Vidéo", Icon: FilmIcon, run: () => pickMedia("video"), studio: true, tint: "#2aa7b8" },
-    { label: "Titre", Icon: TypeIcon, run: () => addHeading(), tint: "transparent" },
-  ].filter((t) => (!t.studio || role === "admin") && (!t.edit || role === "admin" || clientEditAll));
+  // Comme la barre : un clic crée la carte au milieu, un glisser-déposer la pose à l'endroit voulu (ou dans une colonne).
+  const moreList: (Tool & { studio?: boolean; tint: string })[] = [
+    { label: "Croquis", Icon: PencilIcon, run: () => addSketch(), drop: addSketch, tint: "#3a3a3a" },
+    { label: "Nuancier", Icon: PaletteIcon, run: () => addSwatch(), drop: addSwatch, edit: true, tint: "#c0395f" },
+    { label: "Document", Icon: DocIcon, run: () => addDoc(), drop: addDoc, tint: "#4a4a4a" },
+    { label: "Importer doc", Icon: FileIcon, run: () => pickMedia("document"), drop: (at, extra) => pickMedia("document", at, extra), studio: true, tint: "#6b6b6b" },
+    { label: "Audio", Icon: AudioIcon, run: () => pickMedia("audio"), drop: (at, extra) => pickMedia("audio", at, extra), studio: true, tint: "#3f9b5a" },
+    { label: "Carte", Icon: MapIcon, run: () => addMap(), drop: addMap, tint: "#3b78c2" },
+    { label: "Vidéo", Icon: FilmIcon, run: () => pickMedia("video"), drop: (at, extra) => pickMedia("video", at, extra), studio: true, tint: "#2aa7b8" },
+    { label: "Titre", Icon: TypeIcon, run: () => addHeading(), drop: addHeading, tint: "transparent" },
+  ];
+  const moreTools = moreList.filter((t) => (!t.studio || role === "admin") && (!t.edit || role === "admin" || clientEditAll));
   const visibleTools = tools.filter((t) => (!t.admin || role === "admin") && (!t.edit || role === "admin" || clientEditAll));
 
   /** Glisser un outil de la barre jusqu'au tableau (un simple clic marche toujours). */
@@ -2960,6 +2965,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         // Au doigt sur téléphone, un geste horizontal fait défiler la barre d'outils.
         if (ev.pointerType !== "mouse" && Math.abs(ev.clientX - startX) > Math.abs(ev.clientY - startY)) return cleanup();
         dragging = true;
+        setMore(null); // le menu « … » se ferme pour laisser voir le tableau
       }
       setToolGhost({ label: tool.label, Icon: tool.Icon, x: ev.clientX, y: ev.clientY });
     };
@@ -2967,6 +2973,8 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       cleanup();
       if (!dragging) return;
       suppressToolClick.current = true;
+      // Le clic qui suit le lâcher est ignoré ; s'il n'arrive pas (bouton du menu « … » disparu), on oublie.
+      setTimeout(() => (suppressToolClick.current = false), 0);
       setToolGhost(null);
       const root = rootRef.current!;
       const o = root.getBoundingClientRect();
@@ -3111,10 +3119,18 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
             }
             onPointerDown={(e) => e.stopPropagation()}
           >
-            {moreTools.map(({ label, Icon, run, tint }) => (
+            {moreTools.map((tool) => {
+              const { label, Icon, run, tint } = tool;
+              return (
               <button
                 key={label}
+                onPointerDown={(e) => startToolDrag(e, tool)}
+                title={`${label} : cliquez, ou glissez sur le tableau`}
                 onClick={() => {
+                  if (suppressToolClick.current) {
+                    suppressToolClick.current = false;
+                    return;
+                  }
                   setMore(null);
                   run();
                 }}
@@ -3128,7 +3144,8 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
                 </span>
                 {label}
               </button>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -3151,8 +3168,10 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           e.target.value = "";
           if (!files.length) return;
           const kind = mediaPick;
+          const drop = mediaDrop.current;
+          mediaDrop.current = null;
           void ensureName(async () => {
-            const failed = await uploadImages(files, undefined, undefined, undefined, kind);
+            const failed = await uploadImages(files, drop?.at, drop?.extra ? () => ({ ...drop.extra }) : undefined, undefined, kind);
             if (failed.length) alert(`Fichier${failed.length > 1 ? "s" : ""} non envoyé${failed.length > 1 ? "s" : ""} :\n${failed.join("\n")}`);
           });
         }}

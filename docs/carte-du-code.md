@@ -84,7 +84,8 @@ Case photo vide (`data-slot`) : clic → `SlotPicker` (photos déjà posées dan
 Bouton « Images projet » (studio, à côté d'« Image » qui reste l'import classique) : même fenêtre (`imagePick`), photos
 et vidéos du projet (`LibraryImage.video`) ; un choix crée une carte avec
 `copyOf` (le serveur copie le fichier, comme un collage) ; « Importer depuis l'ordinateur » garde l'endroit (`imageDrop`).
-Menu « … » de la barre (`moreTools`, panneau `more`) : **Croquis** = note avec `data.sketch` (traits, `SketchEditor` /
+Menu « … » de la barre (`moreTools`, panneau `more`, chaque entrée glissable sur le tableau ou dans une colonne comme
+les outils de la barre : `drop`, `startToolDrag`, `mediaDrop` pour les fichiers) : **Croquis** = note avec `data.sketch` (traits, `SketchEditor` /
 `SketchView`, `cleanSketch` côté serveur) ; **Nuancier** = une carte couleur (code HEX sur la couleur) + `ColorPicker` (dégradé, teinte, pipette `EyeDropper`, R V B,
 HEX ; un clic sur la couleur le rouvre) ; **Document** = note avec `data.doc` { title, html } (carte fermée : titre + nombre de
 mots ; `DocEditor` plein écran, `execCommand`, export PDF par impression / Word .doc / .txt ; HTML nettoyé côté serveur par
