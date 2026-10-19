@@ -77,6 +77,11 @@ fond : Coller ici (`pasteCards(raw, at)`), nouvelle note / liste ici, tout séle
 Taille du texte : `data.fontSize` (multiplie 13 px, `FONT_SIZES`, bouton « AA » de la barre). Image rognée :
 `data.crop` (fractions, non destructif, `CropEditor` avec formats 1:1, 4:5…). Flèche courbe : `data.bend`
 (décalage perpendiculaire, poignée verte au milieu, double-clic = droite ; courbe quadratique dans `geom.arrows`).
+Vidéos (studio) : carte `image` avec `data.video = true` (mp4 / mov / webm, 50 Mo au plus, `MAX_BOARD_VIDEO_BYTES`
+dans `lib/board-types.ts`), envoyée telle quelle (`readBoardVideo`, `prepareMedia`) au même endroit qu'une image
+(`boardImageKey`, Content-Type vidéo à l'envoi). Lue en boucle, muette, `crossOrigin="anonymous"` ; bouton ▶ =
+plein écran avec le son (`openVideoWithSound`). Pas de rognage ; exclue des aperçus de planches ; un client ne peut pas
+en poser. Capture : vidéos figées, image en cours redessinée (`readableVideo`), jamais clonées par html-to-image.
 Capture : bouton appareil photo en bas à droite → `capture()` avec `html-to-image` (cadrage sur toutes les cartes,
 jusqu'à 6× la taille écran et 64 Mpx ; sans barres d'outils). Le navigateur est testé (`maxCanvasRows`) : si une seule
 toile ne suffit pas (iPhone ~12-16 Mpx), dessin **par bandes** assemblées au fil de l'eau par l'encodeur JPEG maison

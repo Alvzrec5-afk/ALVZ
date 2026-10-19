@@ -44,6 +44,8 @@ export type BoardData = {
   /** Image : dimensions de la version stockée. */
   width?: number;
   height?: number;
+  /** Carte image qui contient en fait une petite vidéo (mp4 / mov / webm, 50 Mo au plus) : lue en boucle, sans le son. */
+  video?: boolean;
   /** Flèche : cartes reliées. */
   from?: string;
   to?: string;
@@ -62,6 +64,10 @@ export type BoardData = {
   /** Tableau « budget » : la colonne TOTAL, le total, le budget client et le bénéfice se calculent tout seuls. */
   calc?: "budget";
 };
+
+/** Petites vidéos posées dans un tableau (studio seulement) : 50 Mo au plus. */
+export const MAX_BOARD_VIDEO_BYTES = 50 * 1024 * 1024;
+export const BOARD_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
 
 /** Ce que le navigateur envoie pour créer ou modifier une carte. */
 export type BoardItemInput = {

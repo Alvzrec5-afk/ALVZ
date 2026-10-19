@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_WIDTH,
+  MAX_BOARD_VIDEO_BYTES,
   MAX_WIDTH,
   MIN_WIDTH,
   NOTE_COLORS,
@@ -19,7 +20,7 @@ import {
   type NoteColor,
   linkEmbed,
 } from "@/lib/board-types";
-import { makeBoardImage } from "@/lib/client/image";
+import { makeBoardImage, readBoardVideo, videoType } from "@/lib/client/image";
 import { groupZipImages, isImageName, isTextName, parseMilanoteText, readZip } from "@/lib/client/milanote";
 import {
   BoardIcon,
@@ -775,6 +776,15 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
 
   const imageDrop = useRef<{ at: At; extra?: Extra } | null>(null);
 
+  /** Photo (préparée en JPEG) ou, pour le studio, petite vidéo (envoyée telle quelle). */
+  const prepareMedia = useCallback(
+    async (file: File) => {
+      if (role === "admin" && videoType(file)) return { ...(await readBoardVideo(file, MAX_BOARD_VIDEO_BYTES)), video: true };
+      return { ...(await makeBoardImage(file)), type: "image/jpeg", video: false };
+    },
+    [role],
+  );
+
   /**
    * Prépare et envoie des images, une par une. `place` décide où va chaque image (ex. dans une colonne,
    * lors d'un import) ; sans lui, elles s'empilent légèrement décalées. Renvoie les échecs au lieu d'alerter.
@@ -786,21 +796,23 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       place?: (i: number, size: { width: number; height: number }) => Partial<BoardItem>,
       onProgress?: (done: number) => void,
     ) => {
-      const images = files.filter((f) => f.type.startsWith("image/") || /\.(jpe?g|png|webp|heic|heif|avif|gif)$/i.test(f.name));
+      const images = files.filter(
+        (f) => f.type.startsWith("image/") || /\.(jpe?g|png|webp|heic|heif|avif|gif)$/i.test(f.name) || (role === "admin" && Boolean(videoType(f))),
+      );
       const failed: string[] = [];
       for (const [i, file] of images.entries()) {
         onProgress?.(i);
         const pos = at ? { x: at.x + i * 30, y: at.y + i * 30 } : undefined;
-        let prepared: Awaited<ReturnType<typeof makeBoardImage>>;
+        let prepared: Awaited<ReturnType<typeof prepareMedia>>;
         try {
-          prepared = await makeBoardImage(file);
+          prepared = await prepareMedia(file);
         } catch (e) {
           failed.push(`${file.name} : ${e instanceof Error ? e.message : e}`);
           continue;
         }
         const id = crypto.randomUUID();
         uploading.current.add(id);
-        const it = create("image", { caption: "", width: prepared.width, height: prepared.height }, pos, {
+        const it = create("image", { caption: "", width: prepared.width, height: prepared.height, ...(prepared.video ? { video: true } : {}) }, pos, {
           id,
           src: URL.createObjectURL(prepared.blob),
           ...place?.(i, prepared),
@@ -820,11 +832,11 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
             const res = await fetch(imageEndpoint, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ itemId: it.id, size: prepared.blob.size }),
+              body: JSON.stringify({ itemId: it.id, size: prepared.blob.size, type: prepared.type }),
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(json.error || `Erreur ${res.status}`);
-            const put = await fetch(json.url, { method: "PUT", headers: { "Content-Type": "image/jpeg" }, body: prepared.blob });
+            const put = await fetch(json.url, { method: "PUT", headers: { "Content-Type": prepared.type }, body: prepared.blob });
             if (!put.ok) throw new Error(`Envoi refusé (${put.status})`);
           }
           uploading.current.delete(id);
@@ -841,7 +853,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       onProgress?.(images.length);
       return failed;
     },
-    [create, imageEndpoint, push, role, setItems],
+    [create, imageEndpoint, prepareMedia, push, role, setItems],
   );
 
   /** Met une image dans une case photo vide (la carte garde sa place et sa largeur). */
@@ -850,24 +862,25 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     async (id: string, file: File) => {
       const it = itemsRef.current[id];
       if (!it) return;
-      let prepared: Awaited<ReturnType<typeof makeBoardImage>>;
+      let prepared: Awaited<ReturnType<typeof prepareMedia>>;
       try {
-        prepared = await makeBoardImage(file);
+        prepared = await prepareMedia(file);
       } catch (e) {
         alert(`${file.name} : ${e instanceof Error ? e.message : e}`);
         return;
       }
       uploading.current.add(id);
-      update(id, { src: URL.createObjectURL(prepared.blob), data: { ...it.data, width: prepared.width, height: prepared.height } }, false);
+      const media = prepared.video ? { video: true, crop: undefined } : { video: undefined };
+      update(id, { src: URL.createObjectURL(prepared.blob), data: { ...it.data, ...media, width: prepared.width, height: prepared.height } }, false);
       try {
         const res = await fetch(imageEndpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ itemId: id, size: prepared.blob.size }),
+          body: JSON.stringify({ itemId: id, size: prepared.blob.size, type: prepared.type }),
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(json.error || `Erreur ${res.status}`);
-        const put = await fetch(json.url, { method: "PUT", headers: { "Content-Type": "image/jpeg" }, body: prepared.blob });
+        const put = await fetch(json.url, { method: "PUT", headers: { "Content-Type": prepared.type }, body: prepared.blob });
         if (!put.ok) throw new Error(`Envoi refusé (${put.status})`);
         uploading.current.delete(id);
         const latest = itemsRef.current[id];
@@ -878,7 +891,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         alert(`Image non envoyée : ${e instanceof Error ? e.message : e}`);
       }
     },
-    [imageEndpoint, push, update],
+    [imageEndpoint, prepareMedia, push, update],
   );
 
   const addImages = useCallback(
@@ -1677,7 +1690,46 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         {it.kind === "image" && (
           <div>
             {it.src ? (
-              // eslint-disable-next-line @next/next/no-img-element
+              it.data.video ? (
+                // Petite vidéo : en boucle et sans le son ; le bouton l'ouvre en grand avec le son.
+                <div className="relative bg-black">
+                  <video
+                    src={it.src}
+                    data-cap=""
+                    crossOrigin="anonymous"
+                    ref={(v) => {
+                      // iPhone : la lecture automatique n'est permise que si la vidéo est vraiment muette.
+                      if (v && !v.hasAttribute("muted")) {
+                        v.setAttribute("muted", "");
+                        v.muted = true;
+                      }
+                    }}
+                    muted
+                    loop
+                    autoPlay
+                    playsInline
+                    preload="auto"
+                    onLoadedData={() => setTick((t) => t + 1)}
+                    className="block w-full h-auto pointer-events-none"
+                    style={{ aspectRatio: `${it.data.width ?? 16} / ${it.data.height ?? 9}` }}
+                  />
+                  <button
+                    data-nodrag
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const v = e.currentTarget.parentElement?.querySelector("video");
+                      if (v) openVideoWithSound(v);
+                    }}
+                    className="absolute right-2 bottom-2 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80"
+                    aria-label="Voir en grand avec le son"
+                    title="Voir en grand avec le son"
+                  >
+                    <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 ml-0.5" fill="currentColor" aria-hidden>
+                      <path d="M7 4.5v15l12-7.5z" />
+                    </svg>
+                  </button>
+                </div>
+              ) : // eslint-disable-next-line @next/next/no-img-element
               it.data.crop ? (
                 // Image rognée : seule la zone choisie est visible (le fichier d'origine reste entier).
                 <div
@@ -2381,6 +2433,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     const tops = Object.values(all).filter((i) => i.kind !== "arrow" && !i.parentId);
     const boxes = tops.map((i) => ({ it: i, b: boxOf(i.id) })).filter((x): x is { it: BoardItem; b: Box } => Boolean(x.b));
     if (!world || !boxes.length) return;
+    const paused: HTMLVideoElement[] = [];
     setCapturing("Capture en cours…");
     setSelected(null);
     setGroup([]);
@@ -2413,10 +2466,27 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         width: w,
         pixelRatio: ratio,
         backgroundColor: bg,
-        filter: (n: HTMLElement) => !(n instanceof HTMLElement && n.dataset.ui !== undefined),
+        // Les vidéos sont dessinées à part (plus bas) : html-to-image les rendrait floues, voire bloquerait la capture.
+        filter: (n: HTMLElement) => !(n instanceof HTMLElement && n.dataset.ui !== undefined) && !(n instanceof HTMLVideoElement),
         imagePlaceholder: "data:image/gif;base64,R0lGODlhAQABAIAAAMLCwgAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==",
       };
       await Promise.all([...world.querySelectorAll("img")].map((img) => img.decode().catch(() => undefined)));
+      // Vidéos figées pendant la capture (la même image dans toutes les bandes), avec une image prête.
+      await Promise.all(
+        [...world.querySelectorAll("video")].map(async (v) => {
+          if (!v.paused) {
+            v.pause();
+            paused.push(v);
+          }
+          if (v.readyState >= 2) return;
+          await new Promise((r) => {
+            v.addEventListener("seeked", r, { once: true });
+            v.addEventListener("loadeddata", r, { once: true });
+            setTimeout(r, 3000);
+            v.currentTime = v.currentTime || 0.01;
+          });
+        }),
+      );
       // Safari dessine parfois les photos en noir au premier essai : un premier passage, tout petit, pour rien.
       if (isWebKit()) {
         const warm = await toCanvas(world, { ...base, pixelRatio: 0.25, height: h, style: { transform: `translate(${-x0}px, ${-y0}px)`, transformOrigin: "0 0" } });
@@ -2434,10 +2504,10 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         while (it?.parentId && all[it.parentId]) it = all[it.parentId];
         return it;
       };
-      const photos = [...world.querySelectorAll<HTMLImageElement>("img[data-cap]")].flatMap((img) => {
+      const photos = [...world.querySelectorAll<HTMLImageElement | HTMLVideoElement>("img[data-cap], video[data-cap]")].flatMap((img) => {
         const id = img.closest<HTMLElement>("[data-item]")?.dataset.item;
         const top = id ? topOf(id) : undefined;
-        if (!top || !img.naturalWidth) return [];
+        if (!top || (img instanceof HTMLImageElement ? !img.naturalWidth : !readableVideo(img))) return [];
         const rect = toWorld(img.getBoundingClientRect());
         const clip = toWorld((img.dataset.cap === "crop" ? img.parentElement! : img).getBoundingClientRect());
         const covered = boxes.some(({ it, b }) => it.id !== top.id && it.z > top.z && hit({ ...b, x: b.x - x0, y: b.y - y0 }, clip));
@@ -2462,6 +2532,16 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         const sy = canvas.height / (n / ratio);
         for (const p of photos) {
           if (p.clip.y + p.clip.h < top || p.clip.y > top + n / ratio) continue;
+          if (p.img instanceof HTMLVideoElement) {
+            // Vidéo : l'image en cours de lecture (lisible sans risque, vérifié par `readableVideo`).
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(p.clip.x * sx, (p.clip.y - top) * sy, p.clip.w * sx, p.clip.h * sy);
+            ctx.clip();
+            ctx.drawImage(p.img, p.rect.x * sx, (p.rect.y - top) * sy, p.rect.w * sx, p.rect.h * sy);
+            ctx.restore();
+            continue;
+          }
           // Fichier relu par fetch (comme html-to-image) : une image d'un autre site (Oracle) prise directement
           // dans la page « salirait » la toile et bloquerait la capture.
           const file = await fetch(p.img.currentSrc || p.img.src).then((r) => (r.ok ? r.blob() : null)).catch(() => null);
@@ -2513,6 +2593,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     } catch (e) {
       alert(`Capture impossible : ${e instanceof Error ? e.message : e}`);
     } finally {
+      for (const v of paused) void v.play().catch(() => undefined);
       setCapturing(false);
     }
   };
@@ -2544,9 +2625,13 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     return [
       { label: "Ouvrir", hidden: one?.kind !== "board", run: close(() => one && openBoard(one)) },
       { label: "Ouvrir le lien", hidden: !(one?.kind === "link" && one.data.url), run: close(() => window.open(one!.data.url, "_blank", "noopener")) },
-      { label: "Voir l'image en grand", hidden: !(one?.kind === "image" && one.src), run: close(() => window.open(one!.src!, "_blank", "noopener")) },
+      {
+        label: one?.data.video ? "Voir la vidéo en grand" : "Voir l'image en grand",
+        hidden: !(one?.kind === "image" && one.src),
+        run: close(() => window.open(one!.src!, "_blank", "noopener")),
+      },
       { label: "Modifier", hidden: !one || one.kind === "arrow" || !canEdit(one), run: close(() => one && startEdit(one)) },
-      { label: "Rogner l'image", hidden: !(one?.kind === "image" && one.src && canEdit(one)), run: close(() => one && setCropping(one.id)) },
+      { label: "Rogner l'image", hidden: !(one?.kind === "image" && one.src && !one.data.video && canEdit(one)), run: close(() => one && setCropping(one.id)) },
       { label: "Redresser la flèche", hidden: !(one?.kind === "arrow" && one.data.bend && canEdit(one)), run: close(() => one && update(one.id, { data: { ...one.data, bend: undefined } })) },
       { sep: true },
       { label: "Copier", hint: "⌘C", run: close(() => void copySelection()) },
@@ -2736,7 +2821,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           onOpen={sel.kind === "board" ? () => openBoard(sel) : undefined}
           onIcon={sel.kind === "board" && role === "admin" ? (icon) => update(sel.id, { data: { ...sel.data, icon } }) : undefined}
           onFontSize={sel.kind !== "arrow" && sel.kind !== "image" ? (size) => applyFontSize([sel.id], size) : undefined}
-          onCrop={sel.kind === "image" && sel.src ? () => setCropping(sel.id) : undefined}
+          onCrop={sel.kind === "image" && sel.src && !sel.data.video ? () => setCropping(sel.id) : undefined}
           onDelete={() => remove(sel.id)}
         />
       )}
@@ -2855,7 +2940,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       <input
         ref={fileRef}
         type="file"
-        accept="image/*"
+        accept={role === "admin" ? "image/*,video/mp4,video/quicktime,video/webm,.mov,.mp4,.m4v,.webm" : "image/*"}
         multiple
         hidden
         onChange={(e) => {
@@ -3583,4 +3668,41 @@ function maxCanvasRows(width: number, maxArea: number) {
     rows = Math.floor(rows * 0.75);
   }
   return 0;
+}
+
+/** Ouvre une vidéo de carte en plein écran avec le son, puis la remet muette en boucle au retour. */
+function openVideoWithSound(v: HTMLVideoElement) {
+  const iosVideo = v as HTMLVideoElement & { webkitEnterFullscreen?: () => void };
+  const back = () => {
+    if (document.fullscreenElement) return;
+    v.muted = true;
+    void v.play().catch(() => undefined);
+    document.removeEventListener("fullscreenchange", back);
+  };
+  v.addEventListener("webkitendfullscreen", back, { once: true });
+  v.muted = false;
+  v.currentTime = 0;
+  void v.play().catch(() => undefined);
+  if (v.requestFullscreen) {
+    document.addEventListener("fullscreenchange", back);
+    v.requestFullscreen().catch(() => iosVideo.webkitEnterFullscreen?.());
+  } else iosVideo.webkitEnterFullscreen?.();
+}
+
+/**
+ * La vidéo a une image à montrer et la dessiner ne bloquera pas la capture (fichier autorisé
+ * par le stockage) — sinon on la laisse de côté plutôt que de faire échouer toute la capture.
+ */
+function readableVideo(v: HTMLVideoElement) {
+  if (v.readyState < 2 || !v.videoWidth) return false;
+  try {
+    const c = document.createElement("canvas");
+    c.width = c.height = 1;
+    const ctx = c.getContext("2d")!;
+    ctx.drawImage(v, 0, 0, 1, 1);
+    ctx.getImageData(0, 0, 1, 1);
+    return true;
+  } catch {
+    return false;
+  }
 }

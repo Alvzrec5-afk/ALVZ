@@ -70,7 +70,7 @@ Détail complet (fichiers, tables, choix techniques) : **`docs/carte-du-code.md`
   « e-mail demandé avant téléchargement », vidéos `/g/<lien>/v/<id>` protégées contre les aspirateurs (URL demandées
   par le lecteur, `fromOwnPage`).
 - **Tableaux façon Milanote `/admin/boards`** (`components/board/board-canvas.tsx`, gros fichier : chercher par mot-clé) :
-  cartes note / image / liste / colonne / flèche (courbe) / planche / couleur / lien / grille / commentaire, couleurs,
+  cartes note / image (ou petite vidéo ≤ 50 Mo, studio) / liste / colonne / flèche (courbe) / planche / couleur / lien / grille / commentaire, couleurs,
   taille du texte, rognage, clic droit, copier-coller entre onglets, annuler, capture PNG, partage client `/t/<lien>`,
   modèle des nouveaux tableaux (6 planches). Serveur : `lib/boards.ts` (`cleanData` filtre chaque champ de carte :
   **tout nouveau champ de `BoardData` doit y être ajouté**).
@@ -80,9 +80,10 @@ Détail complet (fichiers, tables, choix techniques) : **`docs/carte-du-code.md`
 ## En attente / idées discutées
 
 État au 19 oct. 2026 : tout est publié (dernier code : capture nette au zoom jusqu'à 6× / 64 Mpx, aussi sur iPhone grâce au
-dessin par bandes + JPEG maison, « Enregistré » et flèches annuler cachés au téléphone). Rien en attente en local.
+dessin par bandes + JPEG maison, « Enregistré » et flèches annuler cachés au téléphone, petites vidéos dans les tableaux).
+Rien en attente en local.
 
-- **À vérifier en vrai par le propriétaire** : capture d'un tableau **depuis l'iPhone** (nette au zoom ? photos présentes ? non testé sur vrai Safari) et avec de vraies photos Oracle (si elles sortent
+- **À vérifier en vrai par le propriétaire** : vidéo dans un tableau (envoi depuis l'iPhone, lecture, plein écran) ; capture d'un tableau **depuis l'iPhone** (nette au zoom ? photos présentes ? non testé sur vrai Safari) et avec de vraies photos Oracle (si elles sortent
   grises → CORS : passer les images par une route du site ou régler le bucket) ; défilement au doigt sur une grille ;
   Ctrl + clic sur Mac ; envoi d'un clip (H.264/4K) ; e-mail de test Gmail ; images « disparues » des tableaux
   revenues (réparation automatique `objectSize`).

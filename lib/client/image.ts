@@ -140,3 +140,39 @@ export async function makeBoardImage(file: File) {
     bitmap.close();
   }
 }
+
+/** Type d'une vidéo, d'après le fichier ou son extension (les .mov de l'iPhone arrivent parfois sans type). */
+export function videoType(file: File) {
+  if (file.type.startsWith("video/")) return file.type;
+  if (/\.mov$/i.test(file.name)) return "video/quicktime";
+  if (/\.(mp4|m4v)$/i.test(file.name)) return "video/mp4";
+  if (/\.webm$/i.test(file.name)) return "video/webm";
+  return "";
+}
+
+/** Petite vidéo posée sur un tableau : envoyée telle quelle, on lit seulement ses dimensions. */
+export async function readBoardVideo(file: File, maxBytes: number) {
+  const type = videoType(file);
+  if (!["video/mp4", "video/quicktime", "video/webm"].includes(type)) throw new Error("Format vidéo non pris en charge (MP4, MOV ou WebM)");
+  if (file.size > maxBytes) throw new Error(`Vidéo trop lourde (${Math.round(file.size / 1024 / 1024)} Mo, ${Math.round(maxBytes / 1024 / 1024)} Mo au plus)`);
+  const url = URL.createObjectURL(file);
+  try {
+    const size = await new Promise<{ width: number; height: number }>((resolve) => {
+      const v = document.createElement("video");
+      v.preload = "metadata";
+      v.muted = true;
+      const done = (width: number, height: number) => {
+        v.removeAttribute("src");
+        resolve({ width, height });
+      };
+      v.onloadedmetadata = () => done(v.videoWidth || 16, v.videoHeight || 9);
+      // Format que ce navigateur ne lit pas (ex. certains .mov) : on l'envoie quand même, en 16:9.
+      v.onerror = () => done(16, 9);
+      setTimeout(() => done(16, 9), 8000);
+      v.src = url;
+    });
+    return { blob: file as Blob, type, ...size };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}

@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { cache } from "react";
 import {
   isHex,
+  MAX_BOARD_VIDEO_BYTES,
   MAX_WIDTH,
   MIN_WIDTH,
   NOTE_COLORS,
@@ -24,6 +25,7 @@ import { storageUsage } from "@/lib/usage";
 
 export const BOARD_ITEM_FIELDS = "id, kind, x, y, w, z, parent_id, position, data, size_bytes, author, client_id";
 export const MAX_BOARD_IMAGE_BYTES = 4 * 1024 * 1024;
+export { BOARD_VIDEO_TYPES, MAX_BOARD_VIDEO_BYTES } from "@/lib/board-types";
 const MAX_ITEMS = 2000;
 
 type Row = {
@@ -61,7 +63,7 @@ export async function loadBoardItems(db: SupabaseClient, boardId: string, actor:
   await Promise.all(
     empty.map(async (r) => {
       const size = await objectSize(boardImageKey(boardId, r.id));
-      if (size > 0 && size <= MAX_BOARD_IMAGE_BYTES) {
+      if (size > 0 && size <= (r.data?.video ? MAX_BOARD_VIDEO_BYTES : MAX_BOARD_IMAGE_BYTES)) {
         r.size_bytes = size;
         await createServiceClient().from("board_items").update({ size_bytes: size }).eq("id", r.id).eq("size_bytes", 0);
       }
@@ -151,13 +153,13 @@ async function subBoardPreviews(db: SupabaseClient, boardId: string) {
   if (!boards?.length) return out;
   const { data: items } = await db
     .from("board_items")
-    .select("id, board_id, kind, size_bytes, z")
+    .select("id, board_id, kind, size_bytes, z, data")
     .in("board_id", boards.map((b) => b.id as string))
     .is("deleted_at", null)
     .neq("kind", "arrow");
   for (const b of boards) {
     const mine = (items ?? []).filter((i) => i.board_id === b.id);
-    const images = mine.filter((i) => i.kind === "image" && Number(i.size_bytes) > 0).sort((x, y) => Number(y.z) - Number(x.z));
+    const images = mine.filter((i) => i.kind === "image" && Number(i.size_bytes) > 0 && !(i.data as BoardData | null)?.video).sort((x, y) => Number(y.z) - Number(x.z));
     out.set(b.id as string, {
       title: b.title as string,
       count: mine.length,
@@ -227,7 +229,8 @@ function cleanKind(kind: BoardKind, d: BoardData): BoardData {
         caption: text(d.caption, 300) ?? "",
         width: Math.round(num(d.width, 1, 10000, 4)),
         height: Math.round(num(d.height, 1, 10000, 3)),
-        crop: cleanCrop(d.crop),
+        crop: d.video === true ? undefined : cleanCrop(d.crop),
+        video: d.video === true ? true : undefined,
       };
     case "todo":
       return {
@@ -367,6 +370,8 @@ export async function applyBoardOps(
       else if (!row || (before?.title ?? "") !== (data.title ?? "")) subBoards.push({ id: data.boardId, title: data.title || "Sans titre" });
       if (row?.deleted_at) restoredSubBoards.push(data.boardId);
     }
+    // Vidéo : seul le studio en pose (un client ne peut pas transformer une image en vidéo).
+    if (it.kind === "image" && actor.role === "client") data.video = (row?.data as BoardData | null)?.video;
     const imageSrc = !row && it.kind === "image" && it.copyOf ? sourceOf.get(it.copyOf) : undefined;
     if (imageSrc?.kind === "image" && Number(imageSrc.size_bytes) > 0) {
       imageCopies.push({ from: boardImageKey(imageSrc.board_id as string, imageSrc.id as string), to: boardImageKey(boardId, it.id) });
@@ -390,7 +395,7 @@ export async function applyBoardOps(
           : imageSrc?.kind === "image" && Number(imageSrc.size_bytes) > 0
             ? imageSrc.size_bytes
             : it.kind === "image"
-              ? Math.round(num(it.sizeBytes, 0, MAX_BOARD_IMAGE_BYTES))
+              ? Math.round(num(it.sizeBytes, 0, data.video ? MAX_BOARD_VIDEO_BYTES : MAX_BOARD_IMAGE_BYTES))
               : 0,
       // Toujours explicites : dans un envoi groupé, un champ absent serait remis à vide.
       ...(row
