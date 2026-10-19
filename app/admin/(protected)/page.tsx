@@ -4,7 +4,7 @@ import { presignGet, variantKey } from "@/lib/storage";
 import { StorageCheck } from "@/components/admin/storage-check";
 import { GalleryGrid, type GalleryCard } from "@/components/admin/gallery-grid";
 import { StorageMeter } from "@/components/admin/storage-meter";
-import { storageUsage } from "@/lib/usage";
+import { storageParts, storageUsage, studioOverview } from "@/lib/usage";
 
 export const metadata = { title: "Galeries" };
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ type Row = {
 
 export default async function AdminHome() {
   const { supabase } = await requireAdminPage();
-  const [{ data, error }, usage] = await Promise.all([
+  const [{ data, error }, usage, overview] = await Promise.all([
     supabase
       .from("galleries")
       .select("id, slug, title, event_date, cover_photo_id, password_hash, expires_at, created_at, photos!photos_gallery_id_fkey(count)")
@@ -31,6 +31,7 @@ export default async function AdminHome() {
       .is("deleted_at", null)
       .order("created_at", { ascending: false }),
     storageUsage(supabase),
+    studioOverview(supabase),
   ]);
   if (error) throw new Error(`Impossible de charger les galeries : ${error.message}`);
   const rows = (data ?? []) as Row[];
@@ -54,7 +55,7 @@ export default async function AdminHome() {
     <div>
       <GalleryGrid galleries={galleries} />
       <div className="mt-20">
-        <StorageMeter used={usage.total} limit={usage.limit} />
+        <StorageMeter used={usage.total} limit={usage.limit} parts={storageParts(overview)} />
       </div>
       <div className="mt-4 border-t border-line pt-8">
         <StorageCheck />

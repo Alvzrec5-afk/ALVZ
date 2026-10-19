@@ -3,7 +3,7 @@ import { formatLongDate } from "@/lib/dates";
 import { presignGet, videoKey } from "@/lib/storage";
 import { GalleryGrid, type GalleryCard } from "@/components/admin/gallery-grid";
 import { StorageMeter } from "@/components/admin/storage-meter";
-import { storageUsage } from "@/lib/usage";
+import { storageParts, storageUsage, studioOverview } from "@/lib/usage";
 
 export const metadata = { title: "Vidéos" };
 export const dynamic = "force-dynamic";
@@ -22,7 +22,7 @@ type Row = {
 /** Espace Vidéos : chaque projet (clip, film de mariage…) a son lien client, comme une galerie. */
 export default async function VideosHome() {
   const { supabase } = await requireAdminPage();
-  const [{ data, error }, usage] = await Promise.all([
+  const [{ data, error }, usage, overview] = await Promise.all([
     supabase
       .from("galleries")
       .select("id, slug, title, event_date, password_hash, expires_at, created_at, videos(id, status, position)")
@@ -30,6 +30,7 @@ export default async function VideosHome() {
       .is("deleted_at", null)
       .order("created_at", { ascending: false }),
     storageUsage(supabase),
+    studioOverview(supabase),
   ]);
   if (error) throw new Error(`Impossible de charger les projets vidéo : ${error.message}`);
 
@@ -55,7 +56,7 @@ export default async function VideosHome() {
     <div>
       <GalleryGrid galleries={projects} kind="video" />
       <div className="mt-20">
-        <StorageMeter used={usage.total} limit={usage.limit} />
+        <StorageMeter used={usage.total} limit={usage.limit} parts={storageParts(overview)} />
       </div>
     </div>
   );

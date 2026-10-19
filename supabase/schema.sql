@@ -423,3 +423,6 @@ revoke execute on function public.board_path(uuid) from public, anon;
 revoke execute on function public.board_tree(uuid) from public, anon;
 grant execute on function public.board_path(uuid) to authenticated, service_role;
 grant execute on function public.board_tree(uuid) to authenticated, service_role;
+
+-- Accueil du studio : tous les chiffres en une requête (comptes et espace par catégorie ; somme = storage_usage()).
+-- Texte complet de la fonction : voir la migration « studio_overview » (catégories : photos, vidéos, tableaux, banque d'images).

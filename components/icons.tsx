@@ -55,6 +55,13 @@ export const LockIcon = ({ className = "w-5 h-5" }: P) => (
     <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
   </svg>
 );
+export const HomeIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <path d="M4 10.5L12 4l8 6.5" />
+    <path d="M6 9v10.5h12V9" />
+    <path d="M10 19.5v-5h4v5" />
+  </svg>
+);
 export const ImageIcon = ({ className = "w-5 h-5" }: P) => (
   <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
     <rect x="3.5" y="4.5" width="17" height="15" rx="1" />

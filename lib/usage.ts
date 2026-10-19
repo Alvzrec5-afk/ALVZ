@@ -19,3 +19,37 @@ export async function storageUsage(supabase: SupabaseClient) {
   }
   return { total, perGallery, limit: storageLimitBytes() };
 }
+
+export type StudioOverview = {
+  photo_galleries: number;
+  video_projects: number;
+  photos: number;
+  videos: number;
+  boards: number;
+  library_images: number;
+  downloads_30d: number;
+  video_views_30d: number;
+  favorites: number;
+  bytes_photos: number;
+  bytes_videos: number;
+  bytes_boards: number;
+  bytes_library: number;
+};
+
+/** Chiffres de l'accueil du studio, en une requête (fonction SQL `studio_overview`). */
+export async function studioOverview(supabase: SupabaseClient): Promise<StudioOverview> {
+  const { data, error } = await supabase.rpc("studio_overview");
+  if (error) throw new Error(`Chiffres du studio indisponibles : ${error.message}`);
+  const o = (data ?? {}) as Record<string, unknown>;
+  return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Number(v) || 0])) as StudioOverview;
+}
+
+/** Espace par catégorie, dans l'ordre (fixe) des couleurs de la jauge. */
+export function storageParts(o: StudioOverview) {
+  return [
+    { label: "Galeries photo", bytes: o.bytes_photos },
+    { label: "Vidéos", bytes: o.bytes_videos },
+    { label: "Tableaux", bytes: o.bytes_boards },
+    { label: "Banque d'images", bytes: o.bytes_library },
+  ];
+}

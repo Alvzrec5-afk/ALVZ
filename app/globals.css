@@ -317,3 +317,27 @@ body {
 .doc-body blockquote { margin: 0.4em 0 0.4em 1.6em; }
 .doc-body a { text-decoration: underline; text-underline-offset: 2px; }
 .doc-body:empty::before { content: attr(data-placeholder); color: var(--muted); pointer-events: none; }
+
+/* Couleurs des catégories de la jauge de stockage (ordre fixe ; clair puis sombre, vérifiées pour les daltoniens). */
+:root {
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+}
+[data-theme="dark"],
+[data-theme="noir"],
+[data-theme="anthracite"] {
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+}
+@media (prefers-color-scheme: dark) {
+  [data-theme="auto"] {
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+  }
+}

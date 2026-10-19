@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { deleteBoard, duplicateBoard, regenerateBoardLink, updateBoard } from "@/app/admin/board-actions";
-import { ArrowLeft, BoardIcon, CardIcon, ChevronDown, CloseIcon, FilmIcon, ImageIcon, MegaphoneIcon, MenuIcon, TrashIcon } from "@/components/icons";
+import { ArrowLeft, BoardIcon, CardIcon, HomeIcon, ChevronDown, CloseIcon, FilmIcon, ImageIcon, MegaphoneIcon, MenuIcon, TrashIcon } from "@/components/icons";
 
 /** Raccourcis vers le reste du studio (un tableau s'ouvre en plein écran, sans le menu de gauche). */
 const STUDIO = [
+  { href: "/admin/accueil", label: "Accueil", Icon: HomeIcon },
   { href: "/admin", label: "Galeries", Icon: ImageIcon },
   { href: "/admin/videos", label: "Vidéos", Icon: FilmIcon },
   { href: "/admin/boards", label: "Tableaux", Icon: BoardIcon },
