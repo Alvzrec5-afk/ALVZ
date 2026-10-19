@@ -4327,12 +4327,20 @@ type LibraryImage = { id: string; boardId: string; boardTitle: string; src: stri
 /** Place et taille du panneau flottant « Images projet », gardées d'une ouverture à l'autre (cet appareil seulement). */
 const PANEL_KEY = "alvz-image-panel";
 type PanelBox = { x: number; y: number; w: number; h: number };
-function clampPanel(b: PanelBox): PanelBox {
-  const W = window.innerWidth;
-  const H = window.innerHeight;
+/** Zone où le panneau peut aller : le tableau lui-même (jamais sous sa barre du haut ni sous les onglets). */
+type PanelArea = { top: number; left: number; right: number; bottom: number };
+function clampPanel(b: PanelBox, a?: PanelArea | null): PanelBox {
+  const area = a ?? { top: 0, left: 0, right: window.innerWidth, bottom: window.innerHeight };
+  const W = area.right - area.left;
+  const H = area.bottom - area.top;
   const w = Math.min(Math.max(260, b.w), W - 8);
   const h = Math.min(Math.max(220, b.h), H - 8);
-  return { w, h, x: Math.min(Math.max(4, b.x), W - w - 4), y: Math.min(Math.max(4, b.y), H - h - 4) };
+  return {
+    w,
+    h,
+    x: Math.min(Math.max(area.left + 4, b.x), area.right - w - 4),
+    y: Math.min(Math.max(area.top + 4, b.y), area.bottom - h - 4),
+  };
 }
 function initialPanel(): PanelBox {
   if (typeof window === "undefined") return { x: 16, y: 76, w: 400, h: 560 };
@@ -4370,6 +4378,12 @@ function SlotPicker({
   const [box, setBox] = useState<PanelBox | null>(() => (floating ? initialPanel() : null));
   const boxRef = useRef(box);
   boxRef.current = box;
+  const panelRef = useRef<HTMLDivElement>(null);
+  /** Le panneau est dans le tableau (son parent) : on lit la place que celui-ci occupe à l'écran. */
+  const area = (): PanelArea | null => {
+    const r = panelRef.current?.parentElement?.getBoundingClientRect();
+    return r ? { top: r.top, left: r.left, right: r.right, bottom: r.bottom } : null;
+  };
   const [error, setError] = useState("");
   const [tab, setTab] = useState<"project" | "library" | null>(null);
   const [inLibrary, setInLibrary] = useState(false);
@@ -4398,7 +4412,8 @@ function SlotPicker({
   // Panneau gardé dans la fenêtre quand elle change de taille.
   useEffect(() => {
     if (!floating) return;
-    const fit = () => setBox((b) => (b ? clampPanel(b) : b));
+    const fit = () => setBox((b) => (b ? clampPanel(b, area()) : b));
+    fit(); // dès l'ouverture : une place enregistrée plus haut redescend sous les barres
     window.addEventListener("resize", fit);
     return () => window.removeEventListener("resize", fit);
   }, [floating]);
@@ -4415,7 +4430,7 @@ function SlotPicker({
     const move = (ev: PointerEvent) => {
       const dx = ev.clientX - sx;
       const dy = ev.clientY - sy;
-      setBox(clampPanel(mode === "move" ? { ...b, x: b.x + dx, y: b.y + dy } : { ...b, w: b.w + dx, h: b.h + dy }));
+      setBox(clampPanel(mode === "move" ? { ...b, x: b.x + dx, y: b.y + dy } : { ...b, w: b.w + dx, h: b.h + dy }, area()));
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
@@ -4560,6 +4575,7 @@ function SlotPicker({
       <div
         data-ui
         data-modal
+        ref={panelRef}
         className="fixed z-[290000] bg-bg text-ink border border-line shadow-2xl rounded-[6px] flex flex-col overflow-hidden"
         style={{ left: box.x, top: box.y, width: box.w, height: box.h }}
         onPointerDown={(e) => e.stopPropagation()}
