@@ -177,6 +177,11 @@ images des tableaux). Schéma de référence :
 ## Vitesse (19 oct. 2026)
 
 - `adminApiWith(work)` (`lib/auth.ts`) : le contrôle « est l'admin » part en même temps que les lectures (RLS protège).
+- Fonctions SQL `board_path(target)` (chemin jusqu'au tableau principal, du haut vers le bas, toutes colonnes) et
+  `board_tree(root)` (tableau + planches non supprimées) : utilisées par `boardAncestors` et `projectBoards` (ancienne
+  boucle niveau par niveau gardée en secours). La page d'un tableau prend le tableau principal dans le chemin (plus de
+  requête en plus dans une planche). `purgeDeletedItems` et `repairEmptyImages` (ex-option `repair` de `loadBoardItems`)
+  tournent dans `after()` : l'ouverture n'attend plus Oracle.
 - Déclencheur SQL `board_items_touch_board` : toute modification de carte met à jour `boards.updated_at` (plus d'écriture
   manuelle dans `applyBoardOps`). `boardVersion` = plus récente date du tableau et de ses planches.
 - Rafraîchissement : `GET …?v=<version>` répond `{ unchanged: true }` sans relire les cartes ; rechargement complet au moins

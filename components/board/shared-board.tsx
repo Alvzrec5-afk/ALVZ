@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isStudioSession } from "@/lib/auth";
-import { boardVisitor, clientActor, loadBoardItems, resolveSharedBoard } from "@/lib/boards";
+import { after } from "next/server";
+import { boardVisitor, clientActor, loadBoardItems, repairEmptyImages, resolveSharedBoard } from "@/lib/boards";
 import { createServiceClient } from "@/lib/supabase/server";
 import { BoardCanvas } from "@/components/board/board-canvas";
 import { Wordmark } from "@/components/wordmark";
@@ -12,10 +13,11 @@ export async function SharedBoard({ slug, subId }: { slug: string; subId?: strin
   if (!shared) notFound();
   const { root, board, path } = shared;
   const [items, visitor, studio] = await Promise.all([
-    loadBoardItems(createServiceClient(), board.id, await clientActor(root), { repair: true }),
+    loadBoardItems(createServiceClient(), board.id, await clientActor(root)),
     boardVisitor(root),
     isStudioSession(), // c'est le studio qui regarde « comme le client » : chemin de retour
   ]);
+  after(() => repairEmptyImages(board.id).catch(() => undefined)); // sans faire attendre l'ouverture
   const query = board.id === root.id ? "" : `?board=${board.id}`;
 
   return (

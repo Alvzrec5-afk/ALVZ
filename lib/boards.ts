@@ -73,8 +73,6 @@ export async function loadBoardItems(
   db: SupabaseClient,
   boardId: string,
   actor: Actor,
-  /** Ouverture du tableau : on vérifie aussi chez Oracle les cases photo vides (pas à chaque rafraîchissement). */
-  opts: { repair?: boolean } = {},
 ): Promise<BoardItem[]> {
   // Cartes, aperçus des planches et discussions demandés en même temps (chaque aller-retour vers la base compte).
   const [{ data, error }, subs, allComments] = await Promise.all([
@@ -84,18 +82,6 @@ export async function loadBoardItems(
   ]);
   if (error) throw new Error(`Impossible de charger le tableau : ${error.message}`);
   const rows = (data ?? []) as Row[];
-  // Image envoyée mais dont la taille n'a pas été enregistrée (ancien souci d'enregistrement) :
-  // si le fichier est bien chez Oracle, la carte le retrouve au lieu d'afficher une case vide.
-  const empty = opts.repair ? rows.filter((r) => r.kind === "image" && !(Number(r.size_bytes) > 0)).slice(0, 40) : [];
-  await Promise.all(
-    empty.map(async (r) => {
-      const size = await objectSize(boardImageKey(boardId, r.id));
-      if (size > 0 && size <= (r.data?.video || r.data?.media ? MAX_BOARD_VIDEO_BYTES : MAX_BOARD_IMAGE_BYTES)) {
-        r.size_bytes = size;
-        await createServiceClient().from("board_items").update({ size_bytes: size }).eq("id", r.id).eq("size_bytes", 0);
-      }
-    }),
-  );
   const comments = rows.some((r) => r.kind === "comment") ? allComments : new Map<string, BoardComment[]>();
   return Promise.all(
     rows.map(async (r) => ({
@@ -118,6 +104,32 @@ export async function loadBoardItems(
       sub: r.kind === "board" && r.data?.boardId ? subs.get(r.data.boardId) ?? null : undefined,
       comments: r.kind === "comment" ? comments.get(r.id) ?? [] : undefined,
     })),
+  );
+}
+
+/**
+ * Image envoyée mais dont la taille n'a pas été enregistrée (ancien souci d'enregistrement) : si le fichier est bien
+ * chez Oracle, la carte le retrouve au lieu d'afficher une case vide. Lancé après l'affichage du tableau (`after`),
+ * pour ne pas faire attendre l'ouverture (aller-retour vers Oracle à Paris) ; la carte revient à l'ouverture suivante.
+ */
+export async function repairEmptyImages(boardId: string) {
+  const db = createServiceClient();
+  const { data } = await db
+    .from("board_items")
+    .select("id, data")
+    .eq("board_id", boardId)
+    .eq("kind", "image")
+    .eq("size_bytes", 0)
+    .is("deleted_at", null)
+    .limit(40);
+  await Promise.all(
+    (data ?? []).map(async (r) => {
+      const d = r.data as BoardData | null;
+      const size = await objectSize(boardImageKey(boardId, r.id as string));
+      if (size > 0 && size <= (d?.video || d?.media ? MAX_BOARD_VIDEO_BYTES : MAX_BOARD_IMAGE_BYTES)) {
+        await db.from("board_items").update({ size_bytes: size }).eq("id", r.id).eq("size_bytes", 0);
+      }
+    }),
   );
 }
 
@@ -201,7 +213,10 @@ async function subBoardPreviews(db: SupabaseClient, boardId: string) {
 
 /** Chemin depuis le tableau principal jusqu'à ce tableau (fil d'Ariane), du haut vers le bas. */
 export async function boardAncestors(db: SupabaseClient, boardId: string) {
-  type Link = { id: string; title: string; parent_id: string | null; deleted_at: string | null };
+  type Link = { id: string; title: string; parent_id: string | null; deleted_at: string | null } & Record<string, unknown>;
+  // Une seule requête (fonction `board_path`) au lieu d'un aller-retour par niveau ; l'ancienne boucle reste en secours.
+  const { data: path, error } = await db.rpc("board_path", { target: boardId });
+  if (!error && Array.isArray(path)) return path as Link[];
   const chain: Link[] = [];
   let id: string | null = boardId;
   for (let depth = 0; id && depth < 25; depth++) {
@@ -849,6 +864,13 @@ export async function resolveSharedBoard(slug: string, subId?: string | null) {
 
 /** Tous les tableaux d'un projet : on remonte au tableau principal, puis on prend toutes ses planches. */
 async function projectBoards(db: SupabaseClient, boardId: string) {
+  // Deux requêtes (fonctions `board_path` puis `board_tree`) ; l'ancienne méthode, niveau par niveau, reste en secours.
+  const { data: path } = await db.rpc("board_path", { target: boardId });
+  const head = Array.isArray(path) ? (path[0] as { id: string } | undefined) : undefined;
+  if (head) {
+    const { data: tree, error } = await db.rpc("board_tree", { root: head.id });
+    if (!error && Array.isArray(tree)) return new Map((tree as { id: string; title: string }[]).map((b) => [b.id, b.title]));
+  }
   let root = boardId;
   for (let depth = 0; depth < 25; depth++) {
     const { data } = await db.from("boards").select("parent_id").eq("id", root).maybeSingle();

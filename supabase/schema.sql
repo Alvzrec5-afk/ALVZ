@@ -393,3 +393,33 @@ end $$;
 create trigger board_items_touch_board
   after insert or update or delete on public.board_items
   for each row execute function private.touch_board();
+
+-- Chemin d'un tableau jusqu'au tableau principal, et un tableau avec toutes ses planches : une requête au lieu d'une par niveau.
+create or replace function public.board_path(target uuid)
+returns setof public.boards
+language sql stable security invoker set search_path = ''
+as $$
+  with recursive up(id, depth) as (
+    select target, 0
+    union all
+    select b.parent_id, up.depth + 1 from public.boards b join up on b.id = up.id
+    where b.parent_id is not null and up.depth < 25
+  )
+  select b.* from up join public.boards b on b.id = up.id order by up.depth desc;
+$$;
+create or replace function public.board_tree(root uuid)
+returns table (id uuid, title text)
+language sql stable security invoker set search_path = ''
+as $$
+  with recursive down(id, title, depth) as (
+    select b.id, b.title, 0 from public.boards b where b.id = root and b.deleted_at is null
+    union all
+    select b.id, b.title, down.depth + 1 from public.boards b join down on b.parent_id = down.id
+    where b.deleted_at is null and down.depth < 25
+  )
+  select down.id, down.title from down order by down.depth limit 500;
+$$;
+revoke execute on function public.board_path(uuid) from public, anon;
+revoke execute on function public.board_tree(uuid) from public, anon;
+grant execute on function public.board_path(uuid) to authenticated, service_role;
+grant execute on function public.board_tree(uuid) to authenticated, service_role;
