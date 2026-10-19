@@ -81,10 +81,11 @@ Détail complet (fichiers, tables, choix techniques) : **`docs/carte-du-code.md`
 
 État au 19 oct. 2026 : tout est publié (dernier code : capture nette au zoom jusqu'à 6× / 64 Mpx, aussi sur iPhone grâce au
 dessin par bandes + JPEG maison, « Enregistré » et flèches annuler cachés au téléphone, petites vidéos dans les tableaux).
-**Committé en local, pas encore publié (19 oct.) :** menu « … » (croquis, nuancier, document, audio, carte, vidéo,
-titre). Le modèle en base a déjà reçu « 5. STORYBOARD » (planches suivantes renumérotées 6 et 7).
+Publié le 19 oct. : menu « … » (croquis, nuancier, document, audio, carte, vidéo, titre) ; cases photo vides :
+choix parmi les photos du projet + glisser-déposer. Rien en attente en local. Le modèle en base a déjà reçu « 5. STORYBOARD » (planches suivantes renumérotées 6 et 7).
 
-- **À vérifier en vrai par le propriétaire** : vidéo dans un tableau (envoi depuis l'iPhone, lecture, plein écran) ; capture d'un tableau **depuis l'iPhone** (nette au zoom ? photos présentes ? non testé sur vrai Safari) et avec de vraies photos Oracle (si elles sortent
+- **À vérifier en vrai par le propriétaire** : menu « … » (plan Google Maps, envoi d'un PDF / MP3 vers Oracle), case photo vide (choix parmi les photos du projet) ;
+  vidéo dans un tableau (envoi depuis l'iPhone, lecture, plein écran) ; capture d'un tableau **depuis l'iPhone** (nette au zoom ? photos présentes ? non testé sur vrai Safari) et avec de vraies photos Oracle (si elles sortent
   grises → CORS : passer les images par une route du site ou régler le bucket) ; défilement au doigt sur une grille ;
   Ctrl + clic sur Mac ; envoi d'un clip (H.264/4K) ; e-mail de test Gmail ; images « disparues » des tableaux
   revenues (réparation automatique `objectSize`).

@@ -77,6 +77,10 @@ fond : Coller ici (`pasteCards(raw, at)`), nouvelle note / liste ici, tout séle
 Taille du texte : `data.fontSize` (multiplie 13 px, `FONT_SIZES`, bouton « AA » de la barre). Image rognée :
 `data.crop` (fractions, non destructif, `CropEditor` avec formats 1:1, 4:5…). Flèche courbe : `data.bend`
 (décalage perpendiculaire, poignée verte au milieu, double-clic = droite ; courbe quadratique dans `geom.arrows`).
+Case photo vide (`data-slot`) : clic → `SlotPicker` (photos déjà posées dans tout le projet, tableau principal + planches,
+`projectImages` via `GET /api/admin/boards/[id]/library`, la planche ouverte d'abord) ou « Importer depuis l'ordinateur »
+(`fillTarget` + `fileRef`). Choisir une photo = copie Oracle côté serveur (`fillSlotFrom`, `POST …/library`). Une photo
+(ou vidéo) glissée depuis l'ordinateur sur la case la remplit (`onDrop`, surlignage `slotOver`).
 Menu « … » de la barre (`moreTools`, panneau `more`) : **Croquis** = note avec `data.sketch` (traits, `SketchEditor` /
 `SketchView`, `cleanSketch` côté serveur) ; **Nuancier** = 5 cartes couleur côte à côte ; **Document** / **Audio** = carte
 `image` avec `data.media` (« document » | « audio »), `fileName`, `fileType` (50 Mo, studio, `readBoardFile`, extensions

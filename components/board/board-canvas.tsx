@@ -319,6 +319,8 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
   );
   const [cropping, setCropping] = useState<string | null>(null); // image en cours de recadrage
   const [sketching, setSketching] = useState<string | null>(null); // croquis en cours de dessin
+  const [slotPick, setSlotPick] = useState<string | null>(null); // case photo vide : choix d'une photo du projet
+  const [slotOver, setSlotOver] = useState<string | null>(null); // case photo survolée par un fichier glissé
   // Menu « … » de la barre d'outils (Croquis, Nuancier, Document…) : position du bouton qui l'ouvre.
   const [more, setMore] = useState<DOMRect | null>(null);
   const mediaRef = useRef<HTMLInputElement>(null);
@@ -1618,9 +1620,17 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    setSlotOver(null);
     if (!canAdd) return;
     const files = [...e.dataTransfer.files];
     if (!files.length) return;
+    // Photo lâchée sur une case photo vide : elle prend sa place.
+    const slot = (e.target as HTMLElement).closest<HTMLElement>("[data-slot]")?.dataset.slot;
+    if (slot && role === "admin") {
+      const file = files.find((f) => mediaKindOf(f, role) === "image" || mediaKindOf(f, role) === "video");
+      if (file) void fillImage(slot, file);
+      return;
+    }
     // Export Milanote (texte ou ZIP) déposé directement sur le tableau.
     if (role === "admin" && files.some((f) => /\.(zip|md|markdown|txt)$/i.test(f.name))) {
       void importMilanote(files);
@@ -1877,18 +1887,18 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
             ) : (
               <button
                 data-nodrag
+                data-slot={it.id}
                 disabled={role !== "admin" || uploading.current.has(it.id)}
                 onClick={() => {
-                  // Case photo vide : on choisit l'image qui prend sa place.
-                  fillTarget.current = it.id;
-                  fileRef.current?.click();
+                  // Case photo vide : d'abord les photos déjà dans le projet, ou import depuis l'ordinateur.
+                  setSlotPick(it.id);
                 }}
-                className="w-full flex flex-col items-center justify-center gap-2 text-muted hover:text-ink transition-colors"
+                className={`w-full flex flex-col items-center justify-center gap-2 transition-colors ${slotOver === it.id ? "text-emerald-600 outline-2 outline-dashed outline-emerald-500 -outline-offset-4" : "text-muted hover:text-ink"}`}
                 style={{ aspectRatio: `${it.data.width ?? 4} / ${it.data.height ?? 3}`, background: "color-mix(in srgb, var(--ink) 6%, var(--bg-soft))" }}
-                title={role === "admin" ? "Ajouter une image" : undefined}
+                title={role === "admin" ? "Ajouter une image (ou glissez une photo ici)" : undefined}
               >
                 <UploadIcon className="w-10 h-10" />
-                {role === "admin" && <span className="text-[11px]">Ajouter une image</span>}
+                {role === "admin" && <span className="text-[11px]">{slotOver === it.id ? "Lâchez la photo ici" : "Ajouter une image"}</span>}
               </button>
             )}
             {uploading.current.has(it.id) && <div className="absolute inset-x-0 top-0 h-0.5 bg-emerald-500 animate-pulse" />}
@@ -2949,7 +2959,14 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         const o = rootRef.current!.getBoundingClientRect();
         addNote({ x: (e.clientX - o.left - v.x) / v.k, y: (e.clientY - o.top - v.y) / v.k });
       }}
-      onDragOver={(e) => e.preventDefault()}
+      onDragOver={(e) => {
+        e.preventDefault();
+        const slot = role === "admin" ? (e.target as HTMLElement).closest<HTMLElement>("[data-slot]")?.dataset.slot ?? null : null;
+        if (slot !== slotOver) setSlotOver(slot);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setSlotOver(null);
+      }}
       onDrop={onDrop}
       // Le navigateur fait défiler la zone pour montrer un champ qui prend le focus : on l'annule,
       // le tableau se déplace uniquement par sa propre vue (sinon tout se décale).
@@ -3080,6 +3097,42 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           });
         }}
       />
+      {slotPick && items[slotPick] && (
+        <SlotPicker
+          endpoint={imageEndpoint.replace(/\/image$/, "/library")}
+          onClose={() => setSlotPick(null)}
+          onImport={() => {
+            fillTarget.current = slotPick;
+            setSlotPick(null);
+            fileRef.current?.click();
+          }}
+          onPick={async (img) => {
+            const id = slotPick;
+            setSlotPick(null);
+            const it = itemsRef.current[id];
+            if (!it) return;
+            uploading.current.add(id);
+            update(id, { src: img.src, data: { ...it.data, width: img.width, height: img.height, crop: undefined } }, false);
+            try {
+              const res = await fetch(imageEndpoint.replace(/\/image$/, "/library"), {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ itemId: id, fromId: img.id }),
+              });
+              const json = await res.json().catch(() => ({}));
+              if (!res.ok) throw new Error(json.error || `Erreur ${res.status}`);
+              const latest = itemsRef.current[id];
+              if (latest) update(id, { src: json.src, data: { ...latest.data, width: json.width, height: json.height } }, false);
+            } catch (e) {
+              update(id, { src: null, data: it.data }, false);
+              alert(`Photo non placée : ${e instanceof Error ? e.message : e}`);
+            } finally {
+              uploading.current.delete(id);
+              setTick((t) => t + 1);
+            }
+          }}
+        />
+      )}
       {sketching && items[sketching]?.data.sketch && (
         <SketchEditor
           initial={items[sketching].data.sketch!}
@@ -4112,6 +4165,93 @@ function SketchEditor({ initial, onCancel, onDone }: { initial: Sketch; onCancel
         <button onClick={() => onDone({ w: W, h: H, strokes })} className="h-10 px-6 rounded-full bg-emerald-500 text-white text-[13px] font-medium">
           Terminer
         </button>
+      </div>
+    </div>
+  );
+}
+
+type LibraryImage = { id: string; boardId: string; boardTitle: string; src: string; width: number; height: number };
+
+/** Case photo vide : choisir une photo déjà posée dans le projet (toutes planches), ou importer depuis l'ordinateur. */
+function SlotPicker({
+  endpoint,
+  onClose,
+  onImport,
+  onPick,
+}: {
+  endpoint: string;
+  onClose: () => void;
+  onImport: () => void;
+  onPick: (img: LibraryImage) => void;
+}) {
+  const [images, setImages] = useState<LibraryImage[] | null>(null);
+  const [error, setError] = useState("");
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    let alive = true;
+    fetch(endpoint, { cache: "no-store" })
+      .then(async (r) => {
+        const json = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(json.error || `Erreur ${r.status}`);
+        if (alive) setImages(json.images ?? []);
+      })
+      .catch((e) => alive && setError(e instanceof Error ? e.message : String(e)));
+    const key = (e: KeyboardEvent) => e.key === "Escape" && close.current();
+    window.addEventListener("keydown", key);
+    return () => {
+      alive = false;
+      window.removeEventListener("keydown", key);
+    };
+  }, [endpoint]);
+
+  // Regroupées par planche, dans l'ordre reçu (le tableau ouvert d'abord).
+  const groups: { title: string; list: LibraryImage[] }[] = [];
+  for (const img of images ?? []) {
+    const g = groups.find((x) => x.title === img.boardTitle);
+    if (g) g.list.push(img);
+    else groups.push({ title: img.boardTitle, list: [img] });
+  }
+
+  return (
+    <div data-ui className="absolute inset-0 z-[300000] flex items-center justify-center bg-black/50 p-3" onPointerDown={onClose}>
+      <div
+        className="bg-bg text-ink border border-line shadow-2xl rounded-[6px] w-full max-w-[720px] max-h-[82vh] flex flex-col"
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-line">
+          <p className="text-sm font-medium flex-1">Choisir une photo</p>
+          <button onClick={onImport} className="h-9 px-4 rounded-full bg-ink text-bg text-[13px] flex items-center gap-2">
+            <UploadIcon className="w-4 h-4" />
+            Importer depuis l&apos;ordinateur
+          </button>
+          <button onClick={onClose} aria-label="Fermer" className="w-9 h-9 flex items-center justify-center text-muted hover:text-ink">
+            <CloseIcon className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="overflow-y-auto p-4 space-y-5">
+          {error ? (
+            <p className="text-sm text-danger">{error}</p>
+          ) : !images ? (
+            <p className="text-sm text-muted">Chargement des photos du projet…</p>
+          ) : !images.length ? (
+            <p className="text-sm text-muted">Aucune photo dans ce projet pour l&apos;instant : importez-en une depuis l&apos;ordinateur.</p>
+          ) : (
+            groups.map((g) => (
+              <section key={g.title}>
+                <p className="text-[11px] uppercase tracking-widest text-muted mb-2">{g.title || "Sans titre"}</p>
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                  {g.list.map((img) => (
+                    <button key={img.id} onClick={() => onPick(img)} className="relative aspect-square overflow-hidden rounded-[3px] bg-bg-soft hover:ring-2 hover:ring-emerald-500">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img.src} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );

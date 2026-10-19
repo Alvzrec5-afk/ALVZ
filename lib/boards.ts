@@ -720,3 +720,78 @@ export async function resolveSharedBoard(slug: string, subId?: string | null) {
   const path = chain.slice(at).map((b) => ({ id: b.id, title: b.title }));
   return { root, board: path[path.length - 1], path };
 }
+
+/** Tous les tableaux d'un projet : on remonte au tableau principal, puis on prend toutes ses planches. */
+async function projectBoards(db: SupabaseClient, boardId: string) {
+  let root = boardId;
+  for (let depth = 0; depth < 25; depth++) {
+    const { data } = await db.from("boards").select("parent_id").eq("id", root).maybeSingle();
+    if (!data?.parent_id) break;
+    root = data.parent_id as string;
+  }
+  const titles = new Map<string, string>();
+  const { data: top } = await db.from("boards").select("id, title").eq("id", root).is("deleted_at", null).maybeSingle();
+  if (!top) return titles;
+  titles.set(top.id as string, top.title as string);
+  for (let level = [root], depth = 0; level.length && depth < 25 && titles.size < 500; depth++) {
+    const { data } = await db.from("boards").select("id, title").in("parent_id", level).is("deleted_at", null);
+    level = (data ?? []).map((b) => b.id as string).filter((id) => !titles.has(id));
+    for (const b of data ?? []) titles.set(b.id as string, b.title as string);
+  }
+  return titles;
+}
+
+export type LibraryImage = { id: string; boardId: string; boardTitle: string; src: string; width: number; height: number };
+
+/** Photos déjà posées dans le projet (toutes planches), pour remplir une case photo vide. Celles du tableau ouvert d'abord. */
+export async function projectImages(db: SupabaseClient, boardId: string): Promise<LibraryImage[]> {
+  const titles = await projectBoards(db, boardId);
+  if (!titles.size) return [];
+  const { data } = await db
+    .from("board_items")
+    .select("id, board_id, data, z")
+    .in("board_id", [...titles.keys()])
+    .eq("kind", "image")
+    .gt("size_bytes", 0)
+    .is("deleted_at", null)
+    .limit(1000);
+  const rows = (data ?? []).filter((r) => {
+    const d = r.data as BoardData | null;
+    return !d?.video && !d?.media;
+  });
+  // Une même photo collée plusieurs fois n'apparaît pas en double : on ne peut pas le savoir sans lire les fichiers,
+  // alors on se contente de trier (tableau ouvert, puis les autres planches) et de borner à 300.
+  rows.sort((a, b) => Number(b.board_id === boardId) - Number(a.board_id === boardId) || String(a.board_id).localeCompare(String(b.board_id)) || Number(b.z) - Number(a.z));
+  return Promise.all(
+    rows.slice(0, 300).map(async (r) => {
+      const d = (r.data ?? {}) as BoardData;
+      return {
+        id: r.id as string,
+        boardId: r.board_id as string,
+        boardTitle: titles.get(r.board_id as string) ?? "",
+        src: await presignGet(boardImageKey(r.board_id as string, r.id as string)),
+        width: d.width ?? 4,
+        height: d.height ?? 3,
+      };
+    }),
+  );
+}
+
+/** Remplit une case photo vide avec une copie d'une photo du même projet. */
+export async function fillSlotFrom(db: SupabaseClient, boardId: string, itemId: string, fromId: string) {
+  if (!isUuid(itemId) || !isUuid(fromId)) throw new Error("Requête invalide");
+  const [{ data: slot }, { data: from }] = await Promise.all([
+    db.from("board_items").select("id, board_id, kind, data, size_bytes").eq("id", itemId).eq("board_id", boardId).is("deleted_at", null).maybeSingle(),
+    db.from("board_items").select("id, board_id, kind, data, size_bytes").eq("id", fromId).is("deleted_at", null).maybeSingle(),
+  ]);
+  if (!slot || slot.kind !== "image") throw new Error("Case photo introuvable");
+  const src = from?.data as BoardData | null;
+  if (!from || from.kind !== "image" || !(Number(from.size_bytes) > 0) || src?.video || src?.media) throw new Error("Photo introuvable");
+  if (!(await projectBoards(db, boardId)).has(from.board_id as string)) throw new Error("Photo d'un autre projet");
+  await copyObject(boardImageKey(from.board_id as string, fromId), boardImageKey(boardId, itemId));
+  const data: BoardData = { ...((slot.data ?? {}) as BoardData), width: src?.width ?? 4, height: src?.height ?? 3, crop: undefined, video: undefined, media: undefined };
+  const { error } = await db.from("board_items").update({ size_bytes: from.size_bytes, data: cleanData("image", data) }).eq("id", itemId);
+  if (error) throw new Error(error.message);
+  await db.from("boards").update({ updated_at: new Date().toISOString() }).eq("id", boardId);
+  return { src: await presignGet(boardImageKey(boardId, itemId)), width: data.width!, height: data.height!, sizeBytes: Number(from.size_bytes) };
+}
