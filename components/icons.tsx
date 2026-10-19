@@ -275,3 +275,32 @@ export const UploadIcon = ({ className = "w-5 h-5" }: P) => (
     <path d="M12 20v-8m0 0-3 3m3-3 3 3" />
   </svg>
 );
+/** Document joint (PDF, Word, Excel…). */
+export const FileIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <path d="M6.5 3.5h7l4 4v13h-11z" />
+    <path d="M13.5 3.5v4h4M9 12.5h6M9 15.5h6" />
+  </svg>
+);
+/** Son (fichier audio). */
+export const AudioIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <path d="M4 10.5v3M7.5 8v8M11 5v14M14.5 8.5v7M18 10v4M21 11.5v1" />
+  </svg>
+);
+/** Carte géographique (adresse). */
+export const MapIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <path d="M12 21s-6-5.3-6-10.5a6 6 0 0 1 12 0C18 15.7 12 21 12 21Z" />
+    <circle cx="12" cy="10.5" r="2.2" />
+  </svg>
+);
+/** Storyboard : cases d'images reliées. */
+export const StoryboardIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <rect x="2.5" y="6.5" width="5.5" height="5" rx="0.8" />
+    <rect x="9.25" y="6.5" width="5.5" height="5" rx="0.8" />
+    <rect x="16" y="6.5" width="5.5" height="5" rx="0.8" />
+    <path d="M2.5 15h5.5M9.25 15h5.5M16 15h5.5M2.5 17.5h4M9.25 17.5h4M16 17.5h4" />
+  </svg>
+);

@@ -176,3 +176,24 @@ export async function readBoardVideo(file: File, maxBytes: number) {
     URL.revokeObjectURL(url);
   }
 }
+
+const AUDIO_EXT: Record<string, string> = { mp3: "audio/mpeg", m4a: "audio/mp4", aac: "audio/aac", wav: "audio/wav", ogg: "audio/ogg", oga: "audio/ogg", flac: "audio/flac", weba: "audio/webm" };
+
+/** Type d'un son, d'après le fichier ou son extension ("" si ce n'est pas un son pris en charge). */
+export function audioType(file: File) {
+  const t = file.type === "audio/x-m4a" ? "audio/mp4" : file.type === "audio/x-wav" ? "audio/wav" : file.type;
+  if (t.startsWith("audio/")) return t;
+  return AUDIO_EXT[file.name.split(".").pop()?.toLowerCase() ?? ""] ?? "";
+}
+
+/** Son ou document joint à un tableau : envoyé tel quel, 50 Mo au plus, extension contrôlée pour les documents. */
+export function readBoardFile(file: File, media: "audio" | "document", maxBytes: number, documentExtensions: string[]) {
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+  const type = media === "audio" ? audioType(file) : file.type || "application/octet-stream";
+  if (media === "audio" && !type) throw new Error("Format audio non pris en charge (MP3, M4A, WAV, AAC, OGG ou FLAC)");
+  if (media === "document" && !documentExtensions.includes(ext)) {
+    throw new Error(`Type de document non pris en charge (${documentExtensions.map((e) => e.toUpperCase()).join(", ")})`);
+  }
+  if (file.size > maxBytes) throw new Error(`Fichier trop lourd (${Math.round(file.size / 1024 / 1024)} Mo, ${Math.round(maxBytes / 1024 / 1024)} Mo au plus)`);
+  return { blob: file as Blob, type, width: 4, height: 1, fileName: file.name.slice(0, 200) };
+}

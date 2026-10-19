@@ -77,6 +77,12 @@ fond : Coller ici (`pasteCards(raw, at)`), nouvelle note / liste ici, tout séle
 Taille du texte : `data.fontSize` (multiplie 13 px, `FONT_SIZES`, bouton « AA » de la barre). Image rognée :
 `data.crop` (fractions, non destructif, `CropEditor` avec formats 1:1, 4:5…). Flèche courbe : `data.bend`
 (décalage perpendiculaire, poignée verte au milieu, double-clic = droite ; courbe quadratique dans `geom.arrows`).
+Menu « … » de la barre (`moreTools`, panneau `more`) : **Croquis** = note avec `data.sketch` (traits, `SketchEditor` /
+`SketchView`, `cleanSketch` côté serveur) ; **Nuancier** = 5 cartes couleur côte à côte ; **Document** / **Audio** = carte
+`image` avec `data.media` (« document » | « audio »), `fileName`, `fileType` (50 Mo, studio, `readBoardFile`, extensions
+`BOARD_DOCUMENT_EXTENSIONS`, document servi en téléchargement) ; **Carte** = lien avec `data.place` (plan Google Maps
+intégré, « Explorer » pour le manipuler ; `place` gardé même vide) ; **Vidéo** = sélecteur vidéo ; **Titre** = note
+`data.heading` (grand texte sans fond). Champ de fichier `mediaRef` + `mediaPick` ; genre deviné par `mediaKindOf`.
 Vidéos (studio) : carte `image` avec `data.video = true` (mp4 / mov / webm, 50 Mo au plus, `MAX_BOARD_VIDEO_BYTES`
 dans `lib/board-types.ts`), envoyée telle quelle (`readBoardVideo`, `prepareMedia`) au même endroit qu'une image
 (`boardImageKey`, Content-Type vidéo à l'envoi). Lue en boucle, muette, `crossOrigin="anonymous"` ; bouton ▶ =

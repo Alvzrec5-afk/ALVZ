@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_WIDTH,
+  BOARD_DOCUMENT_EXTENSIONS,
+  MAX_BOARD_FILE_BYTES,
   MAX_BOARD_VIDEO_BYTES,
   MAX_WIDTH,
   MIN_WIDTH,
@@ -18,13 +20,22 @@ import {
   type BoardKind,
   type BoardOp,
   type NoteColor,
+  type Sketch,
+  type SketchStroke,
+  SKETCH_COLORS,
   linkEmbed,
 } from "@/lib/board-types";
-import { makeBoardImage, readBoardVideo, videoType } from "@/lib/client/image";
+import { audioType, makeBoardImage, readBoardFile, readBoardVideo, videoType } from "@/lib/client/image";
 import { groupZipImages, isImageName, isTextName, parseMilanoteText, readZip } from "@/lib/client/milanote";
 import {
+  AudioIcon,
   BoardIcon,
   CameraIcon,
+  DotsIcon,
+  FileIcon,
+  MapIcon,
+  StoryboardIcon,
+  TypeIcon,
   ChecklistIcon,
   ClockIcon,
   MoneyIcon,
@@ -56,6 +67,25 @@ type Items = Record<string, BoardItem>;
 type View = { x: number; y: number; k: number };
 type Box = { x: number; y: number; w: number; h: number };
 type Editing = { id: string; field?: string } | null;
+/** Genre de fichier choisi dans le menu « … » (sinon deviné d'après le fichier). */
+type MediaPick = "image" | "video" | "audio" | "document";
+
+/** Genre d'un fichier déposé ou choisi : photo pour tout le monde ; vidéo, son, document pour le studio. */
+function mediaKindOf(file: File, role: "admin" | "client"): MediaPick | null {
+  if (file.type.startsWith("image/") || /\.(jpe?g|png|webp|heic|heif|avif|gif)$/i.test(file.name)) return "image";
+  if (role !== "admin") return null;
+  if (videoType(file)) return "video";
+  if (audioType(file)) return "audio";
+  if (BOARD_DOCUMENT_EXTENSIONS.includes(file.name.split(".").pop()?.toLowerCase() ?? "")) return "document";
+  return null;
+}
+
+/** Champs de la carte selon le fichier préparé (vidéo, son, document). */
+function mediaData(p: { video: boolean; media?: "audio" | "document"; fileName?: string; type: string }): BoardData {
+  if (p.video) return { video: true };
+  if (p.media) return { media: p.media, fileName: p.fileName, fileType: p.type };
+  return {};
+}
 
 type Props = {
   initialItems: BoardItem[];
@@ -139,6 +169,7 @@ const BOARD_ICONS: Record<string, typeof BoardIcon> = {
   shotlist: ChecklistIcon,
   checklist: CameraIcon,
   timeline: ClockIcon,
+  storyboard: StoryboardIcon,
   photo: ImageIcon,
   video: FilmIcon,
   notes: NoteIcon,
@@ -287,6 +318,11 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     [setGroup],
   );
   const [cropping, setCropping] = useState<string | null>(null); // image en cours de recadrage
+  const [sketching, setSketching] = useState<string | null>(null); // croquis en cours de dessin
+  // Menu « … » de la barre d'outils (Croquis, Nuancier, Document…) : position du bouton qui l'ouvre.
+  const [more, setMore] = useState<DOMRect | null>(null);
+  const mediaRef = useRef<HTMLInputElement>(null);
+  const [mediaPick, setMediaPick] = useState<MediaPick>("image");
   const [capturing, setCapturing] = useState<string | false>(false);
   const worldRef = useRef<HTMLDivElement>(null);
   // Menu du clic droit : position à l'écran (dans le tableau), point du tableau visé, carte visée.
@@ -725,6 +761,38 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       const it = create("table", { cells: Array.from({ length: 3 }, () => ["", "", ""]) }, at, extra);
       setEditing({ id: it.id, field: "c:0:0" });
     });
+  const addHeading = (at?: At, extra?: Extra) =>
+    ensureName(() => {
+      const it = create("note", { text: "", color: "blanc", heading: true, fontSize: 2.2 }, at, { w: 420, ...extra });
+      setEditing({ id: it.id });
+    });
+  const addSketch = (at?: At, extra?: Extra) =>
+    ensureName(() => {
+      const it = create("note", { text: "", color: "blanc", sketch: { w: 600, h: 420, strokes: [] } }, at, { w: 320, ...extra });
+      setSketching(it.id);
+    });
+  const addMap = (at?: At, extra?: Extra) =>
+    ensureName(() => {
+      const it = create("link", { url: "", title: "", place: "" }, at, extra);
+      setEditing({ id: it.id });
+    });
+  /** Nuancier : cinq couleurs côte à côte, à renommer et changer. */
+  const addPalette = (at?: At) => {
+    const c = at ?? viewCenter();
+    const x0 = Math.round(c.x - (at ? 0 : (5 * 170 - 10) / 2));
+    const y0 = Math.round(c.y - (at ? 0 : 60));
+    const hexes = ["#e04a33", "#d98b5f", "#d4a017", "#4f7a4a", "#2f6690"];
+    const made = hexes.map((hex, i) => create("color", { hex, title: "" }, { x: x0 + i * 170, y: y0 }));
+    setSelected(null);
+    setGroup(made.map((m) => m.id));
+  };
+  /** Choisir un fichier d'un genre précis (menu « … ») : vidéo, son ou document. */
+  const pickMedia = (kind: MediaPick) =>
+    ensureName(() => {
+      setMediaPick(kind);
+      // Laisse React mettre à jour les formats acceptés avant d'ouvrir le sélecteur.
+      requestAnimationFrame(() => mediaRef.current?.click());
+    });
   const addComment = (at?: At, extra?: Extra) =>
     ensureName(() => {
       const it = create("comment", {}, at, { comments: [], ...extra });
@@ -776,11 +844,18 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
 
   const imageDrop = useRef<{ at: At; extra?: Extra } | null>(null);
 
-  /** Photo (préparée en JPEG) ou, pour le studio, petite vidéo (envoyée telle quelle). */
+  /**
+   * Photo (préparée en JPEG) ou, pour le studio, petite vidéo, son ou document (envoyés tels quels).
+   * Sans `as`, le genre se devine d'après le fichier.
+   */
   const prepareMedia = useCallback(
-    async (file: File) => {
-      if (role === "admin" && videoType(file)) return { ...(await readBoardVideo(file, MAX_BOARD_VIDEO_BYTES)), video: true };
-      return { ...(await makeBoardImage(file)), type: "image/jpeg", video: false };
+    async (file: File, as?: MediaPick) => {
+      const kind = as && as !== "image" ? as : mediaKindOf(file, role);
+      if (kind === "video") return { ...(await readBoardVideo(file, MAX_BOARD_VIDEO_BYTES)), video: true, media: undefined, fileName: undefined };
+      if (kind === "audio" || kind === "document") {
+        return { ...readBoardFile(file, kind, MAX_BOARD_FILE_BYTES, BOARD_DOCUMENT_EXTENSIONS), video: false, media: kind };
+      }
+      return { ...(await makeBoardImage(file)), type: "image/jpeg", video: false, media: undefined, fileName: undefined };
     },
     [role],
   );
@@ -795,24 +870,23 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       at?: { x: number; y: number },
       place?: (i: number, size: { width: number; height: number }) => Partial<BoardItem>,
       onProgress?: (done: number) => void,
+      as?: MediaPick,
     ) => {
-      const images = files.filter(
-        (f) => f.type.startsWith("image/") || /\.(jpe?g|png|webp|heic|heif|avif|gif)$/i.test(f.name) || (role === "admin" && Boolean(videoType(f))),
-      );
+      const images = as && as !== "image" ? files : files.filter((f) => mediaKindOf(f, role) !== null);
       const failed: string[] = [];
       for (const [i, file] of images.entries()) {
         onProgress?.(i);
         const pos = at ? { x: at.x + i * 30, y: at.y + i * 30 } : undefined;
         let prepared: Awaited<ReturnType<typeof prepareMedia>>;
         try {
-          prepared = await prepareMedia(file);
+          prepared = await prepareMedia(file, as);
         } catch (e) {
           failed.push(`${file.name} : ${e instanceof Error ? e.message : e}`);
           continue;
         }
         const id = crypto.randomUUID();
         uploading.current.add(id);
-        const it = create("image", { caption: "", width: prepared.width, height: prepared.height, ...(prepared.video ? { video: true } : {}) }, pos, {
+        const it = create("image", { caption: "", width: prepared.width, height: prepared.height, ...mediaData(prepared) }, pos, {
           id,
           src: URL.createObjectURL(prepared.blob),
           ...place?.(i, prepared),
@@ -832,11 +906,11 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
             const res = await fetch(imageEndpoint, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ itemId: it.id, size: prepared.blob.size, type: prepared.type }),
+              body: JSON.stringify({ itemId: it.id, size: prepared.blob.size, type: prepared.type, media: prepared.media }),
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(json.error || `Erreur ${res.status}`);
-            const put = await fetch(json.url, { method: "PUT", headers: { "Content-Type": prepared.type }, body: prepared.blob });
+            const put = await fetch(json.url, { method: "PUT", headers: { "Content-Type": json.contentType ?? prepared.type }, body: prepared.blob });
             if (!put.ok) throw new Error(`Envoi refusé (${put.status})`);
           }
           uploading.current.delete(id);
@@ -870,17 +944,17 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         return;
       }
       uploading.current.add(id);
-      const media = prepared.video ? { video: true, crop: undefined } : { video: undefined };
+      const media = { video: undefined, media: undefined, fileName: undefined, fileType: undefined, ...mediaData(prepared), ...(prepared.video || prepared.media ? { crop: undefined } : {}) };
       update(id, { src: URL.createObjectURL(prepared.blob), data: { ...it.data, ...media, width: prepared.width, height: prepared.height } }, false);
       try {
         const res = await fetch(imageEndpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ itemId: id, size: prepared.blob.size, type: prepared.type }),
+          body: JSON.stringify({ itemId: id, size: prepared.blob.size, type: prepared.type, media: prepared.media }),
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(json.error || `Erreur ${res.status}`);
-        const put = await fetch(json.url, { method: "PUT", headers: { "Content-Type": prepared.type }, body: prepared.blob });
+        const put = await fetch(json.url, { method: "PUT", headers: { "Content-Type": json.contentType ?? prepared.type }, body: prepared.blob });
         if (!put.ok) throw new Error(`Envoi refusé (${put.status})`);
         uploading.current.delete(id);
         const latest = itemsRef.current[id];
@@ -1441,6 +1515,8 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     const key = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t.closest("input, textarea")) return;
+      // Pendant un croquis, le clavier sert à l'éditeur (Cmd + Z = annuler le trait), pas au tableau.
+      if (document.querySelector("[data-sketch-editor]")) return;
       if (e.key === " ") spaceDown.current = true;
       if ((e.metaKey || e.ctrlKey) && (e.key === "c" || e.key === "x") && !e.shiftKey) {
         if (!copySelection()) return;
@@ -1610,13 +1686,17 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
   const finishEdit = (it: BoardItem) => {
     setEditing((cur) => (cur?.id === it.id ? null : cur));
     const cur = itemsRef.current[it.id];
-    if (cur?.kind === "note" && !cur.data.text?.trim()) remove(it.id);
-    if (cur?.kind === "link" && !cur.data.url?.trim() && !cur.data.text) remove(it.id);
+    if (cur?.kind === "note" && !cur.data.text?.trim() && !cur.data.sketch) remove(it.id);
+    if (cur?.kind === "link" && (cur.data.place !== undefined ? !cur.data.place.trim() : !cur.data.url?.trim() && !cur.data.text)) remove(it.id);
   };
 
   const startEdit = (it: BoardItem) => {
     if (!canEdit(it)) return;
     setSelected(it.id);
+    if (it.kind === "note" && it.data.sketch) {
+      setSketching(it.id);
+      return;
+    }
     setEditing({
       id: it.id,
       field:
@@ -1644,9 +1724,12 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     // Mode flèche : la carte entière se choisit d'un toucher (cases, liens et textes inactifs).
     const pickable = arrowMode ? "cursor-crosshair [&_*]:pointer-events-none" : "";
     const firstPick = arrowMode?.from === it.id;
+    const heading = it.kind === "note" && it.data.heading;
     const shell =
       it.kind === "column"
         ? "p-2.5 border border-line"
+        : heading
+          ? `border ${isSel || inGroup ? "border-line" : "border-transparent"}`
         : `border border-line shadow-[0_1px_3px_rgba(0,0,0,0.08)] ${isDrag ? "shadow-[0_12px_30px_rgba(0,0,0,0.18)] rotate-[0.6deg]" : ""}`;
     return (
       <div
@@ -1661,7 +1744,9 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
                 (it.data.color && it.data.color !== "blanc" ? noteBg(it.data.color) : "color-mix(in srgb, var(--ink) 4%, var(--bg-soft))")
               : it.kind === "color"
                 ? "var(--bg)"
-                : noteBg(it.data.color, it.data.hex),
+                : heading && !it.data.hex && (!it.data.color || it.data.color === "blanc")
+                  ? "transparent"
+                  : noteBg(it.data.color, it.data.hex),
           // Colonne : seul son en-tête prend la couleur de texte (ses cartes gardent la leur).
           ...(it.kind !== "color" && it.kind !== "column" ? inkStyle(it.data) : null),
           outline: isSel || firstPick || inGroup ? "2px solid #10b981" : undefined,
@@ -1677,19 +1762,46 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           else if (it.kind !== "column" || (e.target as HTMLElement).closest("[data-col-head]")) startEdit(it);
         }}
       >
-        {it.kind === "note" && (
-          <div className="px-3.5 py-3">
+        {it.kind === "note" && it.data.sketch && (
+          <SketchView sketch={it.data.sketch} />
+        )}
+        {it.kind === "note" && (!it.data.sketch || it.data.text || ed) && (
+          <div className={heading ? "px-1.5 py-1 font-semibold leading-tight" : "px-3.5 py-3"}>
             {ed ? (
-              <AutoTextarea value={it.data.text ?? ""} onChange={(text) => updateData(it.id, { text })} onDone={() => finishEdit(it)} placeholder="Écrivez…" />
+              <AutoTextarea
+                value={it.data.text ?? ""}
+                onChange={(text) => updateData(it.id, { text })}
+                onDone={() => finishEdit(it)}
+                placeholder={heading ? "Titre" : it.data.sketch ? "Légende du croquis" : "Écrivez…"}
+              />
             ) : (
-              <NoteText text={it.data.text ?? ""} />
+              <NoteText text={it.data.text ?? ""} placeholder={heading ? "Titre" : undefined} />
             )}
           </div>
         )}
 
         {it.kind === "image" && (
           <div>
-            {it.src ? (
+            {it.src && it.data.media === "audio" ? (
+              <div className="px-3.5 pt-3 pb-2.5">
+                <p className="flex items-center gap-2 text-xs min-w-0">
+                  <AudioIcon className="w-4 h-4 shrink-0" />
+                  <span className="truncate">{it.data.fileName || "Son"}</span>
+                </p>
+                <audio data-nodrag controls preload="metadata" src={it.src} className="block w-full h-9 mt-2" />
+              </div>
+            ) : it.src && it.data.media === "document" ? (
+              <a data-nodrag href={it.src} target="_blank" rel="noreferrer noopener" className="flex items-center gap-3 px-3.5 py-3 min-w-0 hover:opacity-80">
+                <span className="relative w-10 h-12 shrink-0 border border-line rounded-[3px] flex items-end justify-center pb-1 text-[9px] font-semibold uppercase tracking-wide">
+                  <FileIcon className="absolute top-1 w-4 h-4 opacity-60" />
+                  {(it.data.fileName?.split(".").pop() ?? "").slice(0, 5)}
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-xs truncate">{it.data.fileName || "Document"}</span>
+                  <span className="block text-[11px] opacity-60">Ouvrir / télécharger</span>
+                </span>
+              </a>
+            ) : it.src ? (
               it.data.video ? (
                 // Petite vidéo : en boucle et sans le son ; le bouton l'ouvre en grand avec le son.
                 <div className="relative bg-black">
@@ -1915,6 +2027,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
 
   /** Carte « lien » : lecteur YouTube / Vimeo / Spotify / SoundCloud / Deezer, ou simple lien. */
   function renderLink(it: BoardItem, ed: Editing) {
+    if (it.data.place !== undefined) return renderMap(it, ed);
     const url = it.data.url ?? "";
     if (ed || !url) {
       return (
@@ -1991,6 +2104,62 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           <a data-nodrag href={url} target="_blank" rel="noreferrer noopener" className="inline-block max-w-full align-top text-xs truncate underline underline-offset-2 hover:opacity-80">
             {it.data.title || url.replace(/^https?:\/\/(www\.)?/, "")}
           </a>
+        </div>
+      </div>
+    );
+  }
+
+  /** Carte « Carte » : un lieu sur un plan Google Maps (on tape l'adresse). */
+  function renderMap(it: BoardItem, ed: Editing) {
+    const place = it.data.place ?? "";
+    const q = encodeURIComponent(place);
+    return (
+      <div>
+        {place && !ed && (
+          <div className="relative aspect-[4/3] bg-bg-soft overflow-hidden rounded-t-[2px]">
+            <iframe
+              src={`https://maps.google.com/maps?q=${q}&z=14&output=embed`}
+              title={place}
+              loading="lazy"
+              className={`absolute inset-0 w-full h-full border-0 ${playing === it.id ? "" : "pointer-events-none"}`}
+            />
+            {/* Le plan ne bouge qu'après un appui sur « Explorer » : sinon la carte se déplace comme les autres. */}
+            {playing !== it.id && (
+              <button
+                data-nodrag
+                onClick={() => setPlaying(it.id)}
+                className="absolute right-2 bottom-2 px-2.5 py-1 rounded-full bg-black/60 text-white text-[11px] hover:bg-black/80"
+              >
+                Explorer
+              </button>
+            )}
+          </div>
+        )}
+        <div className="px-3.5 py-2.5 flex items-center gap-2 min-w-0">
+          <MapIcon className="w-4 h-4 shrink-0 opacity-70" />
+          {ed ? (
+            <InlineInput
+              value={place}
+              onChange={(v) => updateData(it.id, { place: v })}
+              onDone={() => finishEdit(it)}
+              placeholder="Adresse ou lieu (ex. Tour Eiffel, Paris)"
+              className="text-xs"
+            />
+          ) : place ? (
+            <a
+              data-nodrag
+              href={`https://www.google.com/maps/search/?api=1&query=${q}`}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-xs truncate underline underline-offset-2 hover:opacity-80"
+            >
+              {place}
+            </a>
+          ) : (
+            <button data-nodrag disabled={!canEdit(it)} onClick={() => setEditing({ id: it.id })} className="text-xs text-muted text-left">
+              Tapez une adresse ou un lieu
+            </button>
+          )}
         </div>
       </div>
     );
@@ -2626,12 +2795,12 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       { label: "Ouvrir", hidden: one?.kind !== "board", run: close(() => one && openBoard(one)) },
       { label: "Ouvrir le lien", hidden: !(one?.kind === "link" && one.data.url), run: close(() => window.open(one!.data.url, "_blank", "noopener")) },
       {
-        label: one?.data.video ? "Voir la vidéo en grand" : "Voir l'image en grand",
+        label: one?.data.video ? "Voir la vidéo en grand" : one?.data.media ? "Ouvrir le fichier" : "Voir l'image en grand",
         hidden: !(one?.kind === "image" && one.src),
         run: close(() => window.open(one!.src!, "_blank", "noopener")),
       },
       { label: "Modifier", hidden: !one || one.kind === "arrow" || !canEdit(one), run: close(() => one && startEdit(one)) },
-      { label: "Rogner l'image", hidden: !(one?.kind === "image" && one.src && !one.data.video && canEdit(one)), run: close(() => one && setCropping(one.id)) },
+      { label: "Rogner l'image", hidden: !(one?.kind === "image" && one.src && !one.data.video && !one.data.media && canEdit(one)), run: close(() => one && setCropping(one.id)) },
       { label: "Redresser la flèche", hidden: !(one?.kind === "arrow" && one.data.bend && canEdit(one)), run: close(() => one && update(one.id, { data: { ...one.data, bend: undefined } })) },
       { sep: true },
       { label: "Copier", hint: "⌘C", run: close(() => void copySelection()) },
@@ -2671,6 +2840,8 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     edit?: boolean;
     active?: boolean;
     desktop?: boolean;
+    /** Ouvre le menu « … ». */
+    more?: boolean;
   };
   const tools: Tool[] = [
     { label: "Note", Icon: NoteIcon, run: () => addNote(), drop: addNote },
@@ -2693,7 +2864,18 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
     { label: "Commentaire", Icon: CommentIcon, run: () => addComment(), drop: addComment },
     { label: "Flèche", Icon: ConnectorIcon, run: () => setArrowMode((m) => (m ? null : { from: null })), edit: true, active: Boolean(arrowMode) },
     { label: "Importer", Icon: ImportIcon, run: () => setImportOpen(true), admin: true, desktop: true },
+    { label: "Plus", Icon: DotsIcon, run: () => {}, more: true, active: Boolean(more) },
   ];
+  /** Entrées du menu « … » (comme Milanote) ; `studio` : réservées au studio, `edit` : studio ou client autorisé à tout modifier. */
+  const moreTools: { label: string; Icon: typeof NoteIcon; run: () => void; studio?: boolean; edit?: boolean; tint: string }[] = [
+    { label: "Croquis", Icon: PencilIcon, run: () => addSketch(), tint: "#3a3a3a" },
+    { label: "Nuancier", Icon: PaletteIcon, run: () => addPalette(), edit: true, tint: "#c0395f" },
+    { label: "Document", Icon: FileIcon, run: () => pickMedia("document"), studio: true, tint: "#4a4a4a" },
+    { label: "Audio", Icon: AudioIcon, run: () => pickMedia("audio"), studio: true, tint: "#3f9b5a" },
+    { label: "Carte", Icon: MapIcon, run: () => addMap(), tint: "#3b78c2" },
+    { label: "Vidéo", Icon: FilmIcon, run: () => pickMedia("video"), studio: true, tint: "#2aa7b8" },
+    { label: "Titre", Icon: TypeIcon, run: () => addHeading(), tint: "transparent" },
+  ].filter((t) => (!t.studio || role === "admin") && (!t.edit || role === "admin" || clientEditAll));
   const visibleTools = tools.filter((t) => (!t.admin || role === "admin") && (!t.edit || role === "admin" || clientEditAll));
 
   /** Glisser un outil de la barre jusqu'au tableau (un simple clic marche toujours). */
@@ -2821,7 +3003,7 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
           onOpen={sel.kind === "board" ? () => openBoard(sel) : undefined}
           onIcon={sel.kind === "board" && role === "admin" ? (icon) => update(sel.id, { data: { ...sel.data, icon } }) : undefined}
           onFontSize={sel.kind !== "arrow" && sel.kind !== "image" ? (size) => applyFontSize([sel.id], size) : undefined}
-          onCrop={sel.kind === "image" && sel.src && !sel.data.video ? () => setCropping(sel.id) : undefined}
+          onCrop={sel.kind === "image" && sel.src && !sel.data.video && !sel.data.media ? () => setCropping(sel.id) : undefined}
           onDelete={() => remove(sel.id)}
         />
       )}
@@ -2841,6 +3023,82 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
         />
       )}
 
+      {more && (
+        <div data-ui className="fixed inset-0 z-[200005]" onPointerDown={() => setMore(null)}>
+          <div
+            className="absolute bg-bg border border-line shadow-xl rounded-[6px] p-3 grid grid-cols-3 gap-1 w-[282px]"
+            style={
+              window.innerWidth >= 640
+                ? { left: more.right + 8, top: Math.max(8, Math.min(more.top - 40, window.innerHeight - 330)) }
+                : { left: Math.max(8, Math.min(more.left - 100, window.innerWidth - 290)), bottom: window.innerHeight - more.top + 8 }
+            }
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {moreTools.map(({ label, Icon, run, tint }) => (
+              <button
+                key={label}
+                onClick={() => {
+                  setMore(null);
+                  run();
+                }}
+                className="flex flex-col items-center gap-1.5 py-2.5 rounded-[4px] text-[11px] text-muted hover:text-ink hover:bg-bg-soft"
+              >
+                <span
+                  className={`w-12 h-10 rounded-[4px] flex items-center justify-center ${tint === "transparent" ? "border border-dashed border-muted text-ink" : "text-white"}`}
+                  style={{ background: tint }}
+                >
+                  <Icon className="w-5 h-5" />
+                </span>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <input
+        ref={mediaRef}
+        type="file"
+        multiple
+        hidden
+        accept={
+          mediaPick === "video"
+            ? "video/mp4,video/quicktime,video/webm,.mov,.mp4,.m4v,.webm"
+            : mediaPick === "audio"
+              ? "audio/*,.mp3,.m4a,.wav,.aac,.ogg,.flac"
+              : mediaPick === "document"
+                ? BOARD_DOCUMENT_EXTENSIONS.map((e) => `.${e}`).join(",")
+                : "image/*"
+        }
+        onChange={(e) => {
+          const files = [...(e.target.files ?? [])];
+          e.target.value = "";
+          if (!files.length) return;
+          const kind = mediaPick;
+          void ensureName(async () => {
+            const failed = await uploadImages(files, undefined, undefined, undefined, kind);
+            if (failed.length) alert(`Fichier${failed.length > 1 ? "s" : ""} non envoyé${failed.length > 1 ? "s" : ""} :\n${failed.join("\n")}`);
+          });
+        }}
+      />
+      {sketching && items[sketching]?.data.sketch && (
+        <SketchEditor
+          initial={items[sketching].data.sketch!}
+          onCancel={() => {
+            const it = itemsRef.current[sketching];
+            // Croquis tout neuf abandonné sans un trait : la carte disparaît.
+            if (it && !it.data.sketch?.strokes.length && !it.data.text?.trim()) remove(sketching);
+            setSketching(null);
+          }}
+          onDone={(sketch) => {
+            const it = itemsRef.current[sketching];
+            if (it) {
+              if (!sketch.strokes.length && !it.data.text?.trim()) remove(sketching);
+              else update(sketching, { data: { ...it.data, sketch } });
+            }
+            setSketching(null);
+          }}
+        />
+      )}
       {cropping && items[cropping]?.src && (
         <CropEditor
           item={items[cropping]}
@@ -2909,14 +3167,19 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
             <button
               key={label}
               onPointerDown={(e) => startToolDrag(e, tool)}
-              onClick={() => {
+              onClick={(e) => {
                 if (suppressToolClick.current) {
                   suppressToolClick.current = false;
                   return;
                 }
+                if (tool.more) {
+                  const r = e.currentTarget.getBoundingClientRect();
+                  setMore((cur) => (cur ? null : r));
+                  return;
+                }
                 run();
               }}
-              title={tool.drop ? `${label} : cliquez, ou glissez sur le tableau` : desktop ? "Importer un tableau Milanote" : undefined}
+              title={tool.drop ? `${label} : cliquez, ou glissez sur le tableau` : desktop ? "Importer un tableau Milanote" : tool.more ? "Croquis, nuancier, document, audio, carte, vidéo, titre" : undefined}
               className={`${desktop ? "hidden sm:flex" : "flex"} shrink-0 flex-col items-center justify-center gap-1 w-[66px] h-[58px] text-[10px] transition-colors ${active ? "bg-emerald-500/15 text-emerald-600" : "text-muted hover:text-ink hover:bg-bg-soft"}`}
             >
               <Icon className="w-5 h-5" />
@@ -3071,8 +3334,8 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
   }
 }
 
-function NoteText({ text }: { text: string }) {
-  if (!text) return <p className="text-muted">Note vide</p>;
+function NoteText({ text, placeholder = "Commencez à taper…" }: { text: string; placeholder?: string }) {
+  if (!text) return <p className="text-muted">{placeholder}</p>;
   const [first, ...rest] = text.split("\n");
   return (
     <div className="whitespace-pre-wrap break-words">
@@ -3705,4 +3968,151 @@ function readableVideo(v: HTMLVideoElement) {
   } catch {
     return false;
   }
+}
+
+/** Tracé lissé d'un trait de croquis (courbes entre les milieux des points). */
+function sketchPath(p: number[]) {
+  if (p.length < 4) return p.length === 2 ? `M${p[0]} ${p[1]}l0.01 0` : "";
+  let d = `M${p[0]} ${p[1]}`;
+  for (let i = 2; i < p.length - 2; i += 2) {
+    const mx = (p[i] + p[i + 2]) / 2;
+    const my = (p[i + 1] + p[i + 3]) / 2;
+    d += `Q${p[i]} ${p[i + 1]} ${mx} ${my}`;
+  }
+  return `${d}L${p[p.length - 2]} ${p[p.length - 1]}`;
+}
+
+function SketchStrokes({ strokes }: { strokes: SketchStroke[] }) {
+  return (
+    <>
+      {strokes.map((st, i) => (
+        <path
+          key={i}
+          d={sketchPath(st.p)}
+          fill="none"
+          stroke={st.c === "ink" ? "currentColor" : st.c}
+          strokeWidth={st.s}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      ))}
+    </>
+  );
+}
+
+/** Croquis affiché sur la carte. */
+function SketchView({ sketch }: { sketch: Sketch }) {
+  return (
+    <svg viewBox={`0 0 ${sketch.w} ${sketch.h}`} className="block w-full h-auto pointer-events-none" aria-hidden>
+      <SketchStrokes strokes={sketch.strokes} />
+    </svg>
+  );
+}
+
+/** Dessin à main levée (doigt, stylet ou souris) : couleurs, épaisseurs, annuler le dernier trait. */
+function SketchEditor({ initial, onCancel, onDone }: { initial: Sketch; onCancel: () => void; onDone: (sketch: Sketch) => void }) {
+  const [strokes, setStrokes] = useState<SketchStroke[]>(initial.strokes);
+  const [color, setColor] = useState<string>("ink");
+  const [size, setSize] = useState(4);
+  const svg = useRef<SVGSVGElement>(null);
+  const live = useRef<SketchStroke | null>(null);
+  const W = initial.w;
+  const H = initial.h;
+
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        setStrokes((s) => s.slice(0, -1));
+      }
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [onCancel]);
+
+  const point = (e: React.PointerEvent) => {
+    const r = svg.current!.getBoundingClientRect();
+    const x = clamp(((e.clientX - r.left) / r.width) * W, 0, W);
+    const y = clamp(((e.clientY - r.top) / r.height) * H, 0, H);
+    return [Math.round(x * 10) / 10, Math.round(y * 10) / 10];
+  };
+  const down = (e: React.PointerEvent) => {
+    e.preventDefault();
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+    live.current = { c: color, s: size, p: point(e) };
+    setStrokes((s) => [...s, live.current!]);
+  };
+  const move = (e: React.PointerEvent) => {
+    const st = live.current;
+    if (!st) return;
+    const [x, y] = point(e);
+    const lx = st.p[st.p.length - 2];
+    const ly = st.p[st.p.length - 1];
+    if (Math.hypot(x - lx, y - ly) < 1.5) return;
+    st.p = [...st.p, x, y];
+    setStrokes((s) => [...s.slice(0, -1), { ...st }]);
+  };
+  const up = () => {
+    live.current = null;
+  };
+
+  return (
+    <div
+      data-ui
+      data-sketch-editor
+      className="absolute inset-0 z-[300000] flex flex-col items-center justify-center gap-3 bg-black/80 p-4"
+      onPointerDown={(e) => e.stopPropagation()}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <svg
+        ref={svg}
+        viewBox={`0 0 ${W} ${H}`}
+        className="bg-bg text-ink rounded-[4px] touch-none cursor-crosshair select-none"
+        style={{ width: `min(92vw, calc(68vh * ${W / H}))`, aspectRatio: `${W} / ${H}` }}
+        onPointerDown={down}
+        onPointerMove={move}
+        onPointerUp={up}
+        onPointerCancel={up}
+      >
+        <SketchStrokes strokes={strokes} />
+      </svg>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {SKETCH_COLORS.map((c) => (
+          <button
+            key={c}
+            onClick={() => setColor(c)}
+            aria-label={c === "ink" ? "Couleur du texte" : c}
+            className={`w-8 h-8 rounded-full border-2 ${color === c ? "border-emerald-400" : "border-white/30"}`}
+            style={{ background: c === "ink" ? "var(--ink)" : c }}
+          />
+        ))}
+        <span className="w-px h-6 bg-white/20 mx-1" />
+        {[2, 4, 9].map((n) => (
+          <button
+            key={n}
+            onClick={() => setSize(n)}
+            aria-label={`Épaisseur ${n}`}
+            className={`w-9 h-9 rounded-full flex items-center justify-center ${size === n ? "bg-white/25" : "bg-white/10 hover:bg-white/20"}`}
+          >
+            <span className="rounded-full bg-white" style={{ width: n + 2, height: n + 2 }} />
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <button onClick={() => setStrokes((s) => s.slice(0, -1))} disabled={!strokes.length} className="h-10 px-4 rounded-full bg-white/10 text-white text-[13px] hover:bg-white/20 disabled:opacity-40">
+          ↶ Annuler le trait
+        </button>
+        <button onClick={() => setStrokes([])} disabled={!strokes.length} className="h-10 px-4 rounded-full bg-white/10 text-white text-[13px] hover:bg-white/20 disabled:opacity-40">
+          Tout effacer
+        </button>
+        <button onClick={onCancel} className="h-10 px-5 rounded-full bg-white/10 text-white text-[13px] hover:bg-white/20">
+          Fermer
+        </button>
+        <button onClick={() => onDone({ w: W, h: H, strokes })} className="h-10 px-6 rounded-full bg-emerald-500 text-white text-[13px] font-medium">
+          Terminer
+        </button>
+      </div>
+    </div>
+  );
 }

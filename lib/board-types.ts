@@ -46,6 +46,17 @@ export type BoardData = {
   height?: number;
   /** Carte image qui contient en fait une petite vidéo (mp4 / mov / webm, 50 Mo au plus) : lue en boucle, sans le son. */
   video?: boolean;
+  /** Carte image qui contient un autre fichier (studio, 50 Mo au plus) : un son, ou un document (PDF, Word…). */
+  media?: "audio" | "document";
+  /** Fichier joint (son, document) : nom d'origine et type. */
+  fileName?: string;
+  fileType?: string;
+  /** Note « Titre » : grand texte, sans fond ni cadre. */
+  heading?: boolean;
+  /** Note « Croquis » : traits dessinés à la main, dans un cadre de `w` × `h`. */
+  sketch?: Sketch;
+  /** Lien « Carte » : adresse ou lieu montré sur un plan (Google Maps). */
+  place?: string;
   /** Flèche : cartes reliées. */
   from?: string;
   to?: string;
@@ -68,6 +79,16 @@ export type BoardData = {
 /** Petites vidéos posées dans un tableau (studio seulement) : 50 Mo au plus. */
 export const MAX_BOARD_VIDEO_BYTES = 50 * 1024 * 1024;
 export const BOARD_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
+/** Sons et documents joints (studio seulement) : même limite que les vidéos. */
+export const MAX_BOARD_FILE_BYTES = MAX_BOARD_VIDEO_BYTES;
+export const BOARD_AUDIO_TYPES = ["audio/mpeg", "audio/mp4", "audio/x-m4a", "audio/aac", "audio/wav", "audio/x-wav", "audio/ogg", "audio/webm", "audio/flac"];
+/** Documents acceptés, par extension (le type envoyé par le navigateur est souvent vide pour Pages, Keynote…). */
+export const BOARD_DOCUMENT_EXTENSIONS = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "key", "pages", "numbers", "txt", "csv", "rtf", "zip", "md"];
+
+/** Trait d'un croquis : couleur (« ink » = couleur du texte), épaisseur, points x,y à la suite. */
+export type SketchStroke = { c: string; s: number; p: number[] };
+export type Sketch = { w: number; h: number; strokes: SketchStroke[] };
+export const SKETCH_COLORS = ["ink", "#c0392b", "#2f6690", "#4f7a4a", "#d4a017", "#ffffff"] as const;
 
 /** Ce que le navigateur envoie pour créer ou modifier une carte. */
 export type BoardItemInput = {
@@ -198,7 +219,7 @@ function maker() {
 }
 
 /**
- * Tout nouveau tableau : six planches prêtes, comme le déroulé d'un projet (budget → timeline du tournage),
+ * Tout nouveau tableau : sept planches prêtes, comme le déroulé d'un projet (budget → timeline du tournage),
  * chacune déjà remplie. On supprime simplement ce qui ne sert pas.
  */
 export function starterKit(): Starter {
@@ -299,12 +320,22 @@ export function starterKit(): Starter {
     ...scenes.slice(1).map((col, i) => item("arrow", 0, 0, { from: scenes[i].id, to: col.id })),
   ]);
 
-  // 5. CHECK-LIST TOURNAGE — le matériel du studio (à adapter une fois dans le modèle des nouveaux tableaux).
+  // 5. STORYBOARD — huit scènes reliées par des flèches : une case photo et un texte chacune.
+  const frames = Array.from({ length: 8 }, (_, i) => item("column", 40 + i * 240, 40, { title: `Scène ${i + 1}` }, { w: 212 }));
+  const story = planche("5. STORYBOARD", "storyboard", [
+    ...frames.flatMap((col) => [
+      col,
+      ...inside(col, [item("image", 0, 0, { caption: "", width: 400, height: 300 }), item("note", 0, 0, { text: "", color: "blanc" })]),
+    ]),
+    ...frames.slice(1).map((col, i) => item("arrow", 0, 0, { from: frames[i].id, to: col.id })),
+  ]);
+
+  // 6. CHECK-LIST TOURNAGE — le matériel du studio (à adapter une fois dans le modèle des nouveaux tableaux).
   const list = (title: string, entries: (string | [string, number])[]) => ({
     title,
     items: entries.map((e) => ({ id: uid(), text: Array.isArray(e) ? e[0] : e, done: false, ...(Array.isArray(e) ? { indent: e[1] } : {}) })),
   });
-  const check = planche("5. CHECK-LIST TOURNAGE", "checklist", [
+  const check = planche("6. CHECK-LIST TOURNAGE", "checklist", [
     item("note", 40, 40, { text: "CHECK-LIST MATÉRIEL", hex: "#d98b5f" }, { w: 1320 }),
     item("todo", 40, 140, list("CAMERA", ["Sony FX30", "[Caméra 2]", "[Caméra 3]", "DJI osmo nano", "Batteries", "Chargeurs"]), { w: 430 }),
     item("todo", 485, 140, list("LUMIERE", ["NEWEER 150C", "ZHIYUN CINEPEER CF100", 'Softbox 90" + nid d\'abeille', "Pied de lumière", "Prises pour les lumières", "Multiprise"]), { w: 430 }),
@@ -328,12 +359,12 @@ export function starterKit(): Starter {
     item("comment", 485, 900, {}, { w: 430 }),
   ]);
 
-  // 6. TIMELINE TOURNAGE
-  const timeline = planche("6. TIMELINE TOURNAGE", "timeline", [
+  // 7. TIMELINE TOURNAGE
+  const timeline = planche("7. TIMELINE TOURNAGE", "timeline", [
     item("table", 40, 40, { cells: grid(["Heure", "Étape", "Lieu", "Notes"], [["", "Arrivée / installation", "", ""], ["", "Préparatifs", "", ""], ["", "Plan 1", "", ""], ["", "Pause", "", ""], ["", "Plan 2", "", ""], ["", "Fin / rangement", "", ""]]) }, { w: 760 }),
   ]);
 
-  const items = [budget, brief, mood, shot, check, timeline].map((p, i) =>
+  const items = [budget, brief, mood, shot, story, check, timeline].map((p, i) =>
     item("board", 40 + i * 230, 40, { title: p.title, icon: p.icon, boardId: p.boardId }),
   );
   return { items, planches };

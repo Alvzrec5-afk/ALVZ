@@ -25,7 +25,7 @@ import { storageUsage } from "@/lib/usage";
 
 export const BOARD_ITEM_FIELDS = "id, kind, x, y, w, z, parent_id, position, data, size_bytes, author, client_id";
 export const MAX_BOARD_IMAGE_BYTES = 4 * 1024 * 1024;
-export { BOARD_VIDEO_TYPES, MAX_BOARD_VIDEO_BYTES } from "@/lib/board-types";
+export { BOARD_AUDIO_TYPES, BOARD_DOCUMENT_EXTENSIONS, BOARD_VIDEO_TYPES, MAX_BOARD_FILE_BYTES, MAX_BOARD_VIDEO_BYTES } from "@/lib/board-types";
 const MAX_ITEMS = 2000;
 
 type Row = {
@@ -63,7 +63,7 @@ export async function loadBoardItems(db: SupabaseClient, boardId: string, actor:
   await Promise.all(
     empty.map(async (r) => {
       const size = await objectSize(boardImageKey(boardId, r.id));
-      if (size > 0 && size <= (r.data?.video ? MAX_BOARD_VIDEO_BYTES : MAX_BOARD_IMAGE_BYTES)) {
+      if (size > 0 && size <= (r.data?.video || r.data?.media ? MAX_BOARD_VIDEO_BYTES : MAX_BOARD_IMAGE_BYTES)) {
         r.size_bytes = size;
         await createServiceClient().from("board_items").update({ size_bytes: size }).eq("id", r.id).eq("size_bytes", 0);
       }
@@ -86,7 +86,10 @@ export async function loadBoardItems(db: SupabaseClient, boardId: string, actor:
       data: r.data ?? {},
       author: r.author,
       mine: actor.role === "admin" || Boolean(actor.canEditAll) || (r.client_id !== null && r.client_id === actor.clientId),
-      src: r.kind === "image" && r.size_bytes > 0 ? await presignGet(boardImageKey(boardId, r.id)) : null,
+      src:
+        r.kind === "image" && r.size_bytes > 0
+          ? await presignGet(boardImageKey(boardId, r.id), r.data?.media === "document" ? { downloadName: r.data.fileName || "document" } : {})
+          : null,
       sub: r.kind === "board" && r.data?.boardId ? subs.get(r.data.boardId) ?? null : undefined,
       comments: r.kind === "comment" ? comments.get(r.id) ?? [] : undefined,
     })),
@@ -159,7 +162,7 @@ async function subBoardPreviews(db: SupabaseClient, boardId: string) {
     .neq("kind", "arrow");
   for (const b of boards) {
     const mine = (items ?? []).filter((i) => i.board_id === b.id);
-    const images = mine.filter((i) => i.kind === "image" && Number(i.size_bytes) > 0 && !(i.data as BoardData | null)?.video).sort((x, y) => Number(y.z) - Number(x.z));
+    const images = mine.filter((i) => i.kind === "image" && Number(i.size_bytes) > 0 && !(i.data as BoardData | null)?.video && !(i.data as BoardData | null)?.media).sort((x, y) => Number(y.z) - Number(x.z));
     out.set(b.id as string, {
       title: b.title as string,
       count: mine.length,
@@ -207,6 +210,22 @@ function cleanData(kind: BoardKind, raw: BoardData): BoardData {
   return withTint(cleanKind(kind, d));
 }
 
+/** Croquis borné : 400 traits, 30 000 points en tout, coordonnées dans le cadre, arrondies au dixième. */
+function cleanSketch(k: BoardData["sketch"]): BoardData["sketch"] {
+  if (!k || typeof k !== "object" || !Array.isArray(k.strokes)) return undefined;
+  const w = Math.round(num(k.w, 50, 4000, 600));
+  const h = Math.round(num(k.h, 50, 4000, 400));
+  let budget = 30000;
+  const strokes = k.strokes.slice(0, 400).flatMap((st) => {
+    if (!st || !Array.isArray(st.p) || budget <= 0) return [];
+    const pts = st.p.slice(0, Math.min(st.p.length, budget * 2) & ~1).map((n, i) => Math.round(num(n, 0, i % 2 ? h : w) * 10) / 10);
+    budget -= pts.length / 2;
+    const c = st.c === "ink" || isHex(st.c) ? st.c.toLowerCase() : "ink";
+    return pts.length >= 2 ? [{ c, s: Math.round(num(st.s, 1, 40, 3) * 10) / 10, p: pts }] : [];
+  });
+  return { w, h, strokes };
+}
+
 /** Zone de recadrage valide (dans l'image, au moins 2 % de côté), sinon aucune. */
 function cleanCrop(c: BoardData["crop"]): BoardData["crop"] {
   if (!c || typeof c !== "object" || ![c.x, c.y, c.w, c.h].every((n) => Number.isFinite(Number(n)))) return undefined;
@@ -223,14 +242,23 @@ function cleanCrop(c: BoardData["crop"]): BoardData["crop"] {
 function cleanKind(kind: BoardKind, d: BoardData): BoardData {
   switch (kind) {
     case "note":
-      return { text: text(d.text, 5000) ?? "", color: d.color && d.color in NOTE_COLORS ? d.color : "blanc", hex: isHex(d.hex) ? d.hex.toLowerCase() : undefined };
+      return {
+        text: text(d.text, 5000) ?? "",
+        color: d.color && d.color in NOTE_COLORS ? d.color : "blanc",
+        hex: isHex(d.hex) ? d.hex.toLowerCase() : undefined,
+        heading: d.heading === true ? true : undefined,
+        sketch: cleanSketch(d.sketch),
+      };
     case "image":
       return {
         caption: text(d.caption, 300) ?? "",
         width: Math.round(num(d.width, 1, 10000, 4)),
         height: Math.round(num(d.height, 1, 10000, 3)),
-        crop: d.video === true ? undefined : cleanCrop(d.crop),
-        video: d.video === true ? true : undefined,
+        crop: d.video === true || d.media ? undefined : cleanCrop(d.crop),
+        video: d.video === true && !d.media ? true : undefined,
+        media: d.media === "audio" || d.media === "document" ? d.media : undefined,
+        fileName: d.media ? text(d.fileName, 200) : undefined,
+        fileType: d.media ? text(d.fileType, 100) : undefined,
       };
     case "todo":
       return {
@@ -258,7 +286,13 @@ function cleanKind(kind: BoardKind, d: BoardData): BoardData {
     case "link": {
       const url = text(d.url, 2000)?.trim() ?? "";
       // `text` : consigne affichée tant que le lien est vide (« Collez un lien depuis Spotify… »).
-      return { url: /^https?:\/\//i.test(url) ? url : "", title: text(d.title, 200) ?? "", text: text(d.text, 120) || undefined };
+      return {
+        url: /^https?:\/\//i.test(url) ? url : "",
+        title: text(d.title, 200) ?? "",
+        text: text(d.text, 120) || undefined,
+        // Carte « plan » : l'adresse est gardée même vide (c'est ce qui distingue un plan d'un lien).
+        place: typeof d.place === "string" ? d.place.trim().slice(0, 300) : undefined,
+      };
     }
     case "board":
       return { boardId: isUuid(d.boardId) ? d.boardId : undefined, title: text(d.title, 200) ?? "", icon: text(d.icon, 20) || undefined };
@@ -371,7 +405,13 @@ export async function applyBoardOps(
       if (row?.deleted_at) restoredSubBoards.push(data.boardId);
     }
     // Vidéo : seul le studio en pose (un client ne peut pas transformer une image en vidéo).
-    if (it.kind === "image" && actor.role === "client") data.video = (row?.data as BoardData | null)?.video;
+    if (it.kind === "image" && actor.role === "client") {
+      const before = row?.data as BoardData | null;
+      data.video = before?.video;
+      data.media = before?.media;
+      data.fileName = before?.fileName;
+      data.fileType = before?.fileType;
+    }
     const imageSrc = !row && it.kind === "image" && it.copyOf ? sourceOf.get(it.copyOf) : undefined;
     if (imageSrc?.kind === "image" && Number(imageSrc.size_bytes) > 0) {
       imageCopies.push({ from: boardImageKey(imageSrc.board_id as string, imageSrc.id as string), to: boardImageKey(boardId, it.id) });
@@ -395,7 +435,7 @@ export async function applyBoardOps(
           : imageSrc?.kind === "image" && Number(imageSrc.size_bytes) > 0
             ? imageSrc.size_bytes
             : it.kind === "image"
-              ? Math.round(num(it.sizeBytes, 0, data.video ? MAX_BOARD_VIDEO_BYTES : MAX_BOARD_IMAGE_BYTES))
+              ? Math.round(num(it.sizeBytes, 0, data.video || data.media ? MAX_BOARD_VIDEO_BYTES : MAX_BOARD_IMAGE_BYTES))
               : 0,
       // Toujours explicites : dans un envoi groupé, un champ absent serait remis à vide.
       ...(row
@@ -542,7 +582,7 @@ export async function duplicateBoard(
   return boardIds.get(sourceId)!;
 }
 
-/** Remplit un tableau vide avec les six planches de départ (`starterKit`). */
+/** Remplit un tableau vide avec les sept planches de départ (`starterKit`). */
 export async function fillStarter(db: SupabaseClient, boardId: string) {
   const kit = starterKit();
   // Les cartes « planche » créent leurs tableaux ; on remplit ensuite chacun d'eux.
@@ -552,7 +592,7 @@ export async function fillStarter(db: SupabaseClient, boardId: string) {
 
 /**
  * Le « Modèle des nouveaux tableaux » : un tableau que le studio modifie (check-list, budget…) ;
- * chaque nouveau tableau en est une copie. Créé avec les six planches de départ la première fois.
+ * chaque nouveau tableau en est une copie. Créé avec les sept planches de départ la première fois.
  */
 export async function templateBoardId(db: SupabaseClient) {
   const { data } = await db
