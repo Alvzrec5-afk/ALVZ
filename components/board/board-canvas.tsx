@@ -121,8 +121,10 @@ type Props = {
 const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 2.5;
 const POLL_MS = 30_000;
-/** Cartes qu'un client peut ajouter lui-même (images à part : envoi de fichier). Le serveur applique la même règle. */
+/** Cartes qu'un client peut ajouter lui-même (images à part : envoi de fichier ; plans : « lien » avec un lieu).
+ * Le serveur applique la même règle. */
 const CLIENT_ADDS: BoardKind[] = ["note", "comment", "color"];
+const clientCanAdd = (it: Pick<BoardItem, "kind" | "data">) => CLIENT_ADDS.includes(it.kind) || (it.kind === "link" && typeof it.data.place === "string");
 const LIVE_POLL_MS = 90_000;
 const IDLE_STOP_MS = 10 * 60_000;
 
@@ -652,8 +654,8 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
       } catch {
         return;
       }
-      // Un client ne colle que des notes, commentaires et couleurs (images et le reste appartiennent au studio).
-      const source = (parsed.items ?? []).filter((it) => role === "admin" || CLIENT_ADDS.includes(it.kind));
+      // Un client ne colle que ce qu'il peut créer lui-même (images et le reste appartiennent au studio).
+      const source = (parsed.items ?? []).filter((it) => role === "admin" || clientCanAdd(it));
       if (!source.length) return;
       const idMap = new Map(source.map((it) => [it.id, crypto.randomUUID()]));
       const tops = source.filter((it) => !it.parentId || !idMap.has(it.parentId)).filter((it) => it.kind !== "arrow");
@@ -809,10 +811,11 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
       setEditing({ id: it.id });
     });
   /** Nuancier (comme Milanote) : une couleur, avec le sélecteur ouvert tout de suite. */
-  const addSwatch = (at?: At, extra?: Extra) => {
-    const it = create("color", { hex: "#8abbd6", title: "" }, at, { w: 190, ...extra });
-    setColorPick(it.id);
-  };
+  const addSwatch = (at?: At, extra?: Extra) =>
+    ensureName(() => {
+      const it = create("color", { hex: "#8abbd6", title: "" }, at, { w: 190, ...extra });
+      setColorPick(it.id);
+    });
   /** Document écrit : une carte fermée (titre, nombre de mots) qui s'ouvre dans un éditeur de texte. */
   const addDoc = (at?: At, extra?: Extra) =>
     ensureName(() => {
@@ -3090,24 +3093,24 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
     { label: "Commentaire", Icon: CommentIcon, run: () => addComment(), drop: addComment, client: true },
     { label: "Flèche", Icon: ConnectorIcon, run: () => setArrowMode((m) => (m ? null : { from: null })), active: Boolean(arrowMode) },
     { label: "Importer", Icon: ImportIcon, run: () => setImportOpen(true), desktop: true },
-    { label: "Plus", Icon: DotsIcon, run: () => {}, more: true, active: Boolean(more) },
+    { label: "Plus", Icon: DotsIcon, run: () => {}, more: true, client: true, active: Boolean(more) },
   ];
   /** Entrées du menu « … » (comme Milanote) ; `studio` : réservées au studio, `edit` : studio ou client autorisé à tout modifier. */
   // Comme la barre : un clic crée la carte au milieu, un glisser-déposer la pose à l'endroit voulu (ou dans une colonne).
-  const moreList: (Tool & { tint: string })[] = [
+  const moreList: (Tool & { studio?: boolean; tint: string })[] = [
     { label: "Croquis", Icon: PencilIcon, run: () => addSketch(), drop: addSketch, tint: "#3a3a3a" },
     { label: "Nuancier", Icon: PaletteIcon, run: () => addSwatch(), drop: addSwatch, tint: "#c0395f" },
     { label: "Document", Icon: DocIcon, run: () => addDoc(), drop: addDoc, tint: "#4a4a4a" },
-    { label: "Importer doc", Icon: FileIcon, run: () => pickMedia("document"), drop: (at, extra) => pickMedia("document", at, extra), tint: "#6b6b6b" },
-    { label: "Audio", Icon: AudioIcon, run: () => pickMedia("audio"), drop: (at, extra) => pickMedia("audio", at, extra), tint: "#3f9b5a" },
+    { label: "Importer doc", Icon: FileIcon, run: () => pickMedia("document"), drop: (at, extra) => pickMedia("document", at, extra), studio: true, tint: "#6b6b6b" },
+    { label: "Audio", Icon: AudioIcon, run: () => pickMedia("audio"), drop: (at, extra) => pickMedia("audio", at, extra), studio: true, tint: "#3f9b5a" },
     { label: "Carte", Icon: MapIcon, run: () => addMap(), drop: addMap, tint: "#3b78c2" },
-    { label: "Vidéo", Icon: FilmIcon, run: () => pickMedia("video"), drop: (at, extra) => pickMedia("video", at, extra), tint: "#2aa7b8" },
+    { label: "Vidéo", Icon: FilmIcon, run: () => pickMedia("video"), drop: (at, extra) => pickMedia("video", at, extra), studio: true, tint: "#2aa7b8" },
     { label: "Titre", Icon: TypeIcon, run: () => addHeading(), drop: addHeading, tint: "transparent" },
   ];
   // Sans réseau : les outils qui envoient un fichier ou lisent le serveur sont mis de côté.
   const NEEDS_NETWORK = ["Image", "Images projet", "Importer", "Importer doc", "Audio", "Vidéo"];
-  // Client : seulement Image, Note, Commentaire et Couleur (pas de menu « … », pas d'« Images projet »).
-  const moreTools = role === "admin" ? moreList.filter((t) => !(offline && NEEDS_NETWORK.includes(t.label))) : [];
+  // Client : Image, Note, Couleur, Commentaire et le menu « … » sans les envois de fichiers (pas d'« Images projet »).
+  const moreTools = moreList.filter((t) => (role === "admin" || !t.studio) && !(offline && NEEDS_NETWORK.includes(t.label)));
   const visibleTools = tools.filter((t) => (role === "admin" || t.client) && !(offline && NEEDS_NETWORK.includes(t.label)));
 
   /** Nouvelle carte avec une photo ou vidéo du projet / de la banque : le serveur copie le fichier (comme un copier-coller). */

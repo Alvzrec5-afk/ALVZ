@@ -374,8 +374,13 @@ function cleanKind(kind: BoardKind, d: BoardData): BoardData {
 }
 
 const KINDS: BoardKind[] = ["note", "image", "todo", "column", "arrow", "board", "color", "link", "table", "comment"];
-/** Cartes qu'un client peut ajouter (en plus des images, qui passent par la route d'envoi) : notes, commentaires, couleurs. */
+/**
+ * Cartes qu'un client peut ajouter (en plus des images, qui passent par la route d'envoi) : notes (aussi croquis, document,
+ * titre), commentaires, couleurs (aussi nuancier), et les plans Google Maps du menu « … » (carte « lien » avec un lieu).
+ */
 const CLIENT_KINDS: BoardKind[] = ["note", "comment", "color"];
+const clientMay = (it: { kind: BoardKind; data?: BoardData | null }) =>
+  CLIENT_KINDS.includes(it.kind) || (it.kind === "link" && typeof it.data?.place === "string");
 
 /**
  * Applique une série de modifications. Toutes les cartes visées doivent appartenir au tableau ;
@@ -452,12 +457,11 @@ export async function applyBoardOps(
     let row = known.get(it.id);
     if (row && !owns(row)) throw new Error("Carte non modifiable");
     if (row && row.kind !== it.kind) throw new Error("Carte invalide");
-    const clientMay = (k: BoardKind) => CLIENT_KINDS.includes(k);
     // Conflit : la carte a été modifiée ailleurs depuis la version envoyée. Leur version reste en place ; la nôtre
     // est ajoutée juste à côté, comme une nouvelle carte (rien n'est perdu). Planches, flèches et discussions : la leur.
     if (row && !row.deleted_at && changedSince(row, o.base)) {
       const copyable =
-        !["board", "arrow", "comment"].includes(it.kind) && (actor.role === "admin" || (it.kind !== "image" && clientMay(it.kind)));
+        !["board", "arrow", "comment"].includes(it.kind) && (actor.role === "admin" || (it.kind !== "image" && clientMay(it)));
       if (!copyable) {
         conflicts.push({ id: it.id, copy: null });
         continue;
@@ -471,7 +475,7 @@ export async function applyBoardOps(
       conflicts.push({ id: original.id as string, copy: copyId });
       row = undefined;
     }
-    if (!row && actor.role === "client" && !(it.kind === "image" ? opts.clientImage : clientMay(it.kind))) {
+    if (!row && actor.role === "client" && !(it.kind === "image" ? opts.clientImage : clientMay(it))) {
       throw new Error("Carte non autorisée");
     }
     const parent = it.parentId ? known.get(it.parentId) : null;
