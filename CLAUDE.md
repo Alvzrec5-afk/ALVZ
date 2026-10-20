@@ -135,7 +135,7 @@ et les planches en une requête ; ménage des cartes supprimées et réparation 
 - Lenteur du 20 oct. : Supabase lui-même a eu des pics (journaux `edge_logs`, `response.origin_time` : jwks.json 27 s,
   /auth/v1/token 29 s, /rest/v1/admins 21 s ; p95 de 5 à 12 s à 9 h, 11 h et 12 h UTC) alors que les requêtes SQL restent < 10 ms
   et la base presque vide d'activité → instance gratuite partagée ou réseau Supabase, pas le code. Pas d'incident annoncé.
-  **En local, non publié** : clics plus rapides — `HoverLink` (`components/admin/hover-link.tsx`) prépare la page au survol / toucher
+  Publié (20 oct.) : clics plus rapides — `HoverLink` (`components/admin/hover-link.tsx`) prépare la page au survol / toucher
   (Accueil, listes, onglets) au lieu de tout précharger ; `experimental.staleTimes` (dynamic 30 s) : une page vue il y a < 30 s
   se réaffiche sans serveur ; `BoardCanvas` reçoit `renderedAt` et relit les cartes à l'ouverture si la page vient de la mémoire (> 5 s).
   Publié (20 oct.) : `prefetch={false}` sur les liens de l'Accueil, des onglets de planches, des listes de galeries
