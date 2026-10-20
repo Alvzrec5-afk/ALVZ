@@ -51,6 +51,7 @@ export default async function BoardPage({
       <BoardTabs root={{ id: path[0]?.id ?? board.id, title: path[0]?.title ?? board.title }} path={path} planches={planches} />
       <div className="flex-1 min-h-0">
         <BoardCanvas
+          renderedAt={Date.now()}
           key={id}
           boardBase="/admin/boards/"
           initialItems={items}

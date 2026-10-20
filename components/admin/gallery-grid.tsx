@@ -7,6 +7,7 @@ import { GridIcon, LockIcon, MenuIcon } from "@/components/icons";
 import { formatBytes } from "@/lib/format";
 import { trashGallery } from "@/app/admin/actions";
 import { deleteInBackground, useHidden } from "./background";
+import { HoverLink } from "@/components/admin/hover-link";
 
 export type GalleryCard = {
   id: string;
@@ -243,28 +244,28 @@ export function GalleryGrid({ galleries: all, kind = "photo" }: { galleries: Gal
                 {view === "grid" ? (
                   <>
                     <div className="relative">
-                      <Link prefetch={false} href={`/admin/galleries/${g.id}`} className="group block aspect-square lg:aspect-[4/3] bg-bg-soft overflow-hidden">
+                      <HoverLink href={`/admin/galleries/${g.id}`} className="group block aspect-square lg:aspect-[4/3] bg-bg-soft overflow-hidden">
                         {thumb}
-                      </Link>
+                      </HoverLink>
                       {dots}
                       {copied === g.id && <span className="absolute bottom-1.5 left-1.5 bg-black/70 text-white text-[10px] px-1.5 py-0.5">Lien copié ✓</span>}
                     </div>
-                    <Link prefetch={false} href={`/admin/galleries/${g.id}`} className="block mt-2 sm:mt-3">
+                    <HoverLink href={`/admin/galleries/${g.id}`} className="block mt-2 sm:mt-3">
                       <h2 className="text-[13px] sm:text-base truncate">{g.title}</h2>
                       <p className="mt-0.5 sm:mt-1 flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-muted">{meta}</p>
                       {g.date && <p className="hidden sm:block text-[11px] text-muted mt-0.5">{g.date}</p>}
-                    </Link>
+                    </HoverLink>
                   </>
                 ) : (
                   <div className="flex items-center gap-4 py-3 border-b border-line">
-                    <Link prefetch={false} href={`/admin/galleries/${g.id}`} className="group flex-1 min-w-0 flex items-center gap-4">
+                    <HoverLink href={`/admin/galleries/${g.id}`} className="group flex-1 min-w-0 flex items-center gap-4">
                       <span className="block w-16 h-16 sm:w-20 sm:h-20 shrink-0 bg-bg-soft overflow-hidden">{thumb}</span>
                       <span className="min-w-0">
                         <span className="block text-[15px] truncate">{g.title}</span>
                         <span className="mt-1 flex items-center gap-2 text-xs text-muted">{meta}</span>
                         {g.date && <span className="block text-[11px] text-muted mt-0.5">{g.date}</span>}
                       </span>
-                    </Link>
+                    </HoverLink>
                     {copied === g.id && <span className="text-[11px] text-accent shrink-0">Lien copié ✓</span>}
                     {dots}
                   </div>
@@ -276,7 +277,7 @@ export function GalleryGrid({ galleries: all, kind = "photo" }: { galleries: Gal
                       <p className="sm:hidden px-5 pt-3 pb-2 eyebrow text-muted truncate">{g.title}</p>
                       <button className="block w-full text-left px-5 sm:px-4 py-3.5 sm:py-2.5 hover:bg-bg" onClick={() => copyLink(g)}>Copier le lien client</button>
                       <a className="block px-5 sm:px-4 py-3.5 sm:py-2.5 hover:bg-bg" href={`/g/${g.slug}`} target="_blank" rel="noreferrer" onClick={() => setMenu(null)}>{L.view}</a>
-                      <Link prefetch={false} className="block px-5 sm:px-4 py-3.5 sm:py-2.5 hover:bg-bg" href={`/admin/galleries/${g.id}`}>{L.manage}</Link>
+                      <HoverLink className="block px-5 sm:px-4 py-3.5 sm:py-2.5 hover:bg-bg" href={`/admin/galleries/${g.id}`}>{L.manage}</HoverLink>
                       <button className="block w-full text-left px-5 sm:px-4 py-3.5 sm:py-2.5 text-danger hover:bg-bg" onClick={() => remove(g)}>Supprimer</button>
                     </div>
                   </>

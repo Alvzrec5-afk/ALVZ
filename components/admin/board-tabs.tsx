@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef } from "react";
+import { HoverLink } from "@/components/admin/hover-link";
 
 /**
  * Onglets sous la barre d'un tableau : le tableau principal et ses planches (1. BUDGET, 3. MOODBOARD, 4. SHOT LIST…),
@@ -37,8 +37,7 @@ export function BoardTabs({
       {tabs.map((t, i) => {
         const on = t.id === current;
         return (
-          <Link
-            prefetch={false}
+          <HoverLink
             key={t.id}
             href={`/admin/boards/${t.id}`}
             aria-current={t.id === exact ? "page" : undefined}
@@ -48,7 +47,7 @@ export function BoardTabs({
             } ${i === 0 ? "font-medium" : ""}`}
           >
             {t.title || "Sans titre"}
-          </Link>
+          </HoverLink>
         );
       })}
     </nav>

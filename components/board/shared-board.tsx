@@ -63,6 +63,7 @@ export async function SharedBoard({ slug, subId }: { slug: string; subId?: strin
       </header>
       <div className="flex-1 min-h-0">
         <BoardCanvas
+          renderedAt={Date.now()}
           key={board.id}
           boardBase={`/t/${slug}/b/`}
           initialItems={items}

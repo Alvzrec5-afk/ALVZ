@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { formatLongDate, toParisDateInput } from "@/lib/dates";
 import { formatBytes } from "@/lib/format";
 import { storageParts, type StudioOverview } from "@/lib/usage";
 import { StorageMeter } from "@/components/admin/storage-meter";
 import { BoardIcon, FilmIcon, ImageIcon, PlusIcon } from "@/components/icons";
+import { HoverLink } from "@/components/admin/hover-link";
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("fr-FR")} ${n > 1 ? many : one}`;
 
@@ -45,25 +45,25 @@ export function StudioDashboard({ o, usage, galleries: list, boards }: Dashboard
           <p className="text-sm text-muted mt-3">Vue d&apos;ensemble de vos galeries, vidéos et tableaux.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link prefetch={false} href="/admin/galleries/new" className="btn">
+          <HoverLink href="/admin/galleries/new" className="btn">
             <PlusIcon className="w-4 h-4" /> Galerie
-          </Link>
-          <Link prefetch={false} href="/admin/videos/new" className="btn">
+          </HoverLink>
+          <HoverLink href="/admin/videos/new" className="btn">
             <PlusIcon className="w-4 h-4" /> Projet vidéo
-          </Link>
-          <Link prefetch={false} href="/admin/boards/new" className="btn">
+          </HoverLink>
+          <HoverLink href="/admin/boards/new" className="btn">
             <PlusIcon className="w-4 h-4" /> Tableau
-          </Link>
+          </HoverLink>
         </div>
       </div>
 
       <div className="mt-10 grid grid-cols-2 lg:grid-cols-4 gap-px bg-line border border-line">
         {tiles.map((t) => (
-          <Link prefetch={false} key={t.label} href={t.href} className="bg-bg px-4 py-5 sm:px-5 hover:bg-bg-soft transition-colors min-w-0">
+          <HoverLink key={t.label} href={t.href} className="bg-bg px-4 py-5 sm:px-5 hover:bg-bg-soft transition-colors min-w-0">
             <span className="block text-xs text-muted">{t.label}</span>
             <span className="block display text-3xl sm:text-4xl mt-1 tabular-nums">{t.text ?? (t.value ?? 0).toLocaleString("fr-FR")}</span>
             <span className="block text-xs text-muted mt-1 truncate">{t.sub}</span>
-          </Link>
+          </HoverLink>
         ))}
       </div>
 
@@ -78,7 +78,7 @@ export function StudioDashboard({ o, usage, galleries: list, boards }: Dashboard
             <ul className="space-y-3">
               {biggest.map((g) => (
                 <li key={g.id}>
-                  <Link prefetch={false} href={href(g)} className="block group">
+                  <HoverLink href={href(g)} className="block group">
                     <span className="flex items-baseline justify-between gap-3 text-sm">
                       <span className="truncate group-hover:underline underline-offset-2">
                         {g.title}
@@ -92,7 +92,7 @@ export function StudioDashboard({ o, usage, galleries: list, boards }: Dashboard
                         style={{ width: `${Math.max((g.bytes / max) * 100, 1)}%`, background: g.kind === "video" ? "var(--series-2)" : "var(--series-1)" }}
                       />
                     </span>
-                  </Link>
+                  </HoverLink>
                 </li>
               ))}
             </ul>
@@ -106,20 +106,20 @@ export function StudioDashboard({ o, usage, galleries: list, boards }: Dashboard
           <ul className="divide-y divide-line border-y border-line">
             {list.slice(0, 5).map((g) => (
               <li key={g.id}>
-                <Link prefetch={false} href={href(g)} className="flex items-center gap-3 py-3 hover:text-ink text-sm group">
+                <HoverLink href={href(g)} className="flex items-center gap-3 py-3 hover:text-ink text-sm group">
                   {g.kind === "video" ? <FilmIcon className="w-4 h-4 text-muted shrink-0" /> : <ImageIcon className="w-4 h-4 text-muted shrink-0" />}
                   <span className="flex-1 truncate group-hover:underline underline-offset-2">{g.title}</span>
                   <span className="text-xs text-muted shrink-0">Créé le {formatLongDate(toParisDateInput(g.created_at))}</span>
-                </Link>
+                </HoverLink>
               </li>
             ))}
             {boards.map((b) => (
               <li key={b.id}>
-                <Link prefetch={false} href={`/admin/boards/${b.id}`} className="flex items-center gap-3 py-3 text-sm group">
+                <HoverLink href={`/admin/boards/${b.id}`} className="flex items-center gap-3 py-3 text-sm group">
                   <BoardIcon className="w-4 h-4 text-muted shrink-0" />
                   <span className="flex-1 truncate group-hover:underline underline-offset-2">{b.title}</span>
                   <span className="text-xs text-muted shrink-0">Modifié le {formatLongDate(toParisDateInput(b.updated_at))}</span>
-                </Link>
+                </HoverLink>
               </li>
             ))}
           </ul>

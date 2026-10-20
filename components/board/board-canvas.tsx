@@ -93,6 +93,8 @@ function mediaData(p: { video: boolean; media?: "audio" | "document"; fileName?:
 
 type Props = {
   initialItems: BoardItem[];
+  /** Heure du serveur au moment où la page a été préparée (une page gardée en mémoire est relue dès l'ouverture). */
+  renderedAt?: number;
   /** GET = cartes, POST = modifications. */
   endpoint: string;
   /** Studio : POST { itemId, size } → { url } d'envoi direct. Client : POST de l'image elle-même. */
@@ -298,7 +300,7 @@ function InlineInput({
   );
 }
 
-export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAdd, visitorName, joinEndpoint, openImport, boardBase, commentsEndpoint, clientEditAll }: Props) {
+export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint, role, canAdd, visitorName, joinEndpoint, openImport, boardBase, commentsEndpoint, clientEditAll }: Props) {
   const router = useRouter();
   const rootRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -1692,6 +1694,13 @@ export function BoardCanvas({ initialItems, endpoint, imageEndpoint, role, canAd
       // Hors connexion : on réessaiera.
     }
   }, [dragId, editing, endpoint, setItems, sync]);
+
+  // Page reprise de la mémoire du navigateur (retour sur un tableau vu il y a quelques secondes) : on relit tout de suite
+  // les cartes, pour ne jamais travailler sur une version dépassée.
+  useEffect(() => {
+    if (renderedAt && Date.now() - renderedAt > 5000) void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(refresh, POLL_MS);

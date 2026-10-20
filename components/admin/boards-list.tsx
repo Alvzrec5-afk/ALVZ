@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { GridIcon, MenuIcon } from "@/components/icons";
 import { BoardCardMenu } from "./board-card-menu";
+import { HoverLink } from "@/components/admin/hover-link";
 
 export type BoardRow = { id: string; title: string; cover: string | null; meta: string; updated: string };
 
@@ -56,14 +56,14 @@ export function BoardsList({ boards }: { boards: BoardRow[] }) {
           {boards.map((b) => (
             <li key={b.id} className="relative">
               <BoardCardMenu id={b.id} title={b.title} hasCover={Boolean(b.cover)} />
-              <Link prefetch={false} href={`/admin/boards/${b.id}`} className="group block">
+              <HoverLink href={`/admin/boards/${b.id}`} className="group block">
                 <div className="aspect-[4/3] bg-bg-soft overflow-hidden border border-line">
                   <Cover b={b} />
                 </div>
                 <p className="mt-3 text-[15px] truncate">{b.title}</p>
                 <p className="text-xs text-muted mt-1 truncate">{b.meta}</p>
                 <p className="text-[11px] text-muted mt-0.5">{b.updated}</p>
-              </Link>
+              </HoverLink>
             </li>
           ))}
         </ul>
@@ -71,7 +71,7 @@ export function BoardsList({ boards }: { boards: BoardRow[] }) {
         <ul className="border-t border-line">
           {boards.map((b) => (
             <li key={b.id} className="relative border-b border-line">
-              <Link prefetch={false} href={`/admin/boards/${b.id}`} className="group flex items-center gap-4 py-3 pr-14">
+              <HoverLink href={`/admin/boards/${b.id}`} className="group flex items-center gap-4 py-3 pr-14">
                 <span className="w-14 h-14 shrink-0 bg-bg-soft border border-line overflow-hidden">
                   <Cover b={b} small />
                 </span>
@@ -81,7 +81,7 @@ export function BoardsList({ boards }: { boards: BoardRow[] }) {
                     {b.meta} · {b.updated}
                   </span>
                 </span>
-              </Link>
+              </HoverLink>
               <BoardCardMenu id={b.id} title={b.title} hasCover={Boolean(b.cover)} className="top-1/2 -translate-y-1/2 right-0" />
             </li>
           ))}
