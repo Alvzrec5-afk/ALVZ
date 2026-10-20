@@ -5,6 +5,7 @@ import { boardAncestors, isUuid, loadBoardItems, projectPlanches, purgeDeletedIt
 import { BoardCanvas } from "@/components/board/board-canvas";
 import { BoardHeader } from "@/components/admin/board-header";
 import { BoardTabs } from "@/components/admin/board-tabs";
+import { BoardOffline } from "@/components/admin/offline-support";
 
 export const metadata = { title: "Tableau" };
 export const dynamic = "force-dynamic";
@@ -49,6 +50,11 @@ export default async function BoardPage({
         galleries={(galleries ?? []) as { id: string; title: string; kind: string }[]}
       />
       <BoardTabs root={{ id: path[0]?.id ?? board.id, title: path[0]?.title ?? board.title }} path={path} planches={planches} />
+      <BoardOffline
+        rootId={path[0]?.id ?? board.id}
+        current={`/admin/boards/${id}`}
+        pages={[path[0]?.id ?? board.id, ...planches.map((p) => p.id)].map((b) => `/admin/boards/${b}`)}
+      />
       <div className="flex-1 min-h-0">
         <BoardCanvas
           renderedAt={Date.now()}

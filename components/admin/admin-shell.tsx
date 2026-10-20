@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Wordmark } from "@/components/wordmark";
 import { BackgroundStatus } from "./background";
+import { clearOffline } from "./offline-support";
 import { BoardIcon, GlobeIcon, HomeIcon, TrashIcon, CardIcon, CloseIcon, FilmIcon, ImageIcon, LogoutIcon, MegaphoneIcon, MenuIcon } from "@/components/icons";
 
 const NAV = [
@@ -72,7 +73,7 @@ export function AdminShell({ children, signOut }: { children: React.ReactNode; s
                 <NavItem key={item.href} {...item} active={item.match(pathname)} />
               ))}
             </nav>
-            <form action={signOut} className="border-t border-line">
+            <form action={signOut} onSubmit={clearOffline} className="border-t border-line">
               <button className="w-full flex items-center gap-4 px-7 h-14 text-[15px] text-muted hover:text-ink transition-colors">
                 <LogoutIcon /> Déconnexion
               </button>
@@ -96,7 +97,7 @@ export function AdminShell({ children, signOut }: { children: React.ReactNode; s
               <NavItem key={item.href} {...item} active={item.match(pathname)} />
             ))}
           </nav>
-          <form action={signOut} className="border-t border-line">
+          <form action={signOut} onSubmit={clearOffline} className="border-t border-line">
             <button className="w-full flex items-center gap-4 px-7 h-14 text-sm text-muted hover:text-ink transition-colors">
               <LogoutIcon /> Déconnexion
             </button>

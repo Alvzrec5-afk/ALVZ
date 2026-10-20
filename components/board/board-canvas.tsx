@@ -300,7 +300,7 @@ function InlineInput({
   );
 }
 
-export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint, role, canAdd, visitorName, joinEndpoint, openImport, boardBase, commentsEndpoint, clientEditAll }: Props) {
+export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint, role, canAdd: canAddProp, visitorName, joinEndpoint, openImport, boardBase, commentsEndpoint, clientEditAll }: Props) {
   const router = useRouter();
   const rootRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -372,7 +372,11 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
     setViewState(next);
   }, []);
 
-  const canEdit = useCallback((it: BoardItem) => role === "admin" || Boolean(clientEditAll) || it.mine, [clientEditAll, role]);
+  // Hors connexion : le tableau reste lisible (copie gardée par l'appareil) mais en lecture seule, pour que rien ne se perde ;
+  // au retour du réseau il est relu aussitôt (changements du client compris).
+  const [offline, setOffline] = useState(false);
+  const canAdd = canAddProp && !offline;
+  const canEdit = useCallback((it: BoardItem) => !offline && (role === "admin" || Boolean(clientEditAll) || it.mine), [clientEditAll, offline, role]);
 
   // ——— Historique (Cmd + Z / Cmd + Maj + Z) ———
   // Chaque modification enregistrée marque la carte ; après 0,6 s de calme, l'état « avant » et l'état
@@ -1670,6 +1674,7 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
       if (Date.now() - fullAt.current > 60 * 60_000) version.current = "";
       const url = version.current ? `${endpoint}${endpoint.includes("?") ? "&" : "?"}v=${encodeURIComponent(version.current)}` : endpoint;
       const res = await fetch(url, { cache: "no-store" });
+      setOffline(false);
       if (!res.ok) return;
       const json = (await res.json()) as { items?: BoardItem[]; v?: string; unchanged?: boolean };
       if (json.unchanged || !json.items) return;
@@ -1691,9 +1696,26 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
       committed.current = base;
       setItems(next);
     } catch {
-      // Hors connexion : on réessaiera.
+      // Hors connexion : lecture seule jusqu'au retour du réseau (on réessaiera).
+      setOffline(true);
     }
   }, [dragId, editing, endpoint, setItems, sync]);
+
+  // Réseau coupé / revenu (signalé par l'appareil) : lecture seule, puis relecture immédiate au retour.
+  useEffect(() => {
+    if (!navigator.onLine) setOffline(true);
+    const down = () => setOffline(true);
+    const up = () => {
+      lastActivity.current = Date.now();
+      void refresh();
+    };
+    window.addEventListener("offline", down);
+    window.addEventListener("online", up);
+    return () => {
+      window.removeEventListener("offline", down);
+      window.removeEventListener("online", up);
+    };
+  }, [refresh]);
 
   // Page reprise de la mémoire du navigateur (retour sur un tableau vu il y a quelques secondes) : on relit tout de suite
   // les cartes, pour ne jamais travailler sur une version dépassée.
@@ -3362,6 +3384,14 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
         </div>
       )}
 
+      {offline && (
+        <div data-ui className="absolute z-[250000] left-1/2 -translate-x-1/2 top-3 max-w-[calc(100%-24px)] px-4 py-2 rounded-full bg-amber-500 text-black text-[12px] shadow-lg text-center">
+          Hors connexion · lecture seule
+          {renderedAt ? ` · copie du ${new Date(renderedAt).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}
+          <span className="hidden sm:inline"> — tout se met à jour au retour du réseau</span>
+        </div>
+      )}
+
       {/* Outils : à gauche sur ordinateur, en bas sur téléphone */}
       {canAdd && (
         <div
@@ -3452,13 +3482,13 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
 
       {/* Zoom et état de l'enregistrement */}
       <div data-ui className="absolute z-[200000] right-3 bottom-[max(env(safe-area-inset-bottom),12px)] sm:bottom-4 sm:right-4 flex flex-col items-end gap-2">
-        {(role === "admin" || canAdd) && (
+        {!offline && (role === "admin" || canAdd) && (
           // Au téléphone : seulement en cas d'erreur (sinon ça gêne).
           <span className={`text-[11px] px-2 ${status.state === "error" ? "text-danger" : "text-muted hidden sm:inline"}`}>
             {status.state === "saving" ? "Enregistrement…" : status.state === "error" ? status.message : "Enregistré"}
           </span>
         )}
-        {(role === "admin" || canAdd) && (
+        {!offline && (role === "admin" || canAdd) && (
           <div className="hidden sm:flex bg-bg border border-line shadow-sm rounded-[4px] text-muted">
             <button
               className="w-10 h-10 flex items-center justify-center hover:text-ink disabled:opacity-30"
