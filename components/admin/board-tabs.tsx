@@ -38,6 +38,7 @@ export function BoardTabs({
         const on = t.id === current;
         return (
           <Link
+            prefetch={false}
             key={t.id}
             href={`/admin/boards/${t.id}`}
             aria-current={t.id === exact ? "page" : undefined}

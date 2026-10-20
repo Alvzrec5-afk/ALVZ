@@ -56,7 +56,7 @@ export function BoardsList({ boards }: { boards: BoardRow[] }) {
           {boards.map((b) => (
             <li key={b.id} className="relative">
               <BoardCardMenu id={b.id} title={b.title} hasCover={Boolean(b.cover)} />
-              <Link href={`/admin/boards/${b.id}`} className="group block">
+              <Link prefetch={false} href={`/admin/boards/${b.id}`} className="group block">
                 <div className="aspect-[4/3] bg-bg-soft overflow-hidden border border-line">
                   <Cover b={b} />
                 </div>
@@ -71,7 +71,7 @@ export function BoardsList({ boards }: { boards: BoardRow[] }) {
         <ul className="border-t border-line">
           {boards.map((b) => (
             <li key={b.id} className="relative border-b border-line">
-              <Link href={`/admin/boards/${b.id}`} className="group flex items-center gap-4 py-3 pr-14">
+              <Link prefetch={false} href={`/admin/boards/${b.id}`} className="group flex items-center gap-4 py-3 pr-14">
                 <span className="w-14 h-14 shrink-0 bg-bg-soft border border-line overflow-hidden">
                   <Cover b={b} small />
                 </span>
