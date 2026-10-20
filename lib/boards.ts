@@ -374,13 +374,12 @@ function cleanKind(kind: BoardKind, d: BoardData): BoardData {
 }
 
 const KINDS: BoardKind[] = ["note", "image", "todo", "column", "arrow", "board", "color", "link", "table", "comment"];
-const CLIENT_KINDS: BoardKind[] = ["note", "todo", "link", "table", "comment"];
-/** En plus, quand le studio autorise « le client peut tout modifier ». */
-const CLIENT_EDIT_KINDS: BoardKind[] = ["column", "color", "arrow"];
+/** Cartes qu'un client peut ajouter (en plus des images, qui passent par la route d'envoi) : notes, commentaires, couleurs. */
+const CLIENT_KINDS: BoardKind[] = ["note", "comment", "color"];
 
 /**
  * Applique une série de modifications. Toutes les cartes visées doivent appartenir au tableau ;
- * un client ne peut créer que des notes, images et listes, et ne touche qu'à ses propres cartes.
+ * un client ne peut créer que des notes, images, couleurs et commentaires, et ne touche qu'à ses propres cartes.
  */
 export async function applyBoardOps(
   db: SupabaseClient,
@@ -453,7 +452,7 @@ export async function applyBoardOps(
     let row = known.get(it.id);
     if (row && !owns(row)) throw new Error("Carte non modifiable");
     if (row && row.kind !== it.kind) throw new Error("Carte invalide");
-    const clientMay = (k: BoardKind) => CLIENT_KINDS.includes(k) || (actor.role === "client" && Boolean(actor.canEditAll) && CLIENT_EDIT_KINDS.includes(k));
+    const clientMay = (k: BoardKind) => CLIENT_KINDS.includes(k);
     // Conflit : la carte a été modifiée ailleurs depuis la version envoyée. Leur version reste en place ; la nôtre
     // est ajoutée juste à côté, comme une nouvelle carte (rien n'est perdu). Planches, flèches et discussions : la leur.
     if (row && !row.deleted_at && changedSince(row, o.base)) {

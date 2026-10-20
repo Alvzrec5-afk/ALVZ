@@ -125,6 +125,7 @@ Publié (20 oct.) : correction du faux message « modifiée ailleurs » et
 
 En attente de « publie » (20 oct., committé en local) : clés publiques de Supabase Auth (jwks) gardées un jour dans le cache
 de Next (`unstable_cache`, `lib/auth.ts`) au lieu d'être redemandées à chaque démarrage de fonction (jusqu'à 16 s le 20 oct.).
+Aussi en attente : le client n'ajoute plus que notes, images, couleurs et commentaires (outils du tableau client réduits, règle aussi côté serveur).
 Lenteur du 20 oct. vers 22 h UTC : encore Supabase (auth/token 18 s, REST 8 s, base au repos) ; conseillé : Supabase Pro.
 
 - **À faire par le propriétaire** : poser une fois l'index.html (Studio → Site → Relier alvzrec.com) sur l'ancien compte Netlify, puis vérifier alvzrec.com (clips, photos, coulisses).

@@ -247,7 +247,7 @@ export function BoardHeader({
                   void save({ client_can_add: v });
                 }}
                 label="Le client peut ajouter ses idées"
-                hint="Notes, images, listes, liens et commentaires, signés de son prénom."
+                hint="Notes, images, couleurs et commentaires, signés de son prénom."
               />
               {opts.client_can_add && (
                 <Toggle

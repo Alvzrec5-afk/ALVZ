@@ -44,6 +44,8 @@ Serveur : `lib/boards.ts` (`applyBoardOps` valide tout ; un client ne touche qu'
 `app/admin/board-actions.ts`, API `app/api/admin/boards/[id]` et `/image`. Relié à une galerie : menu « Plus » →
 « Tableau de préparation » (`openGalleryBoard`, créé au premier clic). Partage client : `/t/<lien>` (lien secret,
 option « le client peut ajouter ses idées », prénom demandé une fois, cookie signé `b_<tableau>`), API `app/api/b/[slug]`.
+Le client n'ajoute que des **notes, images, couleurs et commentaires** (`CLIENT_KINDS` dans `lib/boards.ts`, `CLIENT_ADDS` et
+outils `client: true` dans `board-canvas.tsx` ; pas de menu « … », pas d'« Images projet » ; un lien collé devient une note).
 Import Milanote (`lib/client/milanote.ts`, bouton « Importer » / menu « Plus ») :
 export Markdown → titres = colonnes, paragraphes = notes, cases à cocher = listes ; ZIP (« Generate ZIP ») lu
 dans le navigateur → un dossier d'images = une colonne (fusionnée avec la colonne du même nom). Format Milanote

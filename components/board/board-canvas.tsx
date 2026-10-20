@@ -121,6 +121,8 @@ type Props = {
 const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 2.5;
 const POLL_MS = 30_000;
+/** Cartes qu'un client peut ajouter lui-même (images à part : envoi de fichier). Le serveur applique la même règle. */
+const CLIENT_ADDS: BoardKind[] = ["note", "comment", "color"];
 const LIVE_POLL_MS = 90_000;
 const IDLE_STOP_MS = 10 * 60_000;
 
@@ -650,8 +652,8 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
       } catch {
         return;
       }
-      // Un client ne colle ni images ni planches (elles appartiennent au studio).
-      const source = (parsed.items ?? []).filter((it) => role === "admin" || (it.kind !== "image" && it.kind !== "board"));
+      // Un client ne colle que des notes, commentaires et couleurs (images et le reste appartiennent au studio).
+      const source = (parsed.items ?? []).filter((it) => role === "admin" || CLIENT_ADDS.includes(it.kind));
       if (!source.length) return;
       const idMap = new Map(source.map((it) => [it.id, crypto.randomUUID()]));
       const tops = source.filter((it) => !it.parentId || !idMap.has(it.parentId)).filter((it) => it.kind !== "arrow");
@@ -764,13 +766,20 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
     });
   const addLink = (url = "", at?: At, extra?: Extra) =>
     ensureName(() => {
+      // Client : un lien collé devient une note (les liens y sont cliquables) ; il n'ajoute pas de carte « lien ».
+      if (role === "client") {
+        const note = create("note", { text: url, color: "blanc" }, at, extra);
+        if (!url) setEditing({ id: note.id });
+        return;
+      }
       const it = create("link", { url, title: "" }, at, extra);
       if (!url) setEditing({ id: it.id });
     });
-  const addColor = (at?: At, extra?: Extra) => {
-    const it = create("color", { hex: "#c8a27a", title: "" }, at, extra);
-    setEditing({ id: it.id, field: "title" });
-  };
+  const addColor = (at?: At, extra?: Extra) =>
+    ensureName(() => {
+      const it = create("color", { hex: "#c8a27a", title: "" }, at, extra);
+      setEditing({ id: it.id, field: "title" });
+    });
   const addBoard = (at?: At, extra?: Extra) => {
     const it = create("board", { title: "", boardId: crypto.randomUUID() }, at, { sub: { title: "", count: 0, covers: [] }, ...extra });
     setEditing({ id: it.id, field: "title" });
@@ -2986,7 +2995,7 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
         { label: "Coller ici", hint: "⌘V", hidden: !canAdd, run: close(() => void pasteFromMenu(menu.at)) },
         { sep: true },
         { label: "Nouvelle note ici", hidden: !canAdd, run: close(() => addNote(menu.at)) },
-        { label: "Nouvelle liste ici", hidden: !canAdd, run: close(() => addTodo(menu.at)) },
+        { label: "Nouvelle liste ici", hidden: !canAdd || role !== "admin", run: close(() => addTodo(menu.at)) },
         { sep: true },
         { label: "Tout sélectionner", hint: "⌘A", run: close(() => setGroup(Object.values(itemsRef.current).filter((i) => i.kind !== "arrow" && !i.parentId && canEdit(i)).map((i) => i.id))) },
         { label: "Tout voir", run: close(() => fit()) },
@@ -3050,20 +3059,20 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
     run: () => void;
     /** Outil glissé puis lâché sur le tableau : création à cet endroit (ou dans la colonne visée). */
     drop?: (at: At, extra?: Extra) => void;
-    admin?: boolean;
-    /** Studio, ou client autorisé à tout modifier. */
-    edit?: boolean;
+    /** Aussi proposé au client (sinon : studio seulement). */
+    client?: boolean;
     active?: boolean;
     desktop?: boolean;
     /** Ouvre le menu « … ». */
     more?: boolean;
   };
   const tools: Tool[] = [
-    { label: "Note", Icon: NoteIcon, run: () => addNote(), drop: addNote },
+    { label: "Note", Icon: NoteIcon, run: () => addNote(), drop: addNote, client: true },
     { label: "Lien", Icon: LinkIcon, run: () => addLink(), drop: (at, extra) => addLink("", at, extra) },
     {
       label: "Image",
       Icon: ImageIcon,
+      client: true,
       run: () => ensureName(() => fileRef.current?.click()),
       drop: (at, extra) =>
         ensureName(() => {
@@ -3072,33 +3081,34 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
         }),
     },
     // Studio : reprendre une photo ou vidéo déjà posée ailleurs dans le projet (moodboard…), sans changer de planche.
-    { label: "Images projet", Icon: GalleryIcon, run: () => setImagePick((p) => (p ? null : {})), drop: (at, extra) => setImagePick({ at, extra }), admin: true },
+    { label: "Images projet", Icon: GalleryIcon, run: () => setImagePick((p) => (p ? null : {})), drop: (at, extra) => setImagePick({ at, extra }) },
     { label: "Liste", Icon: ChecklistIcon, run: () => addTodo(), drop: addTodo },
     { label: "Tableau", Icon: TableIcon, run: () => addTable(), drop: addTable },
-    { label: "Planche", Icon: BoardIcon, run: () => addBoard(), drop: addBoard, admin: true },
-    { label: "Colonne", Icon: ColumnIcon, run: () => addColumn(), drop: (at) => addColumn(at), edit: true },
-    { label: "Couleur", Icon: PaletteIcon, run: () => addColor(), drop: addColor, edit: true },
-    { label: "Commentaire", Icon: CommentIcon, run: () => addComment(), drop: addComment },
-    { label: "Flèche", Icon: ConnectorIcon, run: () => setArrowMode((m) => (m ? null : { from: null })), edit: true, active: Boolean(arrowMode) },
-    { label: "Importer", Icon: ImportIcon, run: () => setImportOpen(true), admin: true, desktop: true },
+    { label: "Planche", Icon: BoardIcon, run: () => addBoard(), drop: addBoard },
+    { label: "Colonne", Icon: ColumnIcon, run: () => addColumn(), drop: (at) => addColumn(at) },
+    { label: "Couleur", Icon: PaletteIcon, run: () => addColor(), drop: addColor, client: true },
+    { label: "Commentaire", Icon: CommentIcon, run: () => addComment(), drop: addComment, client: true },
+    { label: "Flèche", Icon: ConnectorIcon, run: () => setArrowMode((m) => (m ? null : { from: null })), active: Boolean(arrowMode) },
+    { label: "Importer", Icon: ImportIcon, run: () => setImportOpen(true), desktop: true },
     { label: "Plus", Icon: DotsIcon, run: () => {}, more: true, active: Boolean(more) },
   ];
   /** Entrées du menu « … » (comme Milanote) ; `studio` : réservées au studio, `edit` : studio ou client autorisé à tout modifier. */
   // Comme la barre : un clic crée la carte au milieu, un glisser-déposer la pose à l'endroit voulu (ou dans une colonne).
-  const moreList: (Tool & { studio?: boolean; tint: string })[] = [
+  const moreList: (Tool & { tint: string })[] = [
     { label: "Croquis", Icon: PencilIcon, run: () => addSketch(), drop: addSketch, tint: "#3a3a3a" },
-    { label: "Nuancier", Icon: PaletteIcon, run: () => addSwatch(), drop: addSwatch, edit: true, tint: "#c0395f" },
+    { label: "Nuancier", Icon: PaletteIcon, run: () => addSwatch(), drop: addSwatch, tint: "#c0395f" },
     { label: "Document", Icon: DocIcon, run: () => addDoc(), drop: addDoc, tint: "#4a4a4a" },
-    { label: "Importer doc", Icon: FileIcon, run: () => pickMedia("document"), drop: (at, extra) => pickMedia("document", at, extra), studio: true, tint: "#6b6b6b" },
-    { label: "Audio", Icon: AudioIcon, run: () => pickMedia("audio"), drop: (at, extra) => pickMedia("audio", at, extra), studio: true, tint: "#3f9b5a" },
+    { label: "Importer doc", Icon: FileIcon, run: () => pickMedia("document"), drop: (at, extra) => pickMedia("document", at, extra), tint: "#6b6b6b" },
+    { label: "Audio", Icon: AudioIcon, run: () => pickMedia("audio"), drop: (at, extra) => pickMedia("audio", at, extra), tint: "#3f9b5a" },
     { label: "Carte", Icon: MapIcon, run: () => addMap(), drop: addMap, tint: "#3b78c2" },
-    { label: "Vidéo", Icon: FilmIcon, run: () => pickMedia("video"), drop: (at, extra) => pickMedia("video", at, extra), studio: true, tint: "#2aa7b8" },
+    { label: "Vidéo", Icon: FilmIcon, run: () => pickMedia("video"), drop: (at, extra) => pickMedia("video", at, extra), tint: "#2aa7b8" },
     { label: "Titre", Icon: TypeIcon, run: () => addHeading(), drop: addHeading, tint: "transparent" },
   ];
   // Sans réseau : les outils qui envoient un fichier ou lisent le serveur sont mis de côté.
   const NEEDS_NETWORK = ["Image", "Images projet", "Importer", "Importer doc", "Audio", "Vidéo"];
-  const moreTools = moreList.filter((t) => (!t.studio || role === "admin") && (!t.edit || role === "admin" || clientEditAll) && !(offline && NEEDS_NETWORK.includes(t.label)));
-  const visibleTools = tools.filter((t) => (!t.admin || role === "admin") && (!t.edit || role === "admin" || clientEditAll) && !(offline && NEEDS_NETWORK.includes(t.label)));
+  // Client : seulement Image, Note, Commentaire et Couleur (pas de menu « … », pas d'« Images projet »).
+  const moreTools = role === "admin" ? moreList.filter((t) => !(offline && NEEDS_NETWORK.includes(t.label))) : [];
+  const visibleTools = tools.filter((t) => (role === "admin" || t.client) && !(offline && NEEDS_NETWORK.includes(t.label)));
 
   /** Nouvelle carte avec une photo ou vidéo du projet / de la banque : le serveur copie le fichier (comme un copier-coller). */
   const placeLibraryImage = (img: LibraryImage, at?: At, extra?: Extra) =>

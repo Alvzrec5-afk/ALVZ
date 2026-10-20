@@ -49,7 +49,7 @@ export async function SharedBoard({ slug, subId }: { slug: string; subId?: strin
               {root.client_can_add
                 ? visitor
                   ? `Connecté(e) : ${visitor.name} · vos idées sont enregistrées automatiquement`
-                  : "Ajoutez vos idées : notes, images, listes, liens"
+                  : "Ajoutez vos idées : notes, images, couleurs, commentaires"
                 : "Tableau partagé par ALVZ.REC"}
             </p>
           )}
