@@ -123,6 +123,10 @@ Publié (20 oct.) : correction du faux message « modifiée ailleurs » et
 **tableaux en direct** (modifications du client visibles tout de suite au studio et inversement ; déclencheur SQL
 `board_items_live_*` déjà appliqué en base). À vérifier en vrai (Mac + iPhone, note client visible en ~1 s ; sinon activer l'accès public Realtime dans Supabase) (Realtime injoignable depuis le conteneur).
 
+En attente de « publie » (20 oct., committé en local) : clés publiques de Supabase Auth (jwks) gardées un jour dans le cache
+de Next (`unstable_cache`, `lib/auth.ts`) au lieu d'être redemandées à chaque démarrage de fonction (jusqu'à 16 s le 20 oct.).
+Lenteur du 20 oct. vers 22 h UTC : encore Supabase (auth/token 18 s, REST 8 s, base au repos) ; conseillé : Supabase Pro.
+
 - **À faire par le propriétaire** : poser une fois l'index.html (Studio → Site → Relier alvzrec.com) sur l'ancien compte Netlify, puis vérifier alvzrec.com (clips, photos, coulisses).
 - **À vérifier en vrai par le propriétaire** : tableau modifié en mode avion puis réseau remis (iPhone et Mac), panneau « Images projet » (déplacer, agrandir, glisser une image sur le tableau), onglets des planches, Studio → Site (ajout d'un lien YouTube, envoi de photos), Accueil `/admin` (chiffres, stockage détaillé), Banque d'images (copie d'office d'une photo envoyée, onglet, corbeille), ouverture d'une planche ; menu « … » (plan Google Maps, envoi d'un PDF / MP3 vers Oracle), case photo vide (choix parmi les photos du projet) ;
   vidéo dans un tableau (envoi depuis l'iPhone, lecture, plein écran) ; capture d'un tableau **depuis l'iPhone** (nette au zoom ? photos présentes ? non testé sur vrai Safari) et avec de vraies photos Oracle (si elles sortent
