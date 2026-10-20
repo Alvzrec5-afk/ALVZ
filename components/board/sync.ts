@@ -74,7 +74,13 @@ export class BoardSync {
 
   /** Versions des cartes reçues du serveur (ouverture du tableau, rafraîchissement). */
   learn(items: Pick<BoardItem, "id" | "updatedAt">[]) {
-    for (const it of items) if (it.updatedAt && !this.isPending(it.id)) this.known.set(it.id, it.updatedAt);
+    // Jamais en arrière : un rafraîchissement parti avant notre dernier envoi rapporte une version plus ancienne
+    // que la nôtre, qui ferait croire ensuite à une modification faite par quelqu'un d'autre.
+    for (const it of items) {
+      if (!it.updatedAt || this.isPending(it.id)) continue;
+      const mine = this.known.get(it.id);
+      if (!mine || Date.parse(it.updatedAt) > Date.parse(mine)) this.known.set(it.id, it.updatedAt);
+    }
   }
 
   /** Modifications en attente (pour les remettre à l'écran quand la page est rouverte sans réseau). */
@@ -147,7 +153,14 @@ export class BoardSync {
       if (!res.ok) throw new Error(`Erreur ${res.status}`);
       const json = (await res.json().catch(() => ({}))) as { at?: string; conflicts?: SyncConflict[] };
       // Nos cartes sont maintenant la dernière version connue (les prochaines modifications partent de là).
-      if (json.at) for (const id of this.inflight.keys()) if (!this.queue.has(id)) this.known.set(id, json.at);
+      // Les modifications faites pendant l'envoi partent maintenant de notre version (sinon : faux conflit avec nous-mêmes).
+      if (json.at) {
+        for (const id of this.inflight.keys()) {
+          this.known.set(id, json.at);
+          const next = this.queue.get(id);
+          if (next) this.queue.set(id, { ...next, base: json.at });
+        }
+      }
       this.inflight.clear();
       this.save();
       this.retries = 0;
