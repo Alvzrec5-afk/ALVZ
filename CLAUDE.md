@@ -126,6 +126,12 @@ et les planches en une requête ; ménage des cartes supprimées et réparation 
   SPF/DKIM/DMARC).
 - Tableaux, idées : aperçu des liens (Pinterest, Instagram), cocher les listes du studio côté client, temps réel au
   lieu du rafraîchissement, appui long au téléphone = menu du clic droit (iPhone n'a pas de clic droit).
+- **Application Mac (.dmg)** : dossier `desktop/` (Electron : `main.js` ouvre alvzgalleries.com/admin, menu « Aller » ⌘1…⌘5,
+  téléchargements dans « Téléchargements », liens externes dans le navigateur, page `offline.html`). Fabriquée par GitHub Actions
+  (`.github/workflows/mac-app.yml`, Mac de GitHub, gratuit car dépôt public) à chaque changement de `desktop/` ; téléchargement :
+  https://github.com/Alvzrec5-afk/ALVZ/releases/download/mac-app/ALVZ-Studio.dmg . Non signée (pas de compte Apple Developer) :
+  premier lancement = clic droit → Ouvrir. `netlify.toml` ignore `desktop/` et `.github/` (pas de publication du site).
+  Le studio change sans refaire l'application (elle affiche le site en ligne).
 - Lenteur du 20 oct. : Supabase lui-même a eu des pics (journaux `edge_logs`, `response.origin_time` : jwks.json 27 s,
   /auth/v1/token 29 s, /rest/v1/admins 21 s ; p95 de 5 à 12 s à 9 h, 11 h et 12 h UTC) alors que les requêtes SQL restent < 10 ms
   et la base presque vide d'activité → instance gratuite partagée ou réseau Supabase, pas le code. Pas d'incident annoncé.

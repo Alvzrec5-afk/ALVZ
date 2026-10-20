@@ -1,0 +1,29 @@
+{
+  "name": "alvz-studio",
+  "productName": "ALVZ Studio",
+  "version": "1.0.0",
+  "description": "Application Mac du studio ALVZ.REC (alvzgalleries.com)",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --mac dmg --universal --publish never"
+  },
+  "devDependencies": {
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.alvzrec.studio",
+    "productName": "ALVZ Studio",
+    "artifactName": "ALVZ-Studio.${ext}",
+    "files": ["main.js", "offline.html", "icon.png"],
+    "mac": {
+      "category": "public.app-category.photography",
+      "icon": "icon.png",
+      "identity": null,
+      "target": [{ "target": "dmg", "arch": ["universal"] }]
+    },
+    "dmg": { "title": "ALVZ Studio" }
+  }
+}

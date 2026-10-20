@@ -1,0 +1,43 @@
+# Fabrique l'application Mac « ALVZ Studio » (.dmg) sur un Mac de GitHub (gratuit : dépôt public) et la met en
+# téléchargement à une adresse fixe :
+#   https://github.com/Alvzrec5-afk/ALVZ/releases/download/mac-app/ALVZ-Studio.dmg
+# Relancé automatiquement quand le dossier desktop/ change, ou à la main (onglet Actions → Run workflow).
+name: Application Mac
+
+on:
+  push:
+    paths:
+      - "desktop/**"
+      - ".github/workflows/mac-app.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  dmg:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Fabriquer le .dmg
+        working-directory: desktop
+        run: |
+          npm install --no-audit --no-fund
+          npm run dist
+      - name: Garder le fichier dans le résultat de l'action
+        uses: actions/upload-artifact@v4
+        with:
+          name: ALVZ-Studio
+          path: desktop/dist/ALVZ-Studio.dmg
+      - name: Mettre en téléchargement (adresse fixe)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete mac-app --yes --cleanup-tag || true
+          gh release create mac-app desktop/dist/ALVZ-Studio.dmg \
+            --title "ALVZ Studio pour Mac" \
+            --notes "Application Mac du studio ALVZ.REC. Premier lancement : clic droit sur l'application → Ouvrir (application non signée par Apple)." \
+            --target "${{ github.sha }}"
