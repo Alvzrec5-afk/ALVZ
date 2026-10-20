@@ -6,6 +6,8 @@ name: Application Mac
 
 on:
   push:
+    # Une seule branche : sinon deux fabrications publient le fichier en même temps et l'une échoue.
+    branches: [claude/alvz-photo-gallery-platform-tig9or]
     paths:
       - "desktop/**"
       - ".github/workflows/mac-app.yml"
