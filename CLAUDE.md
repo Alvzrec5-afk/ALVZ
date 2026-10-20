@@ -129,7 +129,7 @@ et les planches en une requête ; ménage des cartes supprimées et réparation 
 - Lenteur du 20 oct. : Supabase lui-même a eu des pics (journaux `edge_logs`, `response.origin_time` : jwks.json 27 s,
   /auth/v1/token 29 s, /rest/v1/admins 21 s ; p95 de 5 à 12 s à 9 h, 11 h et 12 h UTC) alors que les requêtes SQL restent < 10 ms
   et la base presque vide d'activité → instance gratuite partagée ou réseau Supabase, pas le code. Pas d'incident annoncé.
-  **En local, non publié** : `prefetch={false}` sur les liens de l'Accueil, des onglets de planches, des listes de galeries
+  Publié (20 oct.) : `prefetch={false}` sur les liens de l'Accueil, des onglets de planches, des listes de galeries
   et de tableaux (l'Accueil lançait ~16 préchargements = 16 fonctions + appels Supabase à chaque ouverture).
   Pistes proposées : base Supabase aux USA (us-east-1, comme les fonctions Netlify) et/ou Supabase Pro (puissance dédiée).
 - Lenteur : surtout la distance Netlify (USA) ↔ Supabase (Irlande) + réveil des fonctions. Mesures du 19 oct. :
