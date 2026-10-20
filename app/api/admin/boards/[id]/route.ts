@@ -35,8 +35,7 @@ export async function POST(req: Request, { params }: Ctx) {
       req.json() as Promise<{ ops: BoardOp[] }>,
     ]);
     if (!board) return Response.json({ error: "Tableau introuvable" }, { status: 404 });
-    await applyBoardOps(supabase, id, body.ops, { role: "admin" });
-    return Response.json({ ok: true });
+    return Response.json({ ok: true, ...(await applyBoardOps(supabase, id, body.ops, { role: "admin" })) });
   } catch (e) {
     return apiError(e);
   }

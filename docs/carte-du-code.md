@@ -129,6 +129,21 @@ cartes) ; studio = logo ALVZ.REC, client = prénom + initiale ; API `…/comment
 partage « Le client peut tout modifier » (`boards.client_can_edit`, avec « ajouter ses idées ») : le client
 déplace / modifie / supprime toutes les cartes et a aussi Colonne, Couleur, Flèche (pas Planche ni Importer).
 
+
+**Hors connexion (studio, application iPhone / Mac)** — niveau 1 : `public/sw.js` (service worker, `VERSION`) garde
+une copie des pages `/admin` (réseau d'abord, copie seulement sans réseau), des fichiers `/_next/static` et des photos
+Oracle (max 1500) ; message `warm` = préparer tout un projet (chaque planche + ses photos), `clear` = tout effacer
+(déconnexion). `components/admin/offline-support.tsx` : `OfflineSupport` (dans la mise en page du studio : enregistre
+le service worker, prépare Accueil + Tableaux toutes les 6 h), `BoardOffline` (page d'un tableau : projet toutes les 6 h,
+planche courante toutes les 30 min), `clearOffline()`. Page jamais ouverte → petite page « Hors connexion ».
+Niveau 2 (modifier en avion) : la file de `sync.ts` est gardée dans `localStorage` (`alvz-pending:<endpoint>`) et
+repart au retour du réseau, même pour une planche fermée (`flushOrphans`, lancé à l'ouverture du studio et à l'événement
+`online`). L'état complet du tableau est aussi gardé dans IndexedDB (`components/board/offline-store.ts`, base
+`alvz-boards`) et réaffiché si plus récent que la page servie. Chaque op porte `base` = `updated_at` de la carte connue ;
+`applyBoardOps` (`lib/boards.ts`) compare : si la carte a changé entre-temps (le client), on garde **sa** version et on
+ajoute **la nôtre en copie** à +40 px (fichier image copié aussi) ; pas de copie pour planche / flèche / commentaire ;
+suppression ignorée. Réponse `{ at, conflicts }`, message dans le tableau. Hors connexion : outils qui demandent le
+réseau cachés (`NEEDS_NETWORK`), envoi de fichiers refusé avec un message, bandeau « Hors connexion ».
 **Accueil (`/admin`)** — `components/admin/studio-dashboard.tsx` : 8 compteurs (liens), `StorageMeter` avec
 `parts` (`storageParts`, couleurs `--series-1…4` de globals.css, vérifiées daltoniens), galeries les plus lourdes
 (`storageUsage().perGallery`), récents. Chiffres : `studioOverview()` (`lib/usage.ts`) → fonction SQL `studio_overview()`

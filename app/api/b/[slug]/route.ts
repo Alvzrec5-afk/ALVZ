@@ -34,8 +34,7 @@ export async function POST(req: Request, { params }: Ctx) {
   if (actor.role !== "client" || !actor.clientId) return Response.json({ error: "Indiquez d'abord votre prénom." }, { status: 401 });
   try {
     const { ops } = (await req.json()) as { ops: BoardOp[] };
-    await applyBoardOps(createServiceClient(), board.id, ops, actor);
-    return Response.json({ ok: true });
+    return Response.json({ ok: true, ...(await applyBoardOps(createServiceClient(), board.id, ops, actor)) });
   } catch (e) {
     return Response.json({ error: e instanceof Error ? e.message : "Erreur" }, { status: 400 });
   }

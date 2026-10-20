@@ -24,7 +24,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { newSlug, sign, unsign } from "@/lib/tokens";
 import { storageUsage } from "@/lib/usage";
 
-export const BOARD_ITEM_FIELDS = "id, kind, x, y, w, z, parent_id, position, data, size_bytes, author, client_id";
+export const BOARD_ITEM_FIELDS = "id, kind, x, y, w, z, parent_id, position, data, size_bytes, author, client_id, updated_at";
 export const MAX_BOARD_IMAGE_BYTES = 4 * 1024 * 1024;
 export { BOARD_AUDIO_TYPES, BOARD_DOCUMENT_EXTENSIONS, BOARD_VIDEO_TYPES, MAX_BOARD_FILE_BYTES, MAX_BOARD_VIDEO_BYTES } from "@/lib/board-types";
 const MAX_ITEMS = 2000;
@@ -42,6 +42,7 @@ type Row = {
   size_bytes: number;
   author: string | null;
   client_id: string | null;
+  updated_at: string;
 };
 
 /** Qui modifie le tableau : le studio (tout) ou un client (seulement ses propres cartes). */
@@ -95,6 +96,7 @@ export async function loadBoardItems(
       position: r.position,
       data: r.data ?? {},
       author: r.author,
+      updatedAt: r.updated_at,
       mine: actor.role === "admin" || Boolean(actor.canEditAll) || (r.client_id !== null && r.client_id === actor.clientId),
       src: r.kind === "image" && r.size_bytes > 0 ? await presignGet(boardImageKey(boardId, r.id)) : null,
       download:
@@ -387,8 +389,9 @@ export async function applyBoardOps(
   actor: Actor,
   /** Client : une carte image ne se crée qu'avec son fichier (route d'envoi), jamais seule. */
   opts: { clientImage?: boolean } = {},
-) {
-  if (!Array.isArray(ops) || ops.length === 0) return;
+): Promise<BoardOpsResult> {
+  const conflicts: BoardOpsResult["conflicts"] = [];
+  if (!Array.isArray(ops) || ops.length === 0) return { at: new Date().toISOString(), conflicts };
   if (ops.length > 500) throw new Error("Trop de modifications en une fois");
   const ids = [...new Set(ops.map((o) => (o.op === "put" ? o.item?.id : o.id)).filter(isUuid))];
   const parentIds = [
@@ -396,11 +399,15 @@ export async function applyBoardOps(
   ];
   const lookup = [...new Set([...ids, ...parentIds])];
   const { data: existing, error } = lookup.length
-    ? await db.from("board_items").select("id, board_id, kind, client_id, author, size_bytes, data, deleted_at").in("id", lookup)
+    ? await db.from("board_items").select("id, board_id, kind, client_id, author, size_bytes, data, deleted_at, updated_at").in("id", lookup)
     : { data: [], error: null };
   if (error) throw new Error(error.message);
   const known = new Map((existing ?? []).map((r) => [r.id as string, r]));
 
+  // Modification préparée sur une version plus ancienne de la carte (hors connexion, ou deux personnes en même temps) :
+  // la carte a changé sur le serveur depuis `base`, la version envoyée ne doit pas l'écraser.
+  const changedSince = (row: { updated_at?: string | null }, base?: string) =>
+    typeof base === "string" && Boolean(row.updated_at) && Date.parse(row.updated_at as string) > Date.parse(base) + 1;
   const owns = (row: { board_id: string; client_id: string | null }) =>
     row.board_id === boardId && (actor.role === "admin" || Boolean(actor.canEditAll) || row.client_id === actor.clientId);
 
@@ -432,16 +439,39 @@ export async function applyBoardOps(
       const row = known.get(o.id);
       if (!row) continue;
       if (!owns(row)) throw new Error("Carte non modifiable");
+      // Supprimée hors connexion alors que quelqu'un l'a modifiée entre-temps : on la garde.
+      if (!row.deleted_at && changedSince(row, o.base)) {
+        conflicts.push({ id: o.id, copy: null });
+        continue;
+      }
       deletes.push(o.id);
       if (row.kind === "board" && isUuid((row.data as BoardData | null)?.boardId)) deletedSubBoards.push((row.data as BoardData).boardId!);
       continue;
     }
-    const it = o.item as BoardItemInput;
+    let it = o.item as BoardItemInput;
     if (!it || !isUuid(it.id) || !KINDS.includes(it.kind)) throw new Error("Carte invalide");
-    const row = known.get(it.id);
+    let row = known.get(it.id);
     if (row && !owns(row)) throw new Error("Carte non modifiable");
     if (row && row.kind !== it.kind) throw new Error("Carte invalide");
     const clientMay = (k: BoardKind) => CLIENT_KINDS.includes(k) || (actor.role === "client" && Boolean(actor.canEditAll) && CLIENT_EDIT_KINDS.includes(k));
+    // Conflit : la carte a été modifiée ailleurs depuis la version envoyée. Leur version reste en place ; la nôtre
+    // est ajoutée juste à côté, comme une nouvelle carte (rien n'est perdu). Planches, flèches et discussions : la leur.
+    if (row && !row.deleted_at && changedSince(row, o.base)) {
+      const copyable =
+        !["board", "arrow", "comment"].includes(it.kind) && (actor.role === "admin" || (it.kind !== "image" && clientMay(it.kind)));
+      if (!copyable) {
+        conflicts.push({ id: it.id, copy: null });
+        continue;
+      }
+      const original = row;
+      const copyId = crypto.randomUUID();
+      it = { ...it, id: copyId, x: it.x + 40, y: it.y + 40, copyOf: undefined, sizeBytes: it.kind === "image" ? Number(original.size_bytes) || 0 : undefined };
+      if (it.kind === "image" && Number(original.size_bytes) > 0) {
+        imageCopies.push({ from: boardImageKey(original.board_id as string, original.id as string), to: boardImageKey(boardId, copyId) });
+      }
+      conflicts.push({ id: original.id as string, copy: copyId });
+      row = undefined;
+    }
     if (!row && actor.role === "client" && !(it.kind === "image" ? opts.clientImage : clientMay(it.kind))) {
       throw new Error("Carte non autorisée");
     }
@@ -564,7 +594,12 @@ export async function applyBoardOps(
   }
   if (uploads.length) await addToLibrary(db, boardId, uploads).catch(() => undefined);
   // La date du tableau (sa « version ») est mise à jour par la base elle-même (déclencheur sur les cartes).
+  // `at` : date d'enregistrement de ces cartes, que l'appareil garde comme version connue (détection des conflits).
+  return { at: now, conflicts };
 }
+
+/** Résultat d'un enregistrement : date des cartes enregistrées et conflits (carte gardée, copie de la nôtre). */
+export type BoardOpsResult = { at: string; conflicts: { id: string; copy: string | null }[] };
 
 /**
  * Copie dans la Banque d'images les photos qu'on vient d'envoyer dans un tableau (sauf dans la banque elle-même),

@@ -111,6 +111,8 @@ export type BoardItemInput = {
 /** Ce que le navigateur reçoit. */
 export type BoardItem = BoardItemInput & {
   author: string | null;
+  /** Date (serveur) de la dernière modification enregistrée de la carte. */
+  updatedAt?: string;
   /** Le visiteur actuel peut déplacer / modifier / supprimer cette carte. */
   mine: boolean;
   /** Image : URL de lecture temporaire. */
@@ -134,7 +136,11 @@ export type BoardComment = {
   mine: boolean;
 };
 
-export type BoardOp = { op: "put"; item: BoardItemInput } | { op: "delete"; id: string };
+/**
+ * Modification d'une carte. `base` : date (serveur) de la version de la carte sur laquelle elle a été faite ; si la carte
+ * a changé depuis (hors connexion, client), le serveur garde les deux versions au lieu d'écraser.
+ */
+export type BoardOp = { op: "put"; item: BoardItemInput; base?: string } | { op: "delete"; id: string; base?: string };
 
 export const DEFAULT_WIDTH: Record<BoardKind, number> = { note: 240, image: 280, todo: 260, column: 280, arrow: 0, board: 200, color: 160, link: 300, table: 420, comment: 320 };
 export const TABLE_MAX_ROWS = 60;

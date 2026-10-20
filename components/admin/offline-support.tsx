@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
+import { clearSnapshots } from "@/components/board/offline-store";
+import { flushOrphans } from "@/components/board/sync";
 
 const HOURS = 3600_000;
 
@@ -19,7 +21,8 @@ export function warmOffline(key: string, pages: string[], every: number) {
 
 /**
  * Studio utilisable hors connexion : installe le service worker et garde l'Accueil et la liste des tableaux
- * (pour que l'application s'ouvre même sans réseau). Les tableaux eux-mêmes sont gardés par `BoardOffline`.
+ * (pour que l'application s'ouvre même sans réseau). Les tableaux eux-mêmes sont gardés par `BoardOffline` ;
+ * les modifications faites hors connexion repartent dès le retour du réseau (`flushOrphans`).
  */
 export function OfflineSupport() {
   useEffect(() => {
@@ -29,6 +32,13 @@ export function OfflineSupport() {
       .then(() => navigator.serviceWorker.ready)
       .then(() => setTimeout(() => warmOffline("studio", ["/admin", "/admin/boards"], 6 * HOURS), 4000))
       .catch(() => {});
+  }, []);
+  // Planches modifiées hors connexion puis quittées : envoyées dès que le studio est ouvert avec du réseau.
+  useEffect(() => {
+    const send = () => void flushOrphans();
+    send();
+    window.addEventListener("online", send);
+    return () => window.removeEventListener("online", send);
   }, []);
   return null;
 }
@@ -52,6 +62,7 @@ export function BoardOffline({ rootId, current, pages }: { rootId: string; curre
 export function clearOffline() {
   try {
     navigator.serviceWorker?.controller?.postMessage({ type: "clear" });
+    void clearSnapshots();
     for (const k of Object.keys(localStorage)) if (k.startsWith("alvz-warm:")) localStorage.removeItem(k);
   } catch {}
 }

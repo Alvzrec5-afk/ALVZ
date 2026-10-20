@@ -65,7 +65,8 @@ import {
   CommentIcon,
   TrashIcon,
 } from "@/components/icons";
-import { BoardSync, type SyncStatus } from "./sync";
+import { BoardSync, flushOrphans, type SyncConflict, type SyncStatus } from "./sync";
+import { loadSnapshot, saveSnapshot } from "./offline-store";
 
 type Items = Record<string, BoardItem>;
 type View = { x: number; y: number; k: number };
@@ -372,11 +373,13 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
     setViewState(next);
   }, []);
 
-  // Hors connexion : le tableau reste lisible (copie gardée par l'appareil) mais en lecture seule, pour que rien ne se perde ;
-  // au retour du réseau il est relu aussitôt (changements du client compris).
+  // Hors connexion (avion…) : on continue de travailler ; les modifications sont gardées sur l'appareil et partent au
+  // retour du réseau (sync.ts). Seuls les ajouts de fichiers (photos, vidéos, documents) attendent le réseau.
   const [offline, setOffline] = useState(false);
-  const canAdd = canAddProp && !offline;
-  const canEdit = useCallback((it: BoardItem) => !offline && (role === "admin" || Boolean(clientEditAll) || it.mine), [clientEditAll, offline, role]);
+  const canAdd = canAddProp;
+  const canEdit = useCallback((it: BoardItem) => role === "admin" || Boolean(clientEditAll) || it.mine, [clientEditAll, role]);
+  /** Message passager (conflits avec le client, envoi après une coupure…). */
+  const [notice, setNotice] = useState<string | null>(null);
 
   // ——— Historique (Cmd + Z / Cmd + Maj + Z) ———
   // Chaque modification enregistrée marque la carte ; après 0,6 s de calme, l'état « avant » et l'état
@@ -893,6 +896,10 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
       onProgress?: (done: number) => void,
       as?: MediaPick,
     ) => {
+      if (!navigator.onLine) {
+        alert("Sans réseau, les photos, vidéos et documents ne peuvent pas être ajoutés : réessayez au retour de la connexion. Le reste du tableau se modifie normalement.");
+        return [];
+      }
       const images = as && as !== "image" ? files : files.filter((f) => mediaKindOf(f, role) !== null);
       const failed: string[] = [];
       for (const [i, file] of images.entries()) {
@@ -1681,6 +1688,7 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
       version.current = json.v ?? "";
       fullAt.current = Date.now();
       const server = json.items;
+      sync.learn(server);
       const local = itemsRef.current;
       const next: Items = {};
       const keep = (id: string) => sync.isPending(id) || uploading.current.has(id) || editing?.id === id || dragId === id;
@@ -1707,7 +1715,9 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
     const down = () => setOffline(true);
     const up = () => {
       lastActivity.current = Date.now();
+      sync.resume();
       void refresh();
+      void flushOrphans();
     };
     window.addEventListener("offline", down);
     window.addEventListener("online", up);
@@ -1715,7 +1725,7 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
       window.removeEventListener("offline", down);
       window.removeEventListener("online", up);
     };
-  }, [refresh]);
+  }, [refresh, sync]);
 
   // Page reprise de la mémoire du navigateur (retour sur un tableau vu il y a quelques secondes) : on relit tout de suite
   // les cartes, pour ne jamais travailler sur une version dépassée.
@@ -1723,6 +1733,48 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
     if (renderedAt && Date.now() - renderedAt > 5000) void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ——— Hors connexion ———
+  useEffect(() => {
+    const detach = sync.attach();
+    sync.learn(initialItems);
+    sync.onConflicts = (list: SyncConflict[]) => {
+      const copies = list.filter((c) => c.copy).length;
+      const kept = list.length - copies;
+      setNotice(
+        [
+          copies ? `${copies} carte${copies > 1 ? "s ont" : " a"} aussi été modifiée${copies > 1 ? "s" : ""} par quelqu'un d'autre : sa version est gardée, la vôtre est juste à côté.` : "",
+          kept ? `${kept} carte${kept > 1 ? "s" : ""} modifiée${kept > 1 ? "s" : ""} ailleurs entre-temps : leur version est gardée.` : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
+      );
+      void refresh();
+    };
+    void flushOrphans();
+    // Rouverte sans réseau ou avec une copie ancienne de la page : on remet la dernière version vue sur cet appareil,
+    // puis les modifications pas encore envoyées.
+    void loadSnapshot(endpoint).then((snap) => {
+      const pending = sync.pending();
+      const useSnap = snap && renderedAt && snap.savedAt > renderedAt;
+      if (!useSnap && !pending.length) return;
+      const next: Items = useSnap ? Object.fromEntries(snap.items.map((i) => [i.id, i])) : { ...itemsRef.current };
+      for (const op of pending) {
+        if (op.op === "delete") delete next[op.id];
+        else next[op.item.id] = { ...(next[op.item.id] ?? { author: null, mine: true, src: null }), ...op.item };
+      }
+      committed.current = { ...next };
+      setItems(next);
+    });
+    return detach;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sync]);
+
+  // Dernière version vue gardée sur l'appareil (1,5 s après la dernière modification).
+  useEffect(() => {
+    const t = setTimeout(() => void saveSnapshot(endpoint, { savedAt: Date.now(), items: Object.values(items) }), 1500);
+    return () => clearTimeout(t);
+  }, [items, endpoint]);
 
   useEffect(() => {
     const timer = setInterval(refresh, POLL_MS);
@@ -2981,8 +3033,10 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
     { label: "Vidéo", Icon: FilmIcon, run: () => pickMedia("video"), drop: (at, extra) => pickMedia("video", at, extra), studio: true, tint: "#2aa7b8" },
     { label: "Titre", Icon: TypeIcon, run: () => addHeading(), drop: addHeading, tint: "transparent" },
   ];
-  const moreTools = moreList.filter((t) => (!t.studio || role === "admin") && (!t.edit || role === "admin" || clientEditAll));
-  const visibleTools = tools.filter((t) => (!t.admin || role === "admin") && (!t.edit || role === "admin" || clientEditAll));
+  // Sans réseau : les outils qui envoient un fichier ou lisent le serveur sont mis de côté.
+  const NEEDS_NETWORK = ["Image", "Images projet", "Importer", "Importer doc", "Audio", "Vidéo"];
+  const moreTools = moreList.filter((t) => (!t.studio || role === "admin") && (!t.edit || role === "admin" || clientEditAll) && !(offline && NEEDS_NETWORK.includes(t.label)));
+  const visibleTools = tools.filter((t) => (!t.admin || role === "admin") && (!t.edit || role === "admin" || clientEditAll) && !(offline && NEEDS_NETWORK.includes(t.label)));
 
   /** Nouvelle carte avec une photo ou vidéo du projet / de la banque : le serveur copie le fichier (comme un copier-coller). */
   const placeLibraryImage = (img: LibraryImage, at?: At, extra?: Extra) =>
@@ -3386,9 +3440,17 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
 
       {offline && (
         <div data-ui className="absolute z-[250000] left-1/2 -translate-x-1/2 top-3 max-w-[calc(100%-24px)] px-4 py-2 rounded-full bg-amber-500 text-black text-[12px] shadow-lg text-center">
-          Hors connexion · lecture seule
-          {renderedAt ? ` · copie du ${new Date(renderedAt).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}
-          <span className="hidden sm:inline"> — tout se met à jour au retour du réseau</span>
+          Hors connexion · vos modifications sont gardées sur cet appareil
+          <span className="hidden sm:inline"> et partiront au retour du réseau</span>
+        </div>
+      )}
+
+      {notice && (
+        <div data-ui className="absolute z-[250000] left-1/2 -translate-x-1/2 top-14 max-w-[min(560px,calc(100%-24px))] px-4 py-2.5 rounded-[6px] bg-ink text-bg text-[13px] shadow-lg flex items-start gap-3">
+          <span className="flex-1">{notice}</span>
+          <button onClick={() => setNotice(null)} aria-label="Fermer" className="shrink-0 opacity-70 hover:opacity-100">
+            ✕
+          </button>
         </div>
       )}
 
@@ -3482,13 +3544,21 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
 
       {/* Zoom et état de l'enregistrement */}
       <div data-ui className="absolute z-[200000] right-3 bottom-[max(env(safe-area-inset-bottom),12px)] sm:bottom-4 sm:right-4 flex flex-col items-end gap-2">
-        {!offline && (role === "admin" || canAdd) && (
+        {(role === "admin" || canAdd) && (
           // Au téléphone : seulement en cas d'erreur (sinon ça gêne).
-          <span className={`text-[11px] px-2 ${status.state === "error" ? "text-danger" : "text-muted hidden sm:inline"}`}>
-            {status.state === "saving" ? "Enregistrement…" : status.state === "error" ? status.message : "Enregistré"}
+          <span className={`text-[11px] px-2 ${status.state === "error" && !offline ? "text-danger" : "text-muted hidden sm:inline"}`}>
+            {offline && status.state !== "saved"
+              ? "Gardé sur l'appareil"
+              : status.state === "saving"
+              ? "Enregistrement…"
+              : status.state === "offline"
+                ? "Gardé sur l'appareil"
+                : status.state === "error"
+                  ? status.message
+                  : "Enregistré"}
           </span>
         )}
-        {!offline && (role === "admin" || canAdd) && (
+        {(role === "admin" || canAdd) && (
           <div className="hidden sm:flex bg-bg border border-line shadow-sm rounded-[4px] text-muted">
             <button
               className="w-10 h-10 flex items-center justify-center hover:text-ink disabled:opacity-30"

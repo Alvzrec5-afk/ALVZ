@@ -115,6 +115,10 @@ alvzrec.com vers `/site` si un jour le domaine est déplacé (option B). Inutili
 Publié aussi : ouverture des tableaux plus rapide — fonctions SQL `board_path` / `board_tree` (déjà en base) pour le chemin
 et les planches en une requête ; ménage des cartes supprimées et réparation des cases vides (`repairEmptyImages`) lancés après l'affichage (`after`). Le modèle en base a déjà reçu « 5. STORYBOARD » (planches suivantes renumérotées 6 et 7).
 
+En attente de « publie » (20 oct., committé en local) : **studio hors connexion** — tableaux consultables et modifiables
+sans réseau (avion), modifications gardées sur l'appareil puis envoyées au retour ; si le client a modifié la même carte,
+sa version est gardée et la nôtre ajoutée à côté. Détail : `docs/carte-du-code.md`, section « Hors connexion ».
+
 - **À faire par le propriétaire** : poser une fois l'index.html (Studio → Site → Relier alvzrec.com) sur l'ancien compte Netlify, puis vérifier alvzrec.com (clips, photos, coulisses).
 - **À vérifier en vrai par le propriétaire** : panneau « Images projet » (déplacer, agrandir, glisser une image sur le tableau), onglets des planches, Studio → Site (ajout d'un lien YouTube, envoi de photos), Accueil `/admin` (chiffres, stockage détaillé), Banque d'images (copie d'office d'une photo envoyée, onglet, corbeille), ouverture d'une planche ; menu « … » (plan Google Maps, envoi d'un PDF / MP3 vers Oracle), case photo vide (choix parmi les photos du projet) ;
   vidéo dans un tableau (envoi depuis l'iPhone, lecture, plein écran) ; capture d'un tableau **depuis l'iPhone** (nette au zoom ? photos présentes ? non testé sur vrai Safari) et avec de vraies photos Oracle (si elles sortent
