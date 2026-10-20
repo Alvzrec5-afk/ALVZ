@@ -29,7 +29,7 @@ construit et les règles de travail convenues avec le propriétaire.
 | Site | https://alvzgalleries.com (aussi alvzgalleries.netlify.app) |
 | Netlify | projet `alvzgalleries`, site id `16e80748-88fd-49c9-a6ae-b72b12bcfb17`, équipe `luis-alves-andrade`, offre gratuite (crédits), fonctions aux USA (iad) |
 | Branche de production | `claude/alvz-photo-gallery-platform-tig9or` (dépôt `Alvzrec5-afk/ALVZ`) |
-| Supabase | projet `ayootztgiuhpqgeckwfu` (eu-west-1, Irlande) — outils MCP Supabase disponibles |
+| Supabase | projet **`eioymzumjfgpsetncicl`** « ALVZ Studio (US) » (us-east-1, à côté des fonctions Netlify) depuis le 21 oct. 2026 — outils MCP Supabase disponibles. Ancien projet `ayootztgiuhpqgeckwfu` (Irlande) gardé comme sauvegarde, à supprimer plus tard |
 | Stockage | Oracle Object Storage (API S3), région eu-paris-1, bucket privé, URL pré-signées |
 | E-mails | Gmail `alvzrec.pro@gmail.com` via SMTP (mot de passe d'application) |
 
@@ -160,5 +160,8 @@ Lenteur du 20 oct. vers 22 h UTC : encore Supabase (auth/token 18 s, REST 8 s, b
   rafraîchissement par version (`boardVersion`, `?v=`), `adminApiWith` (contrôle admin en parallèle), envois photo en parallèle.
   Changer la région Netlify = offre Pro seulement. Option proposée, non décidée : déplacer la base
   Supabase en us-east-1 (nouveau projet, recopie des données, 3 variables Netlify à changer).
-- Côté propriétaire : supprimer le compte de test `e2e-test@alvz.invalid` dans Supabase et vérifier
-  que les inscriptions sont désactivées.
+- Déménagement aux USA (21 oct.) : 29 migrations rejouées (structure identique, vérifiée par empreintes), données recopiées
+  de base à base (pg_net + fonction d'export à jeton, fermée ensuite), compte `alvzrec.pro@gmail.com` repris (même mot de passe) ;
+  le compte de test `e2e-test@alvz.invalid` n'a pas été repris. Inscriptions désactivées et Site URL réglés par le propriétaire.
+  L'outil MCP `execute_sql` attend une confirmation du propriétaire pour DELETE/UPDATE/TRUNCATE/REVOKE (sinon délai dépassé) ;
+  la mise à jour des variables Netlify par MCP renvoie 422 : le propriétaire les change à la main.

@@ -12,9 +12,10 @@ import { createSessionClient } from "@/lib/supabase/server";
  * pas dans cette liste et va la chercher lui-même, comme avant. (unstable_cache plutôt que le cache de fetch, que les
  * pages en force-dynamic n'utilisent pas.)
  */
+// L'adresse du projet fait partie de la clé du cache : un changement de projet Supabase ne reprend pas les anciennes clés.
 const cachedKeys = unstable_cache(
-  async () => {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/.well-known/jwks.json`, {
+  async (url: string) => {
+    const res = await fetch(`${url}/auth/v1/.well-known/jwks.json`, {
       headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY! },
       cache: "no-store",
     });
@@ -29,7 +30,7 @@ const cachedKeys = unstable_cache(
 
 async function signingKeys() {
   try {
-    return await cachedKeys();
+    return await cachedKeys(process.env.NEXT_PUBLIC_SUPABASE_URL!);
   } catch {
     return undefined;
   }
