@@ -433,3 +433,28 @@ grant execute on function public.board_tree(uuid) to authenticated, service_role
 
 -- Planches du projet d'un tableau (onglets de navigation) : migration « board_planches ».
 -- board_planches(target uuid) returns table (id, title, parent_id) — remonte au tableau principal puis descend (5 niveaux).
+
+-- Tableaux en direct : signal « changed » (seulement l'heure) sur le canal Realtime public « board:<id> »
+-- à chaque enregistrement de cartes ; les pages ouvertes relisent alors le tableau.
+create or replace function private.board_items_broadcast() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare r record;
+begin
+  for r in
+    select c.board_id, max(greatest(c.updated_at, coalesce(c.deleted_at, c.updated_at))) as at
+    from changed c group by c.board_id
+  loop
+    begin
+      perform realtime.send(jsonb_build_object('at', r.at), 'changed', 'board:' || r.board_id::text, false);
+    exception when others then
+      null;
+    end;
+  end loop;
+  return null;
+end $$;
+create trigger board_items_live_ins after insert on public.board_items
+  referencing new table as changed for each statement execute function private.board_items_broadcast();
+create trigger board_items_live_upd after update on public.board_items
+  referencing new table as changed for each statement execute function private.board_items_broadcast();
+create trigger board_items_live_del after delete on public.board_items
+  referencing old table as changed for each statement execute function private.board_items_broadcast();

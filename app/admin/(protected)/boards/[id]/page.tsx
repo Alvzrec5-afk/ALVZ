@@ -66,6 +66,7 @@ export default async function BoardPage({
           imageEndpoint={`/api/admin/boards/${id}/image`}
           role="admin"
           canAdd
+          liveId={id}
           openImport={query.import === "1"}
         />
       </div>

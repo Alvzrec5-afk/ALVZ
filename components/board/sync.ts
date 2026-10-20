@@ -50,6 +50,8 @@ export class BoardSync {
   /** Version (date serveur) connue de chaque carte : celle reçue à l'ouverture, au rafraîchissement ou après notre envoi. */
   private known = new Map<string, string>();
   onConflicts: (c: SyncConflict[]) => void = () => {};
+  /** Envoi confirmé par le serveur (heure de la version enregistrée) : sert au direct. */
+  onSaved: (at: string) => void = () => {};
 
   constructor(
     private endpoint: string,
@@ -164,6 +166,7 @@ export class BoardSync {
       this.inflight.clear();
       this.save();
       this.retries = 0;
+      if (json.at) this.onSaved(json.at);
       if (json.conflicts?.length) this.onConflicts(json.conflicts);
       if (this.queue.size) this.schedule(150);
       else this.onStatus({ state: "saved" });

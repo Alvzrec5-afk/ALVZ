@@ -114,11 +114,14 @@ type Props = {
   commentsEndpoint: string;
   /** Client autorisé à modifier toutes les cartes (option « Le client peut tout modifier »). */
   clientEditAll?: boolean;
+  /** Identifiant du tableau : canal « direct » (les modifications du client / du studio arrivent tout de suite). */
+  liveId?: string;
 };
 
 const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 2.5;
 const POLL_MS = 30_000;
+const LIVE_POLL_MS = 90_000;
 const IDLE_STOP_MS = 10 * 60_000;
 
 const toInput = (it: BoardItem): BoardItemInput => ({
@@ -301,7 +304,7 @@ function InlineInput({
   );
 }
 
-export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint, role, canAdd: canAddProp, visitorName, joinEndpoint, openImport, boardBase, commentsEndpoint, clientEditAll }: Props) {
+export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint, role, canAdd: canAddProp, visitorName, joinEndpoint, openImport, boardBase, commentsEndpoint, clientEditAll, liveId }: Props) {
   const router = useRouter();
   const rootRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -1673,10 +1676,15 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
   // Version du tableau déjà reçue : tant qu'elle ne bouge pas, le serveur répond « rien de neuf » sans tout relire.
   // Rechargement complet au moins une fois par heure : les adresses des images expirent au bout de 3 h.
   const version = useRef("");
+  const liveMissed = useRef(false);
   const fullAt = useRef(Date.now());
-  const refresh = useCallback(async () => {
-    if (document.visibilityState !== "visible" || Date.now() - lastActivity.current > IDLE_STOP_MS) return;
-    if (dragId) return;
+  const refresh = useCallback(async (live = false) => {
+    if (document.visibilityState !== "visible") return;
+    if (!live && Date.now() - lastActivity.current > IDLE_STOP_MS) return;
+    if (dragId) {
+      if (live) liveMissed.current = true; // relu dès la fin du déplacement
+      return;
+    }
     try {
       if (Date.now() - fullAt.current > 60 * 60_000) version.current = "";
       const url = version.current ? `${endpoint}${endpoint.includes("?") ? "&" : "?"}v=${encodeURIComponent(version.current)}` : endpoint;
@@ -1776,8 +1784,62 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
     return () => clearTimeout(t);
   }, [items, endpoint]);
 
+  // ——— Direct ———
+  // Canal Realtime « board:<id> » : la base y signale chaque enregistrement (déclencheur `board_items_broadcast`),
+  // et la page qui enregistre prévient aussi les autres pages ouvertes. On relit alors le tableau tout de suite.
+  // Nos propres enregistrements (même heure que celle rendue par le serveur) sont ignorés.
+  const [live, setLive] = useState(false);
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
   useEffect(() => {
-    const timer = setInterval(refresh, POLL_MS);
+    if (!liveId) return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const ours = new Set<number>();
+    let cleanup = () => {};
+    const later = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => void refreshRef.current(true), 350);
+    };
+    void import("@/lib/supabase/browser").then(({ createClient }) => {
+      if (stopped) return;
+      const supabase = createClient();
+      const channel = supabase
+        .channel(`board:${liveId}`, { config: { private: false, broadcast: { self: false } } })
+        .on("broadcast", { event: "changed" }, ({ payload }) => {
+          const at = Date.parse((payload as { at?: string } | undefined)?.at ?? "");
+          if (ours.has(at)) return;
+          later();
+        })
+        .subscribe((state) => setLive(state === "SUBSCRIBED"));
+      sync.onSaved = (at) => {
+        ours.add(Date.parse(at));
+        if (ours.size > 50) ours.delete(ours.values().next().value!);
+        void channel.send({ type: "broadcast", event: "changed", payload: { at } });
+      };
+      cleanup = () => {
+        sync.onSaved = () => {};
+        void supabase.removeChannel(channel);
+      };
+    }).catch(() => {}); // pas de direct (réseau, réglages) : la relecture régulière continue
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+      cleanup();
+    };
+  }, [liveId, sync]);
+
+  // Changement arrivé pendant un déplacement : relu à la fin.
+  useEffect(() => {
+    if (!dragId && liveMissed.current) {
+      liveMissed.current = false;
+      void refresh(true);
+    }
+  }, [dragId, refresh]);
+
+  useEffect(() => {
+    // En direct : la relecture régulière n'est plus qu'un filet de sécurité (moins de fonctions Netlify).
+    const timer = setInterval(() => void refresh(), live ? LIVE_POLL_MS : POLL_MS);
     const vis = () => {
       if (document.visibilityState === "visible") {
         lastActivity.current = Date.now();
@@ -1796,7 +1858,7 @@ export function BoardCanvas({ initialItems, renderedAt, endpoint, imageEndpoint,
       document.removeEventListener("visibilitychange", vis);
       window.removeEventListener("beforeunload", leave);
     };
-  }, [refresh, sync]);
+  }, [refresh, sync, live]);
 
   // ——— Rendu des cartes ———
 

@@ -144,6 +144,15 @@ repart au retour du réseau, même pour une planche fermée (`flushOrphans`, lan
 ajoute **la nôtre en copie** à +40 px (fichier image copié aussi) ; pas de copie pour planche / flèche / commentaire ;
 suppression ignorée. Réponse `{ at, conflicts }`, message dans le tableau. Hors connexion : outils qui demandent le
 réseau cachés (`NEEDS_NETWORK`), envoi de fichiers refusé avec un message, bandeau « Hors connexion ».
+
+**Tableaux en direct** — canal Supabase Realtime public `board:<id>` (prop `liveId` de `BoardCanvas`, studio et
+vue client). Deux sources de signal « changed » `{ at }` (aucun contenu) : le déclencheur SQL `private.board_items_broadcast`
+(`realtime.send`, à chaque enregistrement de cartes, déjà en base) et la page qui vient d'enregistrer (`sync.onSaved` →
+`channel.send`). À réception, relecture du tableau 350 ms plus tard (`refresh(true)`, même au repos ; pendant un
+déplacement : à la fin). Nos propres enregistrements (même `at`) sont ignorés. En direct, la relecture régulière passe
+de 30 s à 90 s (`LIVE_POLL_MS`). Sans direct (réseau, réglage Realtime) : rien ne casse, relecture toutes les 30 s.
+Faux conflits évités dans `sync.ts` : la version connue ne recule jamais (`learn`) et une modification faite pendant
+un envoi repart de notre version (`base` = `json.at`).
 **Accueil (`/admin`)** — `components/admin/studio-dashboard.tsx` : 8 compteurs (liens), `StorageMeter` avec
 `parts` (`storageParts`, couleurs `--series-1…4` de globals.css, vérifiées daltoniens), galeries les plus lourdes
 (`storageUsage().perGallery`), récents. Chiffres : `studioOverview()` (`lib/usage.ts`) → fonction SQL `studio_overview()`
