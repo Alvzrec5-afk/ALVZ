@@ -272,3 +272,10 @@ images des tableaux). Schéma de référence :
   une fois par heure (adresses d'images valables 3 h). Réparation des cases vides chez Oracle seulement à l'ouverture
   (`loadBoardItems(…, { repair: true })`).
 - Envoi photo de galerie : vérifications (galerie, doublon, stockage, collection) en parallèle.
+
+
+**Logos** — `components/wordmark.tsx` : `variant="rec"` (défaut, ALVZ.REC : galeries, vidéos, tableaux partagés, site) ou
+`variant="studio"` (ALVZ .STUDIO : barre et menu du studio, connexion, haut de l'Accueil, en-tête d'un tableau). Fichiers
+`public/brand/studio-logo-{white,dark}.png`, icônes `public/studio-icon.png` / `studio-apple-icon.png` (métadonnées de
+`app/admin/layout.tsx` + `studio.webmanifest`) et `desktop/icon.png` (app Mac). Fabriqués par `scripts/studio-logo.py`
+(« ALVZ » repris du logo d'origine, « .STUDIO » redessiné en pochoir : `python3 scripts/studio-logo.py . <dossier>`).

@@ -92,7 +92,7 @@ export function BoardHeader({
             <aside className="absolute left-0 top-0 h-full w-[78%] max-w-xs bg-bg border-r border-line flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] animate-[slideInLeft_0.25s_ease-out_both]">
               <div className="flex items-center justify-between h-20 px-7 border-b border-line">
                 <Link href="/admin" onClick={() => setNav(false)} className="flex items-center gap-3">
-                  <Wordmark height={26} />
+                  <Wordmark height={26} variant="studio" />
                   <span className="eyebrow text-muted tracking-[0.2em]">studio</span>
                 </Link>
                 <button className="icon-btn -mr-2" onClick={() => setNav(false)} aria-label="Fermer">

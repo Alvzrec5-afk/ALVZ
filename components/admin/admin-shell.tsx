@@ -54,7 +54,7 @@ export function AdminShell({ children, signOut }: { children: React.ReactNode; s
       <header className="border-b border-line lg:hidden sticky top-0 z-40 bg-bg pt-[env(safe-area-inset-top)]">
         <div className="px-3 h-14 flex items-center justify-center">
           <Link href="/admin">
-            <Wordmark height={28} />
+            <Wordmark height={30} variant="studio" />
           </Link>
         </div>
       </header>
@@ -113,11 +113,10 @@ export function AdminShell({ children, signOut }: { children: React.ReactNode; s
 
       {!galleryPage && (
         <aside className="hidden lg:flex fixed inset-y-0 left-0 w-64 flex-col border-r border-line bg-bg z-30">
-          <Link href="/admin" className="flex items-center gap-3 h-20 px-7 border-b border-line">
-            <Wordmark height={28} />
-            <span className="eyebrow text-muted tracking-[0.2em]">studio</span>
+          <Link href="/admin" className="flex items-center h-20 shrink-0 px-7 border-b border-line">
+            <Wordmark height={34} variant="studio" />
           </Link>
-          <nav className="py-4 flex-1">
+          <nav className="py-4 flex-1 overflow-y-auto">
             {NAV.map((item) => (
               <NavItem key={item.href} {...item} active={item.match(pathname)} />
             ))}

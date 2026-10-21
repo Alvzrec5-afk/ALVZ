@@ -11,6 +11,6 @@
   "lang": "fr",
   "icons": [
     { "src": "/studio-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/apple-icon.png", "sizes": "180x180", "type": "image/png" }
+    { "src": "/studio-apple-icon.png", "sizes": "180x180", "type": "image/png" }
   ]
 }

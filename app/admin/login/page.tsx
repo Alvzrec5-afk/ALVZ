@@ -9,7 +9,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <main className="min-h-svh flex items-center justify-center px-6">
       <div className="w-full max-w-sm">
         <div className="flex justify-center">
-          <Wordmark height={72} />
+          <Wordmark height={72} variant="studio" />
         </div>
         <h1 className="display text-4xl text-center mt-10 mb-12">Espace studio</h1>
         <LoginForm initialError={error === "not-admin" ? "Ce compte n'a pas accès à l'espace studio." : null} />

@@ -4,6 +4,7 @@ import { storageParts, type StudioOverview } from "@/lib/usage";
 import { StorageAlert } from "@/components/admin/storage-meter";
 import { BoardIcon, FilmIcon, GalleryIcon, ImageIcon } from "@/components/icons";
 import { HoverLink } from "@/components/admin/hover-link";
+import { Wordmark } from "@/components/wordmark";
 import { StorageAudit } from "@/components/admin/storage-audit";
 import { StorageLimit } from "@/components/admin/storage-limit";
 import { CountUp, DashboardActions } from "@/components/admin/dashboard-parts";
@@ -149,7 +150,13 @@ export function StudioDashboard({ o, usage, activity, recent, galleries, boards 
     <div>
       <div className="flex items-start justify-between gap-4">
         <div className="motion-safe:animate-[fadeUp_0.6s_ease-out_both]">
-          <h1 className="display text-4xl sm:text-5xl">Studio</h1>
+          <h1>
+            <span className="sr-only">Studio</span>
+            <span className="hidden lg:block">
+              <Wordmark variant="studio" height={64} />
+            </span>
+            <span className="display text-4xl sm:text-5xl lg:hidden">Studio</span>
+          </h1>
           <p className="text-sm text-muted mt-3">Vue d&apos;ensemble de vos galeries, vidéos et tableaux.</p>
         </div>
         <DashboardActions galleries={galleries} boards={boards} />

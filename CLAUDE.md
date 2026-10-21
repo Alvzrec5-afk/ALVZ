@@ -143,9 +143,11 @@ Publié (21 oct.) : Studio → Site, coulisses et matériel en nombre libre (pho
 et liste du matériel modifiable (colonne `site_settings.kit`, déjà en base US). Le propriétaire doit **reposer l'index.html** sur
 l'ancien compte Netlify pour que alvzrec.com montre les photos en plus et la nouvelle liste (l'ancienne page ne lit que 3 + 1 photos).
 
-En attente de « publie » (21 oct.) : **nouvelle page d'Accueil** dynamique (indicateurs animés + courbes 14 jours, projets
+Publié (21 oct.) : **nouvelle page d'Accueil** dynamique (indicateurs animés + courbes 14 jours, projets
 récents en images, jauge en demi-cercle, recherche ⌘K, menu « + » au téléphone).
-Aussi en attente : **onglets en bas de l'écran au téléphone** (Accueil, Galeries, Vidéos, Tableaux, Plus).
+Publié aussi : **onglets en bas de l'écran au téléphone** (Accueil, Galeries, Vidéos, Tableaux, Plus).
+Publié aussi : logo **ALVZ .STUDIO** (même style pochoir) dans le studio, icônes de l'app iPhone et Mac ; ALVZ.REC gardé
+pour les galeries, vidéos et pages des clients. Au push, `desktop/icon.png` relance la fabrication du .dmg (GitHub Actions).
 
 - **À faire par le propriétaire** : poser une fois l'index.html (Studio → Site → Relier alvzrec.com) sur l'ancien compte Netlify, puis vérifier alvzrec.com (clips, photos, coulisses).
 - **À vérifier en vrai par le propriétaire** : tableau modifié en mode avion puis réseau remis (iPhone et Mac), panneau « Images projet » (déplacer, agrandir, glisser une image sur le tableau), onglets des planches, Studio → Site (ajout d'un lien YouTube, envoi de photos), Accueil `/admin` (chiffres, stockage détaillé), Banque d'images (copie d'office d'une photo envoyée, onglet, corbeille), ouverture d'une planche ; menu « … » (plan Google Maps, envoi d'un PDF / MP3 vers Oracle), case photo vide (choix parmi les photos du projet) ;
