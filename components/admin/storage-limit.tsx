@@ -12,6 +12,8 @@ import { ORACLE_PRICE_PER_GB_MONTH, STORAGE_LIMIT_CHOICES } from "@/lib/storage-
 export function StorageLimit({ limitGb }: { limitGb: number }) {
   const [value, setValue] = useState(limitGb);
   const [error, setError] = useState("");
+  // Les limites au-delà des 20 Go gratuits restent cachées tant qu'on ne les demande pas.
+  const [more, setMore] = useState(limitGb > 20);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   const choices = (STORAGE_LIMIT_CHOICES as readonly number[]).includes(limitGb) ? STORAGE_LIMIT_CHOICES : [...STORAGE_LIMIT_CHOICES, limitGb].sort((a, b) => a - b);
@@ -24,6 +26,14 @@ export function StorageLimit({ limitGb }: { limitGb: number }) {
         environ {ORACLE_PRICE_PER_GB_MONTH.toString().replace(".", ",")} $ par Go et par mois, seulement pour l&apos;espace vraiment utilisé
         {extra > 0 && <> (au plus {(extra * ORACLE_PRICE_PER_GB_MONTH).toFixed(2).replace(".", ",")} $ par mois si les {value} Go sont remplis)</>}.
       </p>
+      {!more ? (
+        <span className="flex items-center gap-3 text-sm shrink-0">
+          Limite : 20 Go (gratuit)
+          <button onClick={() => setMore(true)} className="text-xs text-muted underline underline-offset-2 hover:text-ink">
+            Augmenter
+          </button>
+        </span>
+      ) : (
       <label className="flex items-center gap-2 text-sm shrink-0">
         Limite
         <select
@@ -51,6 +61,7 @@ export function StorageLimit({ limitGb }: { limitGb: number }) {
           ))}
         </select>
       </label>
+      )}
       {error && <p className="w-full text-sm text-danger">{error}</p>}
     </div>
   );

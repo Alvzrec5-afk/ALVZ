@@ -174,7 +174,7 @@ POST nettoie puis `refreshOracleTotal`), bouton `components/admin/storage-audit.
 rangée comme photo / vidéo / image de tableau / couverture / photo du site dont la ligne n'existe plus ; supprimé seulement après
 24 h ; autres clés jamais touchées ; garde-fou : rien n'est supprimé si plus de la moitié des fichiers semblent orphelins.
 Limite choisie dans le studio : colonne `studio_settings.storage_limit_gb` (sinon `STORAGE_LIMIT_GB`, sinon 20 Go), sélecteur
-`components/admin/storage-limit.tsx` sous la jauge de l'Accueil (choix dans `lib/storage-limits.ts` : 20/50/100/200/500 Go),
+`components/admin/storage-limit.tsx` sous la jauge de l'Accueil (« 20 Go (gratuit) » + lien « Augmenter » qui montre les autres choix de `lib/storage-limits.ts` : 20/50/100/200/500 Go),
 action `app/admin/storage-actions.ts` `setStorageLimit`. `storageUsage` rend aussi `free` (20 Go gratuits) : trait sur la jauge
 et coût estimé au-delà (`ORACLE_PRICE_PER_GB_MONTH`, indicatif).
 
