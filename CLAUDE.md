@@ -134,7 +134,8 @@ Lenteur du 20 oct. vers 22 h UTC : encore Supabase (auth/token 18 s, REST 8 s, b
 Publié (21 oct.) : alerte de stockage (Accueil, galeries, vidéos) dès 75 % ; limite par défaut **20 Go**
 (plafond Oracle « Toujours gratuit », Object + Archive combinés ; au-delà, données supprimées à la fin de l'essai) ; jauge et refus d'envoi sur l'espace **réel** du bucket ;
 bouton « Analyser l'espace réel chez Oracle » + « Libérer » (orphelins, envois interrompus). Le 21 oct. Oracle comptait 6,92 Go pour
-~2,3 Go connus du studio. « Pay As You Go » seulement s'il veut dépasser 20 Go (puis relever `STORAGE_LIMIT_GB`). Les 200 Go gratuits d'Oracle sont des disques de serveur, pas le stockage du studio : déconseillé.
+~2,3 Go connus du studio. Compte Oracle passé en **« Paiement à l'utilisation »** le 21 oct. (plus de risque de suppression ; autorisation
+bancaire de 93 € attendue en retour). Limite du studio laissée à 20 Go ; pour plus, régler `STORAGE_LIMIT_GB` dans Netlify + Trigger deploy. Les 200 Go gratuits d'Oracle sont des disques de serveur, pas le stockage du studio : déconseillé.
 
 Publié (21 oct.) : Studio → Site, coulisses et matériel en nombre libre (photos ajoutées, déplacées, retirées)
 et liste du matériel modifiable (colonne `site_settings.kit`, déjà en base US). Le propriétaire doit **reposer l'index.html** sur
