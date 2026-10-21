@@ -59,7 +59,7 @@ export default async function VideosHome() {
       </div>
       <GalleryGrid galleries={projects} kind="video" />
       <div className="mt-20">
-        <StorageMeter used={usage.total} limit={usage.limit} parts={storageParts(overview, usage.untracked)} />
+        <StorageMeter used={usage.total} limit={usage.limit} free={usage.free} parts={storageParts(overview, usage.untracked)} />
       </div>
     </div>
   );

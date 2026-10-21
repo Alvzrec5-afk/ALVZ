@@ -462,3 +462,7 @@ create trigger board_items_live_del after delete on public.board_items
 -- Site alvzrec : liste du matériel (type + modèle), modifiable dans le studio (Studio → Site).
 alter table public.site_settings add column if not exists kit jsonb not null
   default '[{"type":"kit_a7","model":"Sony a7 IV"},{"type":"kit_a67","model":"Sony a6700"},{"type":"kit_drone","model":"DJI Neo 2"}]'::jsonb;
+
+-- Limite des envois choisie dans le studio (Accueil, sous la jauge). Vide = STORAGE_LIMIT_GB ou 20 Go (partie gratuite d'Oracle).
+alter table public.studio_settings add column if not exists storage_limit_gb integer
+  check (storage_limit_gb is null or storage_limit_gb between 1 and 10000);

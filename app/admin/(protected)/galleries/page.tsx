@@ -58,7 +58,7 @@ export default async function GalleriesHome() {
       </div>
       <GalleryGrid galleries={galleries} />
       <div className="mt-20">
-        <StorageMeter used={usage.total} limit={usage.limit} parts={storageParts(overview, usage.untracked)} />
+        <StorageMeter used={usage.total} limit={usage.limit} free={usage.free} parts={storageParts(overview, usage.untracked)} />
       </div>
       <div className="mt-4 border-t border-line pt-8">
         <StorageCheck />

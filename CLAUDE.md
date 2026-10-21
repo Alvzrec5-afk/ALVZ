@@ -135,7 +135,9 @@ Publié (21 oct.) : alerte de stockage (Accueil, galeries, vidéos) dès 75 % ; 
 (plafond Oracle « Toujours gratuit », Object + Archive combinés ; au-delà, données supprimées à la fin de l'essai) ; jauge et refus d'envoi sur l'espace **réel** du bucket ;
 bouton « Analyser l'espace réel chez Oracle » + « Libérer » (orphelins, envois interrompus). Le 21 oct. Oracle comptait 6,92 Go pour
 ~2,3 Go connus du studio. Compte Oracle passé en **« Paiement à l'utilisation »** le 21 oct. (plus de risque de suppression ; autorisation
-bancaire de 93 € attendue en retour). Limite du studio laissée à 20 Go ; pour plus, régler `STORAGE_LIMIT_GB` dans Netlify + Trigger deploy. Les 200 Go gratuits d'Oracle sont des disques de serveur, pas le stockage du studio : déconseillé.
+bancaire de 93 € attendue en retour). En attente de « publie » : limite des envois choisie **dans le studio**
+(Accueil, sous la jauge : 20/50/100/200/500 Go, colonne `studio_settings.storage_limit_gb` déjà en base US), trait des 20 Go
+gratuits sur la jauge et coût estimé au-delà. Les 200 Go gratuits d'Oracle sont des disques de serveur, pas le stockage du studio : déconseillé.
 
 Publié (21 oct.) : Studio → Site, coulisses et matériel en nombre libre (photos ajoutées, déplacées, retirées)
 et liste du matériel modifiable (colonne `site_settings.kit`, déjà en base US). Le propriétaire doit **reposer l'index.html** sur

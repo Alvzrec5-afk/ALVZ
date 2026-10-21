@@ -1,4 +1,5 @@
 import { formatBytes } from "@/lib/format";
+import { ORACLE_PRICE_PER_GB_MONTH } from "@/lib/storage-limits";
 
 /** Couleurs des catégories (ordre fixe, vérifié pour les daltoniens) : `--series-1…5` dans globals.css. */
 const SERIES = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)", "var(--series-5)", "var(--muted)"];
@@ -7,8 +8,21 @@ const SERIES = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--
  * Jauge d'espace de stockage Oracle utilisé. Avec `parts` : barre découpée par catégorie
  * (galeries, vidéos, tableaux, banque d'images) et légende avec l'espace de chacune.
  */
-export function StorageMeter({ used, limit, parts }: { used: number; limit: number; parts?: { label: string; bytes: number }[] }) {
+export function StorageMeter({
+  used,
+  limit,
+  parts,
+  free,
+}: {
+  used: number;
+  limit: number;
+  parts?: { label: string; bytes: number }[];
+  /** Partie gratuite d'Oracle : repère sur la barre quand la limite la dépasse (paiement à l'utilisation). */
+  free?: number;
+}) {
   const pct = Math.min(100, (used / limit) * 100);
+  const paid = free && used > free ? used - free : 0;
+  const freeMark = free && free < limit ? (free / limit) * 100 : null;
   const level = pct >= 95 ? "danger" : pct >= 80 ? "warn" : "ok";
   const bar = level === "danger" ? "bg-danger" : level === "warn" ? "bg-amber-400" : "bg-emerald-500";
   const shown = parts?.filter((p) => p.bytes > 0) ?? [];
@@ -21,7 +35,8 @@ export function StorageMeter({ used, limit, parts }: { used: number; limit: numb
         </span>
       </div>
       {parts ? (
-        <div className="mt-3 h-2 bg-bg-soft rounded-full overflow-hidden flex gap-[2px]">
+        <div className="relative mt-3">
+        <div className="h-2 bg-bg-soft rounded-full overflow-hidden flex gap-[2px]">
           {shown.map((p) => (
             <div
               key={p.label}
@@ -31,13 +46,28 @@ export function StorageMeter({ used, limit, parts }: { used: number; limit: numb
             />
           ))}
         </div>
+        {freeMark !== null && (
+          <span
+            className="absolute -top-1 -bottom-1 w-px bg-ink/60"
+            style={{ left: `${freeMark}%` }}
+            title={`${formatBytes(free!)} gratuits`}
+            aria-hidden
+          />
+        )}
+        </div>
       ) : (
         <div className="mt-3 h-1.5 bg-bg-soft rounded-full overflow-hidden">
           <div className={`h-full ${bar} rounded-full transition-[width] duration-700`} style={{ width: `${Math.max(pct, used > 0 ? 1 : 0)}%` }} />
         </div>
       )}
       <p className={`mt-2 text-xs ${level === "ok" ? "text-muted" : level === "warn" ? "text-warn" : "text-danger"}`}>
-        {level === "ok" && `${Math.round(pct)} % utilisé · ${formatBytes(Math.max(0, limit - used))} disponibles`}
+        {level === "ok" &&
+          `${Math.round(pct)} % utilisé · ${formatBytes(Math.max(0, limit - used))} disponibles` +
+            (freeMark !== null
+              ? paid
+                ? ` · ${formatBytes(paid)} au-delà des ${formatBytes(free!)} gratuits (environ ${(paid / 1024 ** 3 * ORACLE_PRICE_PER_GB_MONTH).toFixed(2).replace(".", ",")} $ par mois)`
+                : ` · le trait marque les ${formatBytes(free!)} gratuits`
+              : "")}
         {level === "warn" && `${Math.round(pct)} % utilisé : pensez à supprimer d'anciennes galeries ou à agrandir le stockage Oracle.`}
         {level === "danger" && `${Math.round(pct)} % utilisé : stockage presque plein, les nouveaux envois seront bientôt bloqués.`}
       </p>
@@ -84,9 +114,8 @@ export function StorageAlert({ used, limit }: { used: number; limit: number }) {
       <ul className="text-sm text-muted mt-1 list-disc pl-5 space-y-1">
         <li>supprimer d&apos;anciennes galeries ou vidéos (voir « Ce qui prend le plus de place » sur l&apos;Accueil) ;</li>
         <li>
-          agrandir le stockage Oracle : passer le compte en « Pay As You Go » (quelques centimes par Go et par mois au-delà
-          du gratuit), puis relever la limite du studio (variable STORAGE_LIMIT_GB dans Netlify). Un compte gratuit ne doit
-          jamais dépasser 20 Go : Oracle supprimerait les données.
+          relever la limite sur l&apos;Accueil, sous la jauge (compte Oracle en paiement à l&apos;utilisation : quelques centimes
+          par Go et par mois au-delà des 20 Go gratuits).
         </li>
       </ul>
     </div>

@@ -5,12 +5,13 @@ import { StorageAlert, StorageMeter } from "@/components/admin/storage-meter";
 import { BoardIcon, FilmIcon, ImageIcon, PlusIcon } from "@/components/icons";
 import { HoverLink } from "@/components/admin/hover-link";
 import { StorageAudit } from "@/components/admin/storage-audit";
+import { StorageLimit } from "@/components/admin/storage-limit";
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("fr-FR")} ${n > 1 ? many : one}`;
 
 export type DashboardProps = {
   o: StudioOverview;
-  usage: { total: number; untracked: number; limit: number; perGallery: Map<string, number> };
+  usage: { total: number; untracked: number; limit: number; free: number; perGallery: Map<string, number> };
   galleries: { id: string; title: string; kind: string; created_at: string }[];
   boards: { id: string; title: string; updated_at: string }[];
 };
@@ -73,7 +74,8 @@ export function StudioDashboard({ o, usage, galleries: list, boards }: Dashboard
       </div>
 
       <div id="stockage" className="mt-8 scroll-mt-8">
-        <StorageMeter used={usage.total} limit={usage.limit} parts={storageParts(o, usage.untracked)} />
+        <StorageMeter used={usage.total} limit={usage.limit} free={usage.free} parts={storageParts(o, usage.untracked)} />
+        <StorageLimit limitGb={Math.round(usage.limit / 1024 ** 3)} />
         <StorageAudit />
       </div>
 
