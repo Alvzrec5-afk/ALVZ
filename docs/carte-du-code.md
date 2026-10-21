@@ -183,6 +183,12 @@ les `img[data-slot]` (bts1-3, kit) puis exécute les scripts. `lib/site.ts` : `l
 Actions `app/admin/site-actions.ts` (clips, photos, échange de place `swapSitePhotos`, emplacements fixes `slot`). Interface
 `components/admin/site-manager.tsx`. Photos : `site/items/<id>.jpg` + `-thumb.jpg` (Oracle), comptées dans `storage_usage` et
 la catégorie « Site » de la jauge (5e couleur `--series-5`).
+Coulisses et matériel (21 oct.) : plus d'emplacements fixes. `GROUP_CATEGORIES` (`lib/site.ts`) : photos en nombre libre,
+chacune son ordre (`commitSitePhoto` ajoute à la fin, flèches = `swapSitePhotos`). Page : 3 premières coulisses en grand
+(`data-slot` bts1-3), les autres dans `#btsMore` (bande qu'on fait défiler) ; 1re photo du matériel à côté de la liste, les autres
+dans `#kitMore`. Liste du matériel : colonne `site_settings.kit` (jsonb `[{type, model}]`, `cleanKit`, 12 lignes au plus,
+`saveSiteKit`) ; `type` = clé traduite par la page (`KIT_TYPES` : kit_a7, kit_a67, kit_drone, kit_lens, kit_mic, kit_gimbal,
+kit_light) ou texte libre. `siteData` envoie `bts`, `kitPhotos`, `kit` en plus de `slots` (gardé pour l'ancienne page).
 
 **Corbeille (`/admin/trash`, menu Outils)** — supprimer une galerie, un projet vidéo ou un tableau (principal) met
 `deleted_at` (`trashGallery`, `deleteBoard`) ; restaurer = `deleted_at` à null ; « Supprimer définitivement » =

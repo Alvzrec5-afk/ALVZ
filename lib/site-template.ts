@@ -177,6 +177,11 @@ export const SITE_HTML = String.raw`<!DOCTYPE html>
   .spec li { display: grid; gap: 6px; padding: 24px 0; border-bottom: 1px solid var(--line); }
   .spec .k { color: var(--mute); font-size: 15px; }
   .spec .v { font-family: var(--display); font-weight: 800; text-transform: uppercase; font-size: clamp(36px, 5.4vw, 68px); line-height: 1; }
+  /* Photos en plus (coulisses après les 3 grandes, matériel après la principale) : bande qu'on fait défiler. */
+  .bts-more, .kit-more { display: flex; gap: 10px; margin-top: 10px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: thin; padding-bottom: 4px; }
+  .bts-more[hidden], .kit-more[hidden] { display: none; }
+  .bts-more figure, .kit-more figure { flex: 0 0 clamp(120px, 24%, 210px); aspect-ratio: 4/5; overflow: hidden; border-radius: 4px; background: var(--surface); scroll-snap-align: start; margin: 0; }
+  .bts-more img, .kit-more img { width: 100%; height: 100%; object-fit: cover; }
 
   /* CONTACT */
   .contact { padding: clamp(110px, 16vw, 200px) 0 48px; overflow: hidden; }
@@ -492,6 +497,7 @@ export const SITE_HTML = String.raw`<!DOCTYPE html>
         <figure><img data-slot="bts2" src="https://i.imgur.com/9aEFGnn.jpeg" alt="Tournage ALVZ REC, entre deux prises" loading="lazy"></figure>
         <figure><img data-slot="bts3" src="https://i.imgur.com/MCTCyM1.jpeg" alt="Tournage ALVZ REC, mise en place" loading="lazy"></figure>
       </div>
+      <div class="bts-more" id="btsMore" hidden></div>
       </div>
       <div id="materiel">
         <div class="head reveal"><h2 data-i18n="kit_title">Caméras et drone</h2></div>
@@ -503,6 +509,7 @@ export const SITE_HTML = String.raw`<!DOCTYPE html>
           <li><span class="k" data-i18n="kit_drone">Drone</span><span class="v">DJI Neo 2</span></li>
         </ul>
       </div>
+      <div class="kit-more" id="kitMore" hidden></div>
       </div>
     </div>
   </section>
@@ -581,6 +588,7 @@ export const SITE_HTML = String.raw`<!DOCTYPE html>
       wa_sport: 'Salut ! Je viens de ton site, je voudrais un devis pour des photos de sport.',
       bts_title: 'Coulisses', bts_sub: 'Sur le plateau, entre deux prises.',
       kit_title: 'Caméras et drone', kit_a7: 'Caméra plein format', kit_a67: 'Caméra APS-C', kit_drone: 'Drone',
+      kit_lens: 'Objectif', kit_mic: 'Micro', kit_gimbal: 'Stabilisateur', kit_light: 'Lumière',
       contact_title: 'On en parle', contact_sub: 'Écris-moi sur WhatsApp ou Instagram avec ta date et ton idée. Je réponds vite.',
       contact_cta: 'Écrire sur WhatsApp', footer: 'Vidéo et photo',
       cat_evenement: 'Événements', o_evenement: 'Événement', o_evenement_d: 'Anniversaires, soirées et fêtes de famille, avec un décor et des invités mis en valeur.',
@@ -612,6 +620,7 @@ export const SITE_HTML = String.raw`<!DOCTYPE html>
       wa_sport: 'Hi! I found your website and I would like a quote for sport photos.',
       bts_title: 'Behind the scenes', bts_sub: 'On set, between takes.',
       kit_title: 'Cameras and drone', kit_a7: 'Full-frame camera', kit_a67: 'APS-C camera', kit_drone: 'Drone',
+      kit_lens: 'Lens', kit_mic: 'Microphone', kit_gimbal: 'Gimbal', kit_light: 'Lighting',
       contact_title: 'Let’s talk', contact_sub: 'Message me on WhatsApp or Instagram with your date and your idea. I reply fast.',
       contact_cta: 'Message on WhatsApp', footer: 'Video and photo',
       cat_evenement: 'Events', o_evenement: 'Event', o_evenement_d: 'Birthdays, parties and family celebrations, with the setting and the guests at their best.',
@@ -643,6 +652,7 @@ export const SITE_HTML = String.raw`<!DOCTYPE html>
       wa_sport: 'Olá! Vi o teu site e queria um orçamento para fotos de desporto.',
       bts_title: 'Bastidores', bts_sub: 'No set, entre takes.',
       kit_title: 'Câmaras e drone', kit_a7: 'Câmara full frame', kit_a67: 'Câmara APS-C', kit_drone: 'Drone',
+      kit_lens: 'Objetiva', kit_mic: 'Microfone', kit_gimbal: 'Estabilizador', kit_light: 'Iluminação',
       contact_title: 'Bora falar', contact_sub: 'Escreve-me no WhatsApp ou Instagram com a data e a tua ideia. Respondo rápido.',
       contact_cta: 'Escrever no WhatsApp', footer: 'Vídeo e foto',
       cat_evenement: 'Eventos', o_evenement: 'Evento', o_evenement_d: 'Aniversários, festas e celebrações de família, com o cenário e os convidados em destaque.',
@@ -1028,6 +1038,31 @@ export const SITE_HTML = String.raw`<!DOCTYPE html>
       window.SITE = data;
       var slots = data.slots || {};
       document.querySelectorAll('img[data-slot]').forEach(function (im) { var src = slots[im.getAttribute('data-slot')]; if (src) im.src = src; });
+      /* Coulisses après les 3 grandes, photos du matériel après la principale : bande qu'on fait défiler. */
+      function strip(id, list, alt) {
+        var box = document.getElementById(id);
+        if (!box || !list || !list.length) return;
+        list.forEach(function (p) {
+          var fig = document.createElement('figure'), im = document.createElement('img');
+          im.src = p.thumb || p.src; im.alt = alt; im.loading = 'lazy';
+          fig.appendChild(im); box.appendChild(fig);
+        });
+        box.hidden = false;
+      }
+      if (data.bts) strip('btsMore', data.bts.slice(3), 'Tournage ALVZ REC, coulisses');
+      if (data.kitPhotos) strip('kitMore', data.kitPhotos.slice(1), 'Le matériel de tournage ALVZ REC');
+      /* Liste du matériel (type traduit par la page quand c'est une clé connue, sinon tel quel). */
+      var spec = document.querySelector('#materiel .spec');
+      if (spec && data.kit && data.kit.length) {
+        spec.textContent = '';
+        data.kit.forEach(function (it) {
+          var li = document.createElement('li'), k = document.createElement('span'), v = document.createElement('span');
+          k.className = 'k'; v.className = 'v';
+          if (/^kit_[a-z0-9]+$/.test(it.type)) k.setAttribute('data-i18n', it.type);
+          k.textContent = it.type; v.textContent = it.model;
+          li.appendChild(k); li.appendChild(v); spec.appendChild(li);
+        });
+      }
       document.querySelectorAll('script[data-boot]').forEach(function (s) { var n = document.createElement('script'); n.text = s.text; document.body.appendChild(n); });
     }
     /* Page servie par le studio lui-même : le contenu est déjà là. */

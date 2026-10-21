@@ -3,14 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { requireAdminApi } from "@/lib/auth";
 import { formatBytes } from "@/lib/format";
-import { MAX_SITE_IMAGE_BYTES, PHOTO_CATEGORIES, SLOT_CATEGORIES, type SiteSlug, siteItemKey, siteThumbKey, youtubeId, youtubeInfo } from "@/lib/site";
+import { GROUP_CATEGORIES, MAX_SITE_IMAGE_BYTES, PHOTO_CATEGORIES, type SiteSlug, cleanKit, siteItemKey, siteThumbKey, youtubeId, youtubeInfo } from "@/lib/site";
 import { deleteKeys, objectSize, presignPut } from "@/lib/storage";
 import { storageUsage } from "@/lib/usage";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
 const isUuid = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f-]{36}$/i.test(v);
-const isSlug = (v: unknown): v is SiteSlug => (PHOTO_CATEGORIES as readonly unknown[]).includes(v) || (typeof v === "string" && v in SLOT_CATEGORIES);
+const isSlug = (v: unknown): v is SiteSlug => (PHOTO_CATEGORIES as readonly unknown[]).includes(v) || (GROUP_CATEGORIES as readonly unknown[]).includes(v);
 const fail = (e: unknown) => ({ ok: false as const, error: e instanceof Error ? e.message : String(e) });
 const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 type Db = Awaited<ReturnType<typeof requireAdminApi>>["supabase"];
@@ -114,30 +114,17 @@ export async function prepareSitePhoto(size: number, thumbSize: number): Promise
   }
 }
 
-/**
- * Photo envoyée : ajoutée à la fin de sa catégorie, ou (coulisses, matériel) mise à la place `slot`
- * de l'ancienne photo, qui est alors effacée.
- */
-export async function commitSitePhoto(slug: string, photo: { id: string; width: number; height: number }, slot?: number): Promise<Result> {
+/** Photo envoyée : ajoutée à la fin de sa catégorie (coulisses et matériel ont chacun leur propre ordre). */
+export async function commitSitePhoto(slug: string, photo: { id: string; width: number; height: number }): Promise<Result> {
   try {
     const { supabase } = await requireAdminApi();
     if (!isSlug(slug) || !isUuid(photo.id)) throw new Error("Requête invalide");
     const [size, thumbSize, catId] = await Promise.all([objectSize(siteItemKey(photo.id)), objectSize(siteThumbKey(photo.id)), categoryId(supabase, slug)]);
     if (!size) throw new Error("La photo n'est pas arrivée, réessayez.");
-    let position: number;
-    if (slug in SLOT_CATEGORIES) {
-      const max = SLOT_CATEGORIES[slug as keyof typeof SLOT_CATEGORIES];
-      const index = Math.max(0, Math.min(max - 1, Math.round(Number(slot) || 0)));
-      const { data: current } = await supabase.from("site_items").select("id, external_url, position").eq("category_id", catId).order("position").order("created_at");
-      const old = (current ?? [])[index];
-      position = old ? Number(old.position) : index + 1;
-      if (old) await removeItem(supabase, old.id as string, Boolean(old.external_url));
-    } else {
-      // Les photos des catégories se suivent dans un seul ordre (celui de « Tout » sur le site).
-      const ids = await Promise.all(PHOTO_CATEGORIES.map((s) => categoryId(supabase, s)));
-      const { data: last } = await supabase.from("site_items").select("position").in("category_id", ids).order("position", { ascending: false }).limit(1).maybeSingle();
-      position = (Number(last?.position) || 0) + 1;
-    }
+    // Les photos des catégories se suivent dans un seul ordre (celui de « Tout » sur le site) ; coulisses et matériel : le leur.
+    const ids = (GROUP_CATEGORIES as readonly string[]).includes(slug) ? [catId] : await Promise.all(PHOTO_CATEGORIES.map((s) => categoryId(supabase, s)));
+    const { data: last } = await supabase.from("site_items").select("position").in("category_id", ids).order("position", { ascending: false }).limit(1).maybeSingle();
+    const position = (Number(last?.position) || 0) + 1;
     const { error } = await supabase.from("site_items").insert({
       id: photo.id,
       category_id: catId,
@@ -200,6 +187,21 @@ export async function setSitePhotoCategory(id: string, slug: string): Promise<Re
     if (!isUuid(id) || !(PHOTO_CATEGORIES as readonly string[]).includes(slug)) throw new Error("Requête invalide");
     const { error } = await supabase.from("site_items").update({ category_id: await categoryId(supabase, slug as SiteSlug) }).eq("id", id);
     if (error) throw new Error(error.message);
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/* ----- Matériel ----- */
+
+/** Liste du matériel affichée à côté de la photo « Caméras et drone » (type + modèle). */
+export async function saveSiteKit(items: { type: string; model: string }[]): Promise<Result> {
+  try {
+    const { supabase } = await requireAdminApi();
+    const { error } = await supabase.from("site_settings").update({ kit: cleanKit(items), updated_at: new Date().toISOString() }).eq("id", 1);
+    if (error) throw new Error(error.message);
+    revalidatePath("/admin/site");
     return { ok: true };
   } catch (e) {
     return fail(e);

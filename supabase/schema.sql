@@ -458,3 +458,7 @@ create trigger board_items_live_upd after update on public.board_items
   referencing new table as changed for each statement execute function private.board_items_broadcast();
 create trigger board_items_live_del after delete on public.board_items
   referencing old table as changed for each statement execute function private.board_items_broadcast();
+
+-- Site alvzrec : liste du matériel (type + modèle), modifiable dans le studio (Studio → Site).
+alter table public.site_settings add column if not exists kit jsonb not null
+  default '[{"type":"kit_a7","model":"Sony a7 IV"},{"type":"kit_a67","model":"Sony a6700"},{"type":"kit_drone","model":"DJI Neo 2"}]'::jsonb;

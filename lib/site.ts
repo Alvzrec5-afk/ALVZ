@@ -9,10 +9,38 @@ import { presignGet } from "@/lib/storage";
  * studio (Studio → Site) : clips YouTube, photos par catégorie, coulisses, matériel. WhatsApp = Coordonnées.
  */
 
-/** Catégories de photos du site (libellés traduits dans la page elle-même) et emplacements fixes. */
+/**
+ * Catégories de photos du site (libellés traduits dans la page elle-même), puis les groupes à part : coulisses (les 3
+ * premières en grand, les autres dans une bande dessous) et matériel (la première à côté de la liste, les autres dessous).
+ */
 export const PHOTO_CATEGORIES = ["sport", "portrait", "evenement", "bapteme", "mariage"] as const;
-export const SLOT_CATEGORIES = { coulisses: 3, materiel: 1 } as const;
-export type SiteSlug = (typeof PHOTO_CATEGORIES)[number] | keyof typeof SLOT_CATEGORIES;
+export const GROUP_CATEGORIES = ["coulisses", "materiel"] as const;
+export type SiteSlug = (typeof PHOTO_CATEGORIES)[number] | (typeof GROUP_CATEGORIES)[number];
+
+/** Types de matériel traduits par la page (clé → libellé français) ; tout autre texte est affiché tel quel. */
+export const KIT_TYPES: Record<string, string> = {
+  kit_a7: "Caméra plein format",
+  kit_a67: "Caméra APS-C",
+  kit_drone: "Drone",
+  kit_lens: "Objectif",
+  kit_mic: "Micro",
+  kit_gimbal: "Stabilisateur",
+  kit_light: "Lumière",
+};
+export type KitItem = { type: string; model: string };
+export const MAX_KIT_ITEMS = 12;
+
+/** Liste du matériel nettoyée (texte court, 12 lignes au plus, lignes vides retirées). */
+export function cleanKit(input: unknown): KitItem[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((x) => ({
+      type: String((x as KitItem)?.type ?? "").trim().slice(0, 60),
+      model: String((x as KitItem)?.model ?? "").trim().slice(0, 60),
+    }))
+    .filter((x) => x.model)
+    .slice(0, MAX_KIT_ITEMS);
+}
 
 export const MAX_SITE_IMAGE_BYTES = 4 * 1024 * 1024;
 
@@ -29,10 +57,11 @@ export type SitePhoto = { id: string; slug: SiteSlug; src: string; thumb: string
 export type SiteClip = { id: string; youtubeId: string; artist: string; title: string; kind: "clip" | "visualizer"; start: number };
 
 export async function loadSiteContent(db: SupabaseClient) {
-  const [{ data: cats }, { data: items }, { data: clips }] = await Promise.all([
+  const [{ data: cats }, { data: items }, { data: clips }, { data: settings }] = await Promise.all([
     db.from("site_categories").select("id, slug"),
     db.from("site_items").select("id, category_id, external_url, size_bytes, thumb_size, position").order("position").order("created_at"),
     db.from("site_clips").select("id, youtube_id, artist, title, kind, start_at").order("position").order("created_at"),
+    db.from("site_settings").select("kit").eq("id", 1).maybeSingle(),
   ]);
   const slugOf = new Map((cats ?? []).map((c) => [c.id as string, c.slug as SiteSlug]));
   const photos: SitePhoto[] = (
@@ -52,6 +81,7 @@ export async function loadSiteContent(db: SupabaseClient) {
   return {
     categories: new Map((cats ?? []).map((c) => [c.slug as SiteSlug, c.id as string])),
     photos,
+    kit: cleanKit(settings?.kit),
     clips: (clips ?? []).map((c) => ({
       id: c.id as string,
       youtubeId: c.youtube_id as string,
@@ -63,7 +93,10 @@ export async function loadSiteContent(db: SupabaseClient) {
   };
 }
 
-/** Contenu public du site : clips, photos (catégories), photos des emplacements fixes, numéro WhatsApp. */
+/**
+ * Contenu public du site : clips, photos (catégories), coulisses et matériel (toutes leurs photos + la liste), WhatsApp.
+ * `slots` reste pour l'ancienne page (index.html d'avant, qui ne connaît que 3 coulisses + 1 photo de matériel).
+ */
 export async function siteData(db: SupabaseClient) {
   const [content, { data: studio }] = await Promise.all([loadSiteContent(db), db.from("studio_settings").select("contact").eq("id", 1).maybeSingle()]);
   const contact = (studio?.contact ?? {}) as Contact;
@@ -73,6 +106,9 @@ export async function siteData(db: SupabaseClient) {
     clips: content.clips.map((c) => ({ id: c.youtubeId, artist: c.artist, title: c.title, kind: c.kind, start: c.start })),
     photos: content.photos.filter((p) => (PHOTO_CATEGORIES as readonly string[]).includes(p.slug)).map((p) => ({ src: p.src, thumb: p.thumb, cat: p.slug })),
     slots: { bts1: slot("coulisses", 0), bts2: slot("coulisses", 1), bts3: slot("coulisses", 2), kit: slot("materiel", 0) },
+    bts: content.photos.filter((p) => p.slug === "coulisses").map((p) => ({ src: p.src, thumb: p.thumb })),
+    kitPhotos: content.photos.filter((p) => p.slug === "materiel").map((p) => ({ src: p.src, thumb: p.thumb })),
+    kit: content.kit,
   };
 }
 export type SiteData = Awaited<ReturnType<typeof siteData>>;
