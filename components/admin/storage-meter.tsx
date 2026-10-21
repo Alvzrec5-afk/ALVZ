@@ -84,8 +84,9 @@ export function StorageAlert({ used, limit }: { used: number; limit: number }) {
       <ul className="text-sm text-muted mt-1 list-disc pl-5 space-y-1">
         <li>supprimer d&apos;anciennes galeries ou vidéos (voir « Ce qui prend le plus de place » sur l&apos;Accueil) ;</li>
         <li>
-          agrandir le stockage Oracle : passer le compte en « Pay As You Go » (environ 2,50 € par mois pour 100 Go de plus),
-          puis relever la limite du studio (variable STORAGE_LIMIT_GB dans Netlify).
+          agrandir le stockage Oracle : passer le compte en « Pay As You Go » (quelques centimes par Go et par mois au-delà
+          du gratuit), puis relever la limite du studio (variable STORAGE_LIMIT_GB dans Netlify). Un compte gratuit ne doit
+          jamais dépasser 20 Go : Oracle supprimerait les données.
         </li>
       </ul>
     </div>

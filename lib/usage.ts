@@ -4,12 +4,13 @@ import { revalidateTag, unstable_cache } from "next/cache";
 import { listAllObjects, listOpenUploads } from "@/lib/storage";
 
 /**
- * Limite de stockage en octets (variable STORAGE_LIMIT_GB). 10 Go par défaut : l'offre gratuite d'Oracle donne 10 Go de
- * stockage d'objets « Standard » (les 10 Go « Archive » ne servent pas au studio : fichiers lisibles seulement après restauration).
+ * Limite de stockage en octets (variable STORAGE_LIMIT_GB). 20 Go par défaut : un compte Oracle « Toujours gratuit » a droit
+ * à 20 Go au total (Object Storage + Archive) ; au-delà, à la fin de l'essai gratuit, Oracle supprime les données.
+ * Les envois sont refusés à la limite (calculée sur l'espace réel du bucket), elle ne peut donc pas être dépassée.
  */
 export function storageLimitBytes() {
   const gb = Number(process.env.STORAGE_LIMIT_GB);
-  return (Number.isFinite(gb) && gb > 0 ? gb : 10) * 1024 ** 3;
+  return (Number.isFinite(gb) && gb > 0 ? gb : 20) * 1024 ** 3;
 }
 
 const ORACLE_TAG = "oracle-usage";

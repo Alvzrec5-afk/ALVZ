@@ -163,7 +163,8 @@ un envoi repart de notre version (`base` = `json.at`).
 (jsonb ; espace calculé comme `storage_usage`, banque d'images = arbre du tableau `is_library`). Liste des galeries photo :
 `/admin/galleries` (page `galleries/page.tsx`) ; `/admin/accueil` (ancienne adresse) redirige vers `/admin`.
 Alerte de stockage : `StorageAlert` (`storage-meter.tsx`), en haut de l'Accueil, des galeries et des vidéos dès 75 % de la
-limite (`STORAGE_LIMIT_GB`, **10 Go** par défaut = stockage « Standard » gratuit d'Oracle ; les 10 Go « Archive » ne servent pas ; au-delà, les envois sont refusés), rouge dès 95 % ;
+limite (`STORAGE_LIMIT_GB`, **20 Go** par défaut = plafond d'un compte Oracle « Toujours gratuit », Object + Archive combinés ;
+au-delà, à la fin de l'essai, Oracle supprime les données ; au-delà, les envois sont refusés), rouge dès 95 % ;
 conseille de supprimer d'anciennes galeries ou de passer Oracle en « Pay As You Go » puis de relever `STORAGE_LIMIT_GB`.
 Espace réel : `lib/usage.ts` `storageUsage` prend le plus grand de la base (`storage_usage`) et du total réel du bucket
 (`oracleTotal`, liste de tous les objets + envois en morceaux non terminés, `unstable_cache` 1 h, tag `oracle-usage`) ;

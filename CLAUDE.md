@@ -131,11 +131,10 @@ de Next (`unstable_cache`, `lib/auth.ts`) au lieu d'être redemandées à chaque
 Publié aussi : le client n'ajoute plus que notes, images, couleurs, commentaires et le menu « … » (croquis, nuancier, document, carte, titre ; pas d'envoi de fichier), règle aussi côté serveur.
 Lenteur du 20 oct. vers 22 h UTC : encore Supabase (auth/token 18 s, REST 8 s, base au repos) ; conseillé : Supabase Pro.
 
-En attente de « publie » (21 oct.) : alerte de stockage (Accueil, galeries, vidéos) dès 75 % ; limite par défaut ramenée à **10 Go**
-(Oracle gratuit = 10 Go Standard + 10 Go Archive, inutilisable pour le studio) ; jauge et refus d'envoi sur l'espace **réel** du bucket ;
+Publié (21 oct.) : alerte de stockage (Accueil, galeries, vidéos) dès 75 % ; limite par défaut **20 Go**
+(plafond Oracle « Toujours gratuit », Object + Archive combinés ; au-delà, données supprimées à la fin de l'essai) ; jauge et refus d'envoi sur l'espace **réel** du bucket ;
 bouton « Analyser l'espace réel chez Oracle » + « Libérer » (orphelins, envois interrompus). Le 21 oct. Oracle comptait 6,92 Go pour
-~2,3 Go connus du studio. Conseillé au propriétaire : passer Oracle en « Pay As You Go » (fin de l'essai gratuit : au-delà du gratuit,
-les données sont supprimées) et vérifier que `STORAGE_LIMIT_GB` n'est pas réglé à 20 dans Netlify. Les 200 Go gratuits d'Oracle sont des disques de serveur, pas le stockage du studio : déconseillé.
+~2,3 Go connus du studio. « Pay As You Go » seulement s'il veut dépasser 20 Go (puis relever `STORAGE_LIMIT_GB`). Les 200 Go gratuits d'Oracle sont des disques de serveur, pas le stockage du studio : déconseillé.
 
 - **À faire par le propriétaire** : poser une fois l'index.html (Studio → Site → Relier alvzrec.com) sur l'ancien compte Netlify, puis vérifier alvzrec.com (clips, photos, coulisses).
 - **À vérifier en vrai par le propriétaire** : tableau modifié en mode avion puis réseau remis (iPhone et Mac), panneau « Images projet » (déplacer, agrandir, glisser une image sur le tableau), onglets des planches, Studio → Site (ajout d'un lien YouTube, envoi de photos), Accueil `/admin` (chiffres, stockage détaillé), Banque d'images (copie d'office d'une photo envoyée, onglet, corbeille), ouverture d'une planche ; menu « … » (plan Google Maps, envoi d'un PDF / MP3 vers Oracle), case photo vide (choix parmi les photos du projet) ;
