@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Wordmark } from "@/components/wordmark";
 import { BackgroundStatus } from "./background";
 import { clearOffline } from "./offline-support";
-import { BoardIcon, GlobeIcon, HomeIcon, TrashIcon, CardIcon, CloseIcon, FilmIcon, ImageIcon, LogoutIcon, MegaphoneIcon, MenuIcon } from "@/components/icons";
+import { BoardIcon, GlobeIcon, HomeIcon, TrashIcon, CardIcon, CloseIcon, DotsIcon, FilmIcon, ImageIcon, LogoutIcon, MegaphoneIcon } from "@/components/icons";
 
 const NAV = [
   { href: "/admin", label: "Accueil", Icon: HomeIcon, match: (p: string) => p === "/admin" },
@@ -21,8 +21,11 @@ const TOOLS = [
   { href: "/admin/trash", label: "Corbeille", Icon: TrashIcon, match: (p: string) => p.startsWith("/admin/trash") },
 ];
 
+/** Onglets de la barre du bas (téléphone) ; « Plus » ouvre le reste du menu. */
+const TABS = NAV.slice(0, 4);
+
 /**
- * Mobile : barre en haut. Ordinateur : menu latéral à gauche (comme Pixieset) ;
+ * Téléphone : logo en haut et onglets en bas de l'écran (comme une app). Ordinateur : menu latéral à gauche (comme Pixieset) ;
  * la page d'une galerie occupe tout l'écran avec sa propre barre.
  */
 export function AdminShell({ children, signOut }: { children: React.ReactNode; signOut: () => Promise<void> }) {
@@ -31,6 +34,11 @@ export function AdminShell({ children, signOut }: { children: React.ReactNode; s
   // Un tableau occupe tout l'écran, avec sa propre barre (aussi sur téléphone).
   const boardPage = /^\/admin\/boards\/(?!new)[^/]+/.test(pathname);
   const [menu, setMenu] = useState(false);
+  const tabBar = !boardPage && !galleryPage;
+  // Hauteur de la barre du bas, pour que les bulles d'état (envois en arrière-plan…) passent au-dessus.
+  useEffect(() => {
+    document.documentElement.style.setProperty("--tabbar", tabBar ? "4.25rem" : "0px");
+  }, [tabBar]);
 
   if (boardPage)
     return (
@@ -42,34 +50,55 @@ export function AdminShell({ children, signOut }: { children: React.ReactNode; s
 
   return (
     <div className="min-h-svh">
-      {/* Mobile : logo au milieu ; menu ☰ sur les pages principales (pas dans une galerie).
-          Barre fixe en haut (l'app iPhone n'a pas de barre Safari), décalée sous l'heure et la batterie. */}
+      {/* Téléphone : logo au milieu, barre fixe en haut (l'app iPhone n'a pas de barre Safari), décalée sous l'heure. */}
       <header className="border-b border-line lg:hidden sticky top-0 z-40 bg-bg pt-[env(safe-area-inset-top)]">
-        <div className="px-3 h-16 grid grid-cols-[2.75rem_1fr_2.75rem] items-center">
-          <span />
-          <Link href="/admin" className="justify-self-center">
-            <Wordmark height={30} />
+        <div className="px-3 h-14 flex items-center justify-center">
+          <Link href="/admin">
+            <Wordmark height={28} />
           </Link>
-          {!galleryPage && (
-            <button className="icon-btn" onClick={() => setMenu(true)} aria-label="Menu">
-              <MenuIcon />
-            </button>
-          )}
         </div>
       </header>
+
+      {/* Téléphone : onglets en bas de l'écran, au-dessus de la barre d'accueil de l'iPhone. */}
+      {tabBar && (
+        <nav className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-line bg-bg/90 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
+          <div className="grid grid-cols-5 h-[4.25rem]">
+            {TABS.map((t) => {
+              const active = t.match(pathname);
+              return (
+                <Link
+                  key={t.href}
+                  href={t.href}
+                  className={`relative flex flex-col items-center justify-center gap-1 text-[11px] transition-colors ${active ? "text-ink" : "text-muted"}`}
+                >
+                  <span className={`absolute top-0 h-[2px] w-8 rounded-full bg-ink transition-all duration-300 ${active ? "opacity-100" : "opacity-0 scale-x-0"}`} />
+                  <t.Icon className={`w-[22px] h-[22px] transition-transform duration-300 ${active ? "-translate-y-0.5" : ""}`} />
+                  {t.label}
+                </Link>
+              );
+            })}
+            <button onClick={() => setMenu(true)} className={`flex flex-col items-center justify-center gap-1 text-[11px] ${menu ? "text-ink" : "text-muted"}`} aria-label="Plus">
+              <DotsIcon className="w-[22px] h-[22px]" />
+              Plus
+            </button>
+          </div>
+        </nav>
+      )}
 
       {menu && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/50 animate-[fadeIn_0.2s_ease-out_both]" onClick={() => setMenu(false)} />
-          <aside className="absolute right-0 top-0 h-full w-[78%] max-w-xs bg-bg border-l border-line flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] animate-[slideIn_0.25s_ease-out_both]">
-            <div className="flex items-center justify-between h-16 px-6">
+          {/* « Plus » : le menu complet monte du bas de l'écran. */}
+          <aside className="absolute inset-x-0 bottom-0 max-h-[85svh] overflow-y-auto bg-bg border-t border-line rounded-t-2xl flex flex-col pb-[env(safe-area-inset-bottom)] animate-[sheetUp_0.28s_cubic-bezier(.2,.8,.2,1)_both]">
+            <span className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-line" aria-hidden />
+            <div className="flex items-center justify-between h-14 px-6">
               <span className="eyebrow text-muted">Studio</span>
               <button className="icon-btn -mr-2" onClick={() => setMenu(false)} aria-label="Fermer">
                 <CloseIcon />
               </button>
             </div>
             <nav className="flex-1" onClick={() => setMenu(false)}>
-              {[...NAV, ...TOOLS].map((item) => (
+              {[...NAV.slice(TABS.length), ...TOOLS].map((item) => (
                 <NavItem key={item.href} {...item} active={item.match(pathname)} />
               ))}
             </nav>
@@ -109,7 +138,7 @@ export function AdminShell({ children, signOut }: { children: React.ReactNode; s
         className={
           galleryPage
             ? "px-5 sm:px-8 py-6 lg:p-0"
-            : "mx-auto max-w-6xl px-5 sm:px-8 py-6 sm:py-14 lg:max-w-none lg:mx-0 lg:ml-64 lg:px-12 lg:py-10"
+            : "mx-auto max-w-6xl px-5 sm:px-8 pt-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pt-14 lg:pb-10 lg:max-w-none lg:mx-0 lg:ml-64 lg:px-12 lg:pt-10"
         }
       >
         {children}

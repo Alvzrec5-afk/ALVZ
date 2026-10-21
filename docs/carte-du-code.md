@@ -185,6 +185,9 @@ dessinent (`Spark`, animation `drawLine` de globals.css), cartes images avec bad
 jauge en demi-cercle (`StorageArc`), « Ce qui prend le plus de place », carte Oracle (limite + analyse en version `compact`).
 `components/admin/dashboard-parts.tsx` : `CountUp`, `DashboardActions` (boutons de création, « + » en menu au téléphone,
 recherche ⌘K / Ctrl+K parmi galeries, vidéos et tableaux).
+Téléphone (21 oct.) : `admin-shell.tsx` affiche des onglets en bas de l'écran (`TABS` = Accueil, Galeries, Vidéos, Tableaux
++ « Plus » qui fait monter le reste du menu, animation `sheetUp`), sauf dans un tableau ou une galerie ouverte ; variable CSS
+`--tabbar` pour remonter les bulles d'état (`background.tsx`) au-dessus de la barre.
 
 **Site alvzrec.com (`/admin/site`)** — la page d'origine du site (ancien compte Netlify) est gardée telle quelle dans
 `lib/site-template.ts` (`String.raw`, ni accent grave ni `${` dedans). Ses deux scripts d'origine sont en `type="text/plain"

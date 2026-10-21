@@ -67,7 +67,7 @@ export function BackgroundStatus() {
   }
   if (!n) return null;
   return (
-    <div className="fixed z-[600000] left-1/2 -translate-x-1/2 bottom-[max(env(safe-area-inset-bottom),16px)] bg-ink text-bg text-xs px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 pointer-events-none">
+    <div className="fixed z-[600000] left-1/2 -translate-x-1/2 bottom-[calc(max(env(safe-area-inset-bottom),16px)+var(--tabbar,0px))] lg:bottom-[max(env(safe-area-inset-bottom),16px)] bg-ink text-bg text-xs px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 pointer-events-none">
       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
       Suppression en cours{n > 1 ? ` (${n})` : ""}…
     </div>

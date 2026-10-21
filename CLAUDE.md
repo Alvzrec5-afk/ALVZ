@@ -145,6 +145,7 @@ l'ancien compte Netlify pour que alvzrec.com montre les photos en plus et la nou
 
 En attente de « publie » (21 oct.) : **nouvelle page d'Accueil** dynamique (indicateurs animés + courbes 14 jours, projets
 récents en images, jauge en demi-cercle, recherche ⌘K, menu « + » au téléphone).
+Aussi en attente : **onglets en bas de l'écran au téléphone** (Accueil, Galeries, Vidéos, Tableaux, Plus).
 
 - **À faire par le propriétaire** : poser une fois l'index.html (Studio → Site → Relier alvzrec.com) sur l'ancien compte Netlify, puis vérifier alvzrec.com (clips, photos, coulisses).
 - **À vérifier en vrai par le propriétaire** : tableau modifié en mode avion puis réseau remis (iPhone et Mac), panneau « Images projet » (déplacer, agrandir, glisser une image sur le tableau), onglets des planches, Studio → Site (ajout d'un lien YouTube, envoi de photos), Accueil `/admin` (chiffres, stockage détaillé), Banque d'images (copie d'office d'une photo envoyée, onglet, corbeille), ouverture d'une planche ; menu « … » (plan Google Maps, envoi d'un PDF / MP3 vers Oracle), case photo vide (choix parmi les photos du projet) ;
