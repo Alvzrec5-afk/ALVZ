@@ -3,7 +3,7 @@ import { formatLongDate } from "@/lib/dates";
 import { presignGet, variantKey } from "@/lib/storage";
 import { StorageCheck } from "@/components/admin/storage-check";
 import { GalleryGrid, type GalleryCard } from "@/components/admin/gallery-grid";
-import { StorageMeter } from "@/components/admin/storage-meter";
+import { StorageAlert, StorageMeter } from "@/components/admin/storage-meter";
 import { storageParts, storageUsage, studioOverview } from "@/lib/usage";
 
 export const metadata = { title: "Galeries" };
@@ -53,6 +53,9 @@ export default async function GalleriesHome() {
 
   return (
     <div>
+      <div className="mb-8 empty:hidden">
+        <StorageAlert used={usage.total} limit={usage.limit} />
+      </div>
       <GalleryGrid galleries={galleries} />
       <div className="mt-20">
         <StorageMeter used={usage.total} limit={usage.limit} parts={storageParts(overview)} />

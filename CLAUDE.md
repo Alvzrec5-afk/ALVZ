@@ -131,6 +131,9 @@ de Next (`unstable_cache`, `lib/auth.ts`) au lieu d'être redemandées à chaque
 Publié aussi : le client n'ajoute plus que notes, images, couleurs, commentaires et le menu « … » (croquis, nuancier, document, carte, titre ; pas d'envoi de fichier), règle aussi côté serveur.
 Lenteur du 20 oct. vers 22 h UTC : encore Supabase (auth/token 18 s, REST 8 s, base au repos) ; conseillé : Supabase Pro.
 
+En attente de « publie » (21 oct.) : alerte de stockage en haut de l'Accueil, des galeries et des vidéos dès 75 % des 20 Go
+(environ 2,3 Go utilisés le 21 oct.). Les 200 Go gratuits d'Oracle sont des disques de serveur, pas le stockage du studio : déconseillé.
+
 - **À faire par le propriétaire** : poser une fois l'index.html (Studio → Site → Relier alvzrec.com) sur l'ancien compte Netlify, puis vérifier alvzrec.com (clips, photos, coulisses).
 - **À vérifier en vrai par le propriétaire** : tableau modifié en mode avion puis réseau remis (iPhone et Mac), panneau « Images projet » (déplacer, agrandir, glisser une image sur le tableau), onglets des planches, Studio → Site (ajout d'un lien YouTube, envoi de photos), Accueil `/admin` (chiffres, stockage détaillé), Banque d'images (copie d'office d'une photo envoyée, onglet, corbeille), ouverture d'une planche ; menu « … » (plan Google Maps, envoi d'un PDF / MP3 vers Oracle), case photo vide (choix parmi les photos du projet) ;
   vidéo dans un tableau (envoi depuis l'iPhone, lecture, plein écran) ; capture d'un tableau **depuis l'iPhone** (nette au zoom ? photos présentes ? non testé sur vrai Safari) et avec de vraies photos Oracle (si elles sortent

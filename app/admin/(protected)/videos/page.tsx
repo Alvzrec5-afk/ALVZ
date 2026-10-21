@@ -2,7 +2,7 @@ import { requireAdminPage } from "@/lib/auth";
 import { formatLongDate } from "@/lib/dates";
 import { presignGet, videoKey } from "@/lib/storage";
 import { GalleryGrid, type GalleryCard } from "@/components/admin/gallery-grid";
-import { StorageMeter } from "@/components/admin/storage-meter";
+import { StorageAlert, StorageMeter } from "@/components/admin/storage-meter";
 import { storageParts, storageUsage, studioOverview } from "@/lib/usage";
 
 export const metadata = { title: "Vidéos" };
@@ -54,6 +54,9 @@ export default async function VideosHome() {
 
   return (
     <div>
+      <div className="mb-8 empty:hidden">
+        <StorageAlert used={usage.total} limit={usage.limit} />
+      </div>
       <GalleryGrid galleries={projects} kind="video" />
       <div className="mt-20">
         <StorageMeter used={usage.total} limit={usage.limit} parts={storageParts(overview)} />

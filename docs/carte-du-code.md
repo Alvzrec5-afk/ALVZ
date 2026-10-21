@@ -162,6 +162,9 @@ un envoi repart de notre version (`base` = `json.at`).
 (`storageUsage().perGallery`), récents. Chiffres : `studioOverview()` (`lib/usage.ts`) → fonction SQL `studio_overview()`
 (jsonb ; espace calculé comme `storage_usage`, banque d'images = arbre du tableau `is_library`). Liste des galeries photo :
 `/admin/galleries` (page `galleries/page.tsx`) ; `/admin/accueil` (ancienne adresse) redirige vers `/admin`.
+Alerte de stockage : `StorageAlert` (`storage-meter.tsx`), en haut de l'Accueil, des galeries et des vidéos dès 75 % de la
+limite (`STORAGE_LIMIT_GB`, 20 Go par défaut = offre gratuite Oracle ; au-delà, les envois sont refusés), rouge dès 95 % ;
+conseille de supprimer d'anciennes galeries ou de passer Oracle en « Pay As You Go » puis de relever `STORAGE_LIMIT_GB`.
 
 **Site alvzrec.com (`/admin/site`)** — la page d'origine du site (ancien compte Netlify) est gardée telle quelle dans
 `lib/site-template.ts` (`String.raw`, ni accent grave ni `${` dedans). Ses deux scripts d'origine sont en `type="text/plain"

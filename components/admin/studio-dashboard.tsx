@@ -1,7 +1,7 @@
 import { formatLongDate, toParisDateInput } from "@/lib/dates";
 import { formatBytes } from "@/lib/format";
 import { storageParts, type StudioOverview } from "@/lib/usage";
-import { StorageMeter } from "@/components/admin/storage-meter";
+import { StorageAlert, StorageMeter } from "@/components/admin/storage-meter";
 import { BoardIcon, FilmIcon, ImageIcon, PlusIcon } from "@/components/icons";
 import { HoverLink } from "@/components/admin/hover-link";
 
@@ -55,6 +55,10 @@ export function StudioDashboard({ o, usage, galleries: list, boards }: Dashboard
             <PlusIcon className="w-4 h-4" /> Tableau
           </HoverLink>
         </div>
+      </div>
+
+      <div className="mt-8 empty:hidden">
+        <StorageAlert used={usage.total} limit={usage.limit} />
       </div>
 
       <div className="mt-10 grid grid-cols-2 lg:grid-cols-4 gap-px bg-line border border-line">

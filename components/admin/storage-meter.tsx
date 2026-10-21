@@ -38,7 +38,7 @@ export function StorageMeter({ used, limit, parts }: { used: number; limit: numb
       )}
       <p className={`mt-2 text-xs ${level === "ok" ? "text-muted" : level === "warn" ? "text-warn" : "text-danger"}`}>
         {level === "ok" && `${Math.round(pct)} % utilisé · ${formatBytes(Math.max(0, limit - used))} disponibles`}
-        {level === "warn" && `${Math.round(pct)} % utilisé : pensez à supprimer d'anciennes galeries.`}
+        {level === "warn" && `${Math.round(pct)} % utilisé : pensez à supprimer d'anciennes galeries ou à agrandir le stockage Oracle.`}
         {level === "danger" && `${Math.round(pct)} % utilisé : stockage presque plein, les nouveaux envois seront bientôt bloqués.`}
       </p>
       {parts && (
@@ -57,6 +57,37 @@ export function StorageMeter({ used, limit, parts }: { used: number; limit: numb
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+/** Seuil de l'alerte (part de l'espace gratuit utilisée) : assez tôt pour avoir le temps de réagir. */
+const ALERT_AT = 0.75;
+
+/**
+ * Alerte bien visible en haut de l'Accueil, des galeries et des vidéos quand le stockage approche de la limite
+ * (au-delà, les envois sont refusés). Rien en dessous de 75 %.
+ */
+export function StorageAlert({ used, limit }: { used: number; limit: number }) {
+  if (!limit || used < limit * ALERT_AT) return null;
+  const pct = Math.min(100, Math.round((used / limit) * 100));
+  const urgent = pct >= 95;
+  return (
+    <div role="status" className={`border px-4 py-4 sm:px-5 ${urgent ? "border-danger" : "border-warn"}`}>
+      <p className={`text-sm font-medium ${urgent ? "text-danger" : "text-warn"}`}>
+        {urgent ? "Stockage presque plein" : "Le stockage approche de la limite"} : {formatBytes(used)} sur {formatBytes(limit)} ({pct} %)
+      </p>
+      <p className="text-sm text-muted mt-2">
+        {urgent ? "Les nouveaux envois (photos, vidéos, images des tableaux) seront bientôt refusés. " : ""}
+        Pour continuer sans souci, au choix :
+      </p>
+      <ul className="text-sm text-muted mt-1 list-disc pl-5 space-y-1">
+        <li>supprimer d&apos;anciennes galeries ou vidéos (voir « Ce qui prend le plus de place » sur l&apos;Accueil) ;</li>
+        <li>
+          agrandir le stockage Oracle : passer le compte en « Pay As You Go » (environ 2,50 € par mois pour 100 Go de plus),
+          puis relever la limite du studio (variable STORAGE_LIMIT_GB dans Netlify).
+        </li>
+      </ul>
     </div>
   );
 }
