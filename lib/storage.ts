@@ -8,6 +8,8 @@ import {
   DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListMultipartUploadsCommand,
+  ListObjectsV2Command,
   ListPartsCommand,
   PutObjectCommand,
   S3Client,
@@ -217,4 +219,46 @@ export async function deleteKeys(keys: string[]) {
       }
     }
   }
+}
+
+/** Tous les fichiers du bucket (clé, taille, date), page par page (1000 par appel). */
+export async function listAllObjects() {
+  const out: { key: string; size: number; modified: number }[] = [];
+  let token: string | undefined;
+  do {
+    const res = await s3().send(new ListObjectsV2Command({ Bucket: bucket(), ContinuationToken: token, MaxKeys: 1000 }));
+    for (const o of res.Contents ?? []) {
+      if (o.Key) out.push({ key: o.Key, size: Number(o.Size) || 0, modified: o.LastModified?.getTime() ?? 0 });
+    }
+    token = res.IsTruncated ? res.NextContinuationToken : undefined;
+  } while (token);
+  return out;
+}
+
+/** Envois en plusieurs morceaux jamais terminés : Oracle garde (et compte) leurs morceaux. */
+export async function listOpenUploads() {
+  const out: { key: string; uploadId: string; size: number; started: number }[] = [];
+  let keyMarker: string | undefined;
+  let idMarker: string | undefined;
+  do {
+    const res = await s3().send(new ListMultipartUploadsCommand({ Bucket: bucket(), KeyMarker: keyMarker, UploadIdMarker: idMarker }));
+    for (const u of res.Uploads ?? []) {
+      if (!u.Key || !u.UploadId) continue;
+      out.push({ key: u.Key, uploadId: u.UploadId, size: await partsSize(u.Key, u.UploadId).catch(() => 0), started: u.Initiated?.getTime() ?? 0 });
+    }
+    keyMarker = res.IsTruncated ? res.NextKeyMarker : undefined;
+    idMarker = res.IsTruncated ? res.NextUploadIdMarker : undefined;
+  } while (keyMarker);
+  return out;
+}
+
+async function partsSize(key: string, uploadId: string) {
+  let total = 0;
+  let marker: string | undefined;
+  do {
+    const res = await s3().send(new ListPartsCommand({ Bucket: bucket(), Key: key, UploadId: uploadId, PartNumberMarker: marker }));
+    for (const p of res.Parts ?? []) total += Number(p.Size) || 0;
+    marker = res.IsTruncated ? res.NextPartNumberMarker : undefined;
+  } while (marker);
+  return total;
 }

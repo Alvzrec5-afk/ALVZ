@@ -1,23 +1,51 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { revalidateTag, unstable_cache } from "next/cache";
+import { listAllObjects, listOpenUploads } from "@/lib/storage";
 
-/** Limite de stockage en octets (variable STORAGE_LIMIT_GB, 20 Go par défaut = offre gratuite Oracle). */
+/**
+ * Limite de stockage en octets (variable STORAGE_LIMIT_GB). 10 Go par défaut : l'offre gratuite d'Oracle donne 10 Go de
+ * stockage d'objets « Standard » (les 10 Go « Archive » ne servent pas au studio : fichiers lisibles seulement après restauration).
+ */
 export function storageLimitBytes() {
   const gb = Number(process.env.STORAGE_LIMIT_GB);
-  return (Number.isFinite(gb) && gb > 0 ? gb : 20) * 1024 ** 3;
+  return (Number.isFinite(gb) && gb > 0 ? gb : 10) * 1024 ** 3;
 }
 
-/** Espace utilisé, au total et par galerie (client admin : soumis aux règles RLS). */
+const ORACLE_TAG = "oracle-usage";
+
+/**
+ * Espace réellement facturé par Oracle (tous les fichiers du bucket + envois interrompus), relu au plus une fois par
+ * heure (cache partagé entre les démarrages). Il peut dépasser ce que la base connaît : fichiers oubliés.
+ */
+const oracleTotal = unstable_cache(
+  async () => {
+    const [objects, uploads] = await Promise.all([listAllObjects(), listOpenUploads()]);
+    return objects.reduce((n, o) => n + o.size, 0) + uploads.reduce((n, u) => n + u.size, 0);
+  },
+  ["oracle-total"],
+  { revalidate: 3600, tags: [ORACLE_TAG] },
+);
+
+/** Après un nettoyage : le prochain affichage relit l'espace réel chez Oracle. */
+export function refreshOracleTotal() {
+  revalidateTag(ORACLE_TAG, { expire: 0 });
+}
+
+/**
+ * Espace utilisé, au total et par galerie (client admin : soumis aux règles RLS). Le total est le plus grand des deux :
+ * ce que la base connaît, ou ce qu'Oracle compte réellement (`untracked` = la différence, fichiers oubliés).
+ */
 export async function storageUsage(supabase: SupabaseClient) {
-  const { data, error } = await supabase.rpc("storage_usage");
+  const [{ data, error }, real] = await Promise.all([supabase.rpc("storage_usage"), oracleTotal().catch(() => 0)]);
   if (error) throw new Error(`Calcul du stockage impossible : ${error.message}`);
   const perGallery = new Map<string, number>();
-  let total = 0;
+  let known = 0;
   for (const row of (data ?? []) as { gallery_id: string; bytes: number }[]) {
     perGallery.set(row.gallery_id, Number(row.bytes));
-    total += Number(row.bytes);
+    known += Number(row.bytes);
   }
-  return { total, perGallery, limit: storageLimitBytes() };
+  return { total: Math.max(known, real), untracked: Math.max(0, real - known), perGallery, limit: storageLimitBytes() };
 }
 
 export type StudioOverview = {
@@ -47,13 +75,14 @@ export async function studioOverview(supabase: SupabaseClient): Promise<StudioOv
   return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Number(v) || 0])) as StudioOverview;
 }
 
-/** Espace par catégorie, dans l'ordre (fixe) des couleurs de la jauge. */
-export function storageParts(o: StudioOverview) {
+/** Espace par catégorie, dans l'ordre (fixe) des couleurs de la jauge ; en dernier, les fichiers oubliés chez Oracle. */
+export function storageParts(o: StudioOverview, untracked = 0) {
   return [
     { label: "Galeries photo", bytes: o.bytes_photos },
     { label: "Vidéos", bytes: o.bytes_videos },
     { label: "Tableaux", bytes: o.bytes_boards },
     { label: "Banque d'images", bytes: o.bytes_library },
     { label: "Site", bytes: o.bytes_site },
+    ...(untracked > 0 ? [{ label: "Fichiers oubliés", bytes: untracked }] : []),
   ];
 }

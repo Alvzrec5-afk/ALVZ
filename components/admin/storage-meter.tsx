@@ -1,7 +1,7 @@
 import { formatBytes } from "@/lib/format";
 
 /** Couleurs des catégories (ordre fixe, vérifié pour les daltoniens) : `--series-1…5` dans globals.css. */
-const SERIES = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)", "var(--series-5)"];
+const SERIES = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)", "var(--series-5)", "var(--muted)"];
 
 /**
  * Jauge d'espace de stockage Oracle utilisé. Avec `parts` : barre découpée par catégorie
@@ -42,7 +42,7 @@ export function StorageMeter({ used, limit, parts }: { used: number; limit: numb
         {level === "danger" && `${Math.round(pct)} % utilisé : stockage presque plein, les nouveaux envois seront bientôt bloqués.`}
       </p>
       {parts && (
-        <ul className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-x-4 gap-y-3">
+        <ul className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-4 gap-y-3">
           {parts.map((p, i) => (
             <li key={p.label} className="flex items-start gap-2 min-w-0">
               <span className="mt-1 w-2.5 h-2.5 rounded-[2px] shrink-0" style={{ background: SERIES[i] }} aria-hidden />

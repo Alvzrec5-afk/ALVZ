@@ -163,8 +163,15 @@ un envoi repart de notre version (`base` = `json.at`).
 (jsonb ; espace calculé comme `storage_usage`, banque d'images = arbre du tableau `is_library`). Liste des galeries photo :
 `/admin/galleries` (page `galleries/page.tsx`) ; `/admin/accueil` (ancienne adresse) redirige vers `/admin`.
 Alerte de stockage : `StorageAlert` (`storage-meter.tsx`), en haut de l'Accueil, des galeries et des vidéos dès 75 % de la
-limite (`STORAGE_LIMIT_GB`, 20 Go par défaut = offre gratuite Oracle ; au-delà, les envois sont refusés), rouge dès 95 % ;
+limite (`STORAGE_LIMIT_GB`, **10 Go** par défaut = stockage « Standard » gratuit d'Oracle ; les 10 Go « Archive » ne servent pas ; au-delà, les envois sont refusés), rouge dès 95 % ;
 conseille de supprimer d'anciennes galeries ou de passer Oracle en « Pay As You Go » puis de relever `STORAGE_LIMIT_GB`.
+Espace réel : `lib/usage.ts` `storageUsage` prend le plus grand de la base (`storage_usage`) et du total réel du bucket
+(`oracleTotal`, liste de tous les objets + envois en morceaux non terminés, `unstable_cache` 1 h, tag `oracle-usage`) ;
+`untracked` = « Fichiers oubliés » (6e part de la jauge, gris). Les refus d'envoi utilisent aussi ce total.
+Analyse / nettoyage : `lib/storage-audit.ts` (`auditStorage`, `cleanStorage`), route `app/api/admin/storage-audit` (GET analyse,
+POST nettoie puis `refreshOracleTotal`), bouton `components/admin/storage-audit.tsx` sous la jauge de l'Accueil. Orphelin = clé
+rangée comme photo / vidéo / image de tableau / couverture / photo du site dont la ligne n'existe plus ; supprimé seulement après
+24 h ; autres clés jamais touchées ; garde-fou : rien n'est supprimé si plus de la moitié des fichiers semblent orphelins.
 
 **Site alvzrec.com (`/admin/site`)** — la page d'origine du site (ancien compte Netlify) est gardée telle quelle dans
 `lib/site-template.ts` (`String.raw`, ni accent grave ni `${` dedans). Ses deux scripts d'origine sont en `type="text/plain"
