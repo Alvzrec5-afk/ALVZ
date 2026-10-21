@@ -9,7 +9,7 @@ import type { StorageAuditResult } from "@/lib/storage-audit";
  * Espace réellement occupé chez Oracle (le compteur du studio ne voit que les fichiers qu'il connaît) et nettoyage
  * des fichiers orphelins / envois interrompus.
  */
-export function StorageAudit() {
+export function StorageAudit({ compact = false }: { compact?: boolean } = {}) {
   const [state, setState] = useState<"idle" | "running" | "cleaning">("idle");
   const [audit, setAudit] = useState<StorageAuditResult | null>(null);
   const [message, setMessage] = useState("");
@@ -52,15 +52,17 @@ export function StorageAudit() {
   }
 
   return (
-    <div className="border-x border-b border-line px-4 py-4 sm:px-5">
+    <div className={compact ? "" : "border-x border-b border-line px-4 py-4 sm:px-5"}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-muted max-w-prose">
+        <p className={compact ? "hidden" : "text-xs text-muted max-w-prose"}>
           Le compteur ci-dessus additionne les fichiers connus du studio. L&apos;analyse compte tout ce qu&apos;Oracle facture
           réellement, y compris les fichiers oubliés.
         </p>
-        <button onClick={() => analyse()} disabled={state !== "idle"} className="btn btn-ghost">
-          {state === "running" ? "Analyse…" : audit ? "Relancer l'analyse" : "Analyser l'espace réel chez Oracle"}
-        </button>
+        <span className={compact ? "w-full" : ""}>
+          <button onClick={() => analyse()} disabled={state !== "idle"} className="btn btn-ghost" style={compact ? { width: "100%" } : undefined}>
+            {state === "running" ? "Analyse…" : audit ? "Relancer l'analyse" : compact ? "Analyser l'espace" : "Analyser l'espace réel chez Oracle"}
+          </button>
+        </span>
       </div>
       {audit && (
         <div className="mt-4 text-sm">

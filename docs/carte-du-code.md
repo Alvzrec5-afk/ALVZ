@@ -177,6 +177,14 @@ Limite choisie dans le studio : colonne `studio_settings.storage_limit_gb` (sino
 `components/admin/storage-limit.tsx` sous la jauge de l'Accueil (« 20 Go (gratuit) » + lien « Augmenter » qui montre les autres choix de `lib/storage-limits.ts` : 20/50/100/200/500 Go),
 action `app/admin/storage-actions.ts` `setStorageLimit`. `storageUsage` rend aussi `free` (20 Go gratuits) : trait sur la jauge
 et coût estimé au-delà (`ORACLE_PRICE_PER_GB_MONTH`, indicatif).
+Nouvelle mise en page (21 oct.) : `app/admin/(protected)/page.tsx` prépare les projets récents (galeries, projets vidéo et
+tableaux mêlés, 6 au plus, avec couverture : photo de couverture ou 1re photo en taille web, affiche de la 1re vidéo, couverture
+du tableau ou 1re image de ses planches) et l'activité des 14 derniers jours (photos envoyées, vues vidéo, cartes de tableaux,
+images de la banque). `studio-dashboard.tsx` : indicateurs avec chiffres qui montent (`CountUp`) et petites courbes qui se
+dessinent (`Spark`, animation `drawLine` de globals.css), cartes images avec badge coloré (téléphone : lignes à vignette),
+jauge en demi-cercle (`StorageArc`), « Ce qui prend le plus de place », carte Oracle (limite + analyse en version `compact`).
+`components/admin/dashboard-parts.tsx` : `CountUp`, `DashboardActions` (boutons de création, « + » en menu au téléphone,
+recherche ⌘K / Ctrl+K parmi galeries, vidéos et tableaux).
 
 **Site alvzrec.com (`/admin/site`)** — la page d'origine du site (ancien compte Netlify) est gardée telle quelle dans
 `lib/site-template.ts` (`String.raw`, ni accent grave ni `${` dedans). Ses deux scripts d'origine sont en `type="text/plain"

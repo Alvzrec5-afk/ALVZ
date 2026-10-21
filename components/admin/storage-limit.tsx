@@ -9,7 +9,7 @@ import { ORACLE_PRICE_PER_GB_MONTH, STORAGE_LIMIT_CHOICES } from "@/lib/storage-
  * Limite des envois, choisie sur l'Accueil : 20 Go = partie gratuite d'Oracle ; plus haut, le compte Oracle doit être
  * en « paiement à l'utilisation » (le surplus est facturé quelques centimes par Go et par mois).
  */
-export function StorageLimit({ limitGb }: { limitGb: number }) {
+export function StorageLimit({ limitGb, compact = false }: { limitGb: number; compact?: boolean }) {
   const [value, setValue] = useState(limitGb);
   const [error, setError] = useState("");
   // Les limites au-delà des 20 Go gratuits restent cachées tant qu'on ne les demande pas.
@@ -20,8 +20,8 @@ export function StorageLimit({ limitGb }: { limitGb: number }) {
   const extra = Math.max(0, value - 20);
 
   return (
-    <div className="border-x border-b border-line px-4 py-4 sm:px-5 flex flex-wrap items-center justify-between gap-3">
-      <p className="text-xs text-muted max-w-prose">
+    <div className={compact ? "flex flex-wrap items-center justify-between gap-2" : "border-x border-b border-line px-4 py-4 sm:px-5 flex flex-wrap items-center justify-between gap-3"}>
+      <p className={compact ? "hidden" : "text-xs text-muted max-w-prose"}>
         Limite des envois. Les 20 premiers Go sont gratuits chez Oracle ; au-delà (compte en paiement à l&apos;utilisation),
         environ {ORACLE_PRICE_PER_GB_MONTH.toString().replace(".", ",")} $ par Go et par mois, seulement pour l&apos;espace vraiment utilisé
         {extra > 0 && <> (au plus {(extra * ORACLE_PRICE_PER_GB_MONTH).toFixed(2).replace(".", ",")} $ par mois si les {value} Go sont remplis)</>}.
