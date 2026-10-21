@@ -51,6 +51,9 @@ Parfois Netlify marque un push « Skipped » : même solution (Trigger deploy).
 - Supabase : client de session (`lib/supabase/server.ts`, RLS) pour le studio ; client « service »
   (`SUPABASE_SECRET_KEY`) seulement pour les pages publiques, après contrôle d'accès. RLS partout,
   fonction `private.is_admin()`. **Migrations additives uniquement** (les DROP ont fait échouer l'outil).
+  Depuis le 30 oct. 2026, Supabase ne donne plus d'accès API automatique aux **nouvelles** tables de `public` : toute
+  migration qui crée une table doit ajouter `grant select, insert, update, delete on public.<table> to authenticated, service_role;`
+  (pas de grant à `anon` : le site n'en a pas besoin). Les tables existantes gardent leurs droits.
 - Oracle : AWS SDK v3, `forcePathStyle`, `requestChecksumCalculation/responseChecksumValidation: "WHEN_REQUIRED"`.
   Envoi direct navigateur → Oracle (PUT pré-signé, multipart > 20 Mo, morceaux de 10 Mo, reprise).
 - Cookies signés HMAC (`GALLERY_SECRET`, `lib/tokens.ts`) pour l'accès aux galeries et les favoris.
