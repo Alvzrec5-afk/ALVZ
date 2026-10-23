@@ -309,3 +309,9 @@ E-mails (23 oct.) : `buildMessage` (`lib/mailer.ts`) prend `buttons` (repère se
 `public/brand/mail/avatar.png` + icônes rondes `public/brand/mail/<whatsapp|instagram|tiktok|email|website>.png`
 (glyphes Simple Icons CC0, rendus en PNG car Gmail n'affiche pas le SVG). Pas de lien de paiement dans les e-mails :
 le bouton « Payer l'acompte » / « Payer la facture » est sur la page du devis. Logo du devis forcé foncé (`Wordmark tone="dark"`).
+Articles (23 oct.) : table `catalog_items` (migration « catalog_items », remplie avec les 20 articles d'Abby : nom, référence,
+description, unité, prix HT en centimes, kind service|debours, position, archived). Onglet Finances → Articles
+(`components/admin/finance/catalog-manager.tsx` : recherche, modification sur place, ajout, archiver, supprimer) ; actions
+`saveCatalogItem` / `archiveCatalogItem` / `deleteCatalogItem`. Devis : « Ajouter un article » (`CatalogPicker` dans
+`quote-editor.tsx`, articles non archivés) recopie l'article dans la ligne (`QuoteLine.description`, `QuoteLine.unit`) : changer
+le catalogue ne modifie pas les devis déjà faits. Page client : description sous le nom, quantité + unité (`qtyWithUnit` : « 2 h »).

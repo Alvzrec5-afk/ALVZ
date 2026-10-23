@@ -5,6 +5,7 @@ import {
   formatCents,
   formatDay,
   lineTotal,
+  qtyWithUnit,
   quoteState,
   quoteTotals,
   type FinanceSettings,
@@ -72,7 +73,7 @@ export function QuoteDocument({ q, paid, f, slug }: { q: Quote; paid: number; f:
             <thead>
               <tr className="text-left text-xs text-muted border-b border-ink">
                 <th className="py-2 font-normal">Description</th>
-                <th className="py-2 font-normal text-right w-16">Qté</th>
+                <th className="py-2 font-normal text-right w-20">Qté</th>
                 <th className="py-2 font-normal text-right w-28 hidden sm:table-cell print:table-cell">Prix unitaire{franchise ? "" : " HT"}</th>
                 <th className="py-2 font-normal text-right w-28">Total{franchise ? "" : " HT"}</th>
               </tr>
@@ -80,8 +81,11 @@ export function QuoteDocument({ q, paid, f, slug }: { q: Quote; paid: number; f:
             <tbody>
               {q.lines.map((l, i) => (
                 <tr key={i} className="border-b border-line align-top">
-                  <td className="py-3 pr-4 whitespace-pre-line">{l.label}</td>
-                  <td className="py-3 text-right tabular-nums">{String(l.qty).replace(".", ",")}</td>
+                  <td className="py-3 pr-4">
+                    <span className="block whitespace-pre-line">{l.label}</span>
+                    {l.description && <span className="block text-xs text-muted mt-1 leading-relaxed whitespace-pre-line">{l.description}</span>}
+                  </td>
+                  <td className="py-3 text-right tabular-nums whitespace-nowrap">{qtyWithUnit(l.qty, l.unit)}</td>
                   <td className="py-3 text-right tabular-nums hidden sm:table-cell print:table-cell">{formatCents(l.unit_cents)}</td>
                   <td className="py-3 text-right tabular-nums">{formatCents(lineTotal(l))}</td>
                 </tr>

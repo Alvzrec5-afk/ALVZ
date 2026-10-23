@@ -268,3 +268,54 @@ export async function emailQuote(id: string, input: { subject: string; body: str
   refresh(id);
   return { ok: input.kind === "reminder" ? "Relance envoyée." : "Devis envoyé." };
 }
+
+export type CatalogInput = { name: string; reference: string; description: string; unit: string; price_cents: number; kind: string };
+
+/** Ajoute (id null) ou modifie un article du catalogue. */
+export async function saveCatalogItem(id: string | null, input: CatalogInput): Promise<Result & { id?: string }> {
+  const { supabase } = await requireAdminApi();
+  const name = text(input.name, 200);
+  if (!name) return { error: "Donnez un nom à l'article." };
+  const row = {
+    name,
+    reference: text(input.reference, 60),
+    description: text(input.description, 1000),
+    unit: text(input.unit, 30) || "Forfait",
+    price_cents: Math.min(100_000_000, Math.max(0, Math.round(Number(input.price_cents) || 0))),
+    kind: input.kind === "debours" ? "debours" : "service",
+    updated_at: new Date().toISOString(),
+  };
+  if (id) {
+    const { error } = await supabase.from("catalog_items").update(row).eq("id", id);
+    if (error) return { error: error.message };
+    refresh();
+    return { ok: "Enregistré", id };
+  }
+  const { data: last } = await supabase.from("catalog_items").select("position").order("position", { ascending: false }).limit(1);
+  const { data, error } = await supabase
+    .from("catalog_items")
+    .insert({ ...row, position: Number(last?.[0]?.position ?? 0) + 1 })
+    .select("id")
+    .single();
+  if (error) return { error: error.message };
+  refresh();
+  return { ok: "Ajouté", id: data.id as string };
+}
+
+/** Archiver garde l'article (anciens devis intacts) mais ne le propose plus dans les nouveaux devis. */
+export async function archiveCatalogItem(id: string, archived: boolean): Promise<Result> {
+  const { supabase } = await requireAdminApi();
+  const { error } = await supabase.from("catalog_items").update({ archived, updated_at: new Date().toISOString() }).eq("id", id);
+  if (error) return { error: error.message };
+  refresh();
+  return {};
+}
+
+/** Supprimer un article ne touche pas aux devis déjà faits (la ligne y est recopiée). */
+export async function deleteCatalogItem(id: string): Promise<Result> {
+  const { supabase } = await requireAdminApi();
+  const { error } = await supabase.from("catalog_items").delete().eq("id", id);
+  if (error) return { error: error.message };
+  refresh();
+  return {};
+}

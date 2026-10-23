@@ -6,6 +6,7 @@ import { HoverLink } from "@/components/admin/hover-link";
 const TABS = [
   { href: "/admin/finances", label: "Vue d'ensemble", match: (p: string) => p === "/admin/finances" },
   { href: "/admin/finances/devis", label: "Devis", match: (p: string) => p.startsWith("/admin/finances/devis") },
+  { href: "/admin/finances/articles", label: "Articles", match: (p: string) => p.startsWith("/admin/finances/articles") },
   { href: "/admin/finances/depenses", label: "Dépenses", match: (p: string) => p.startsWith("/admin/finances/depenses") },
   { href: "/admin/finances/reglages", label: "Réglages", match: (p: string) => p.startsWith("/admin/finances/reglages") },
 ];

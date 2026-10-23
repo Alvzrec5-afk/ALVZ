@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { QUOTE_FIELDS, type Expense, type FinanceSettings, type Payment, type Quote } from "@/lib/finance";
+import { CATALOG_FIELDS, QUOTE_FIELDS, type CatalogItem, type Expense, type FinanceSettings, type Payment, type Quote } from "@/lib/finance";
 
 export async function loadFinanceSettings(supabase: SupabaseClient) {
   const { data } = await supabase.from("studio_settings").select("finance").eq("id", 1).maybeSingle();
@@ -32,4 +32,11 @@ export async function loadExpenses(supabase: SupabaseClient) {
 export async function loadProjects(supabase: SupabaseClient) {
   const { data } = await supabase.from("galleries").select("id, title, kind").is("deleted_at", null).order("created_at", { ascending: false }).limit(300);
   return (data ?? []) as { id: string; title: string; kind: "photo" | "video" }[];
+}
+
+/** Catalogue d'articles (les archivés aussi, pour la page Articles ; le devis ne propose que les actifs). */
+export async function loadCatalog(supabase: SupabaseClient) {
+  const { data, error } = await supabase.from("catalog_items").select(CATALOG_FIELDS).order("position").order("name");
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as CatalogItem[]).map((c) => ({ ...c, price_cents: Number(c.price_cents) }));
 }

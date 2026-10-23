@@ -15,6 +15,8 @@ import {
   quoteState,
   quoteTotals,
   todayParis,
+  UNITS,
+  type CatalogItem,
   type FinanceSettings,
   type Payment,
   type PaymentMethod,
@@ -35,22 +37,41 @@ import { HoverLink } from "@/components/admin/hover-link";
 import { PlusIcon, TrashIcon } from "@/components/icons";
 import { QuoteBadge } from "./finance-parts";
 
-type Line = { label: string; qty: string; unit: string };
+/** Ligne en cours de saisie : `unit` = prix unitaire tapé, `uom` = unité (Heure, Forfait…). */
+type Line = { label: string; desc: string; uom: string; qty: string; unit: string };
 
+const EMPTY: Line = { label: "", desc: "", uom: "", qty: "1", unit: "" };
 const toLine = (l: Quote["lines"][number]): Line => ({
   label: l.label,
+  desc: l.description ?? "",
+  uom: l.unit ?? "",
   qty: String(l.qty).replace(".", ","),
   unit: l.unit_cents ? (l.unit_cents / 100).toFixed(2).replace(".", ",") : "",
 });
-const fromLine = (l: Line) => ({ label: l.label, qty: Number(l.qty.replace(",", ".")) || 0, unit_cents: parseEuros(l.unit) ?? 0 });
+const fromLine = (l: Line) => ({
+  label: l.label,
+  description: l.desc,
+  unit: l.uom,
+  qty: Number(l.qty.replace(",", ".")) || 0,
+  unit_cents: parseEuros(l.unit) ?? 0,
+});
+const fromCatalog = (c: CatalogItem): Line => ({
+  label: c.name,
+  desc: c.description,
+  uom: c.unit,
+  qty: "1",
+  unit: c.price_cents ? (c.price_cents / 100).toFixed(2).replace(".", ",") : "",
+});
 
 export function QuoteEditor({
   quote,
   payments,
   settings,
   projects,
+  catalog,
   mailer,
 }: {
+  catalog: CatalogItem[];
   quote: Quote;
   payments: Payment[];
   settings: FinanceSettings;
@@ -74,7 +95,14 @@ export function QuoteEditor({
     notes: quote.notes,
     payment_link: quote.payment_link,
   });
-  const [lines, setLines] = useState<Line[]>(() => (quote.lines.length ? quote.lines.map(toLine) : [{ label: "", qty: "1", unit: "" }]));
+  const [lines, setLines] = useState<Line[]>(() => (quote.lines.length ? quote.lines.map(toLine) : [EMPTY]));
+  const [picker, setPicker] = useState(false);
+  const addFromCatalog = (c: CatalogItem) => {
+    // Une seule ligne encore vide : l'article la remplace.
+    setLines((ls) => [...ls.filter((l) => l.label.trim() || l.unit.trim()), fromCatalog(c)]);
+    setDirty(true);
+    setPicker(false);
+  };
   const [dirty, setDirty] = useState(false);
   const [notice, setNotice] = useState<{ ok?: string; error?: string } | null>(null);
   const [saving, startSave] = useTransition();
@@ -213,15 +241,38 @@ export function QuoteEditor({
             const t = fromLine(l);
             return (
               <div key={i} className="grid grid-cols-[1fr_4.5rem_6.5rem_2rem] sm:grid-cols-[1fr_5rem_7rem_7rem_2rem] gap-3 items-center py-3 border-b border-line">
-                <input className="field col-span-4 sm:col-span-1" placeholder="Ex. Reportage photo (8 h)" value={l.label} onChange={(e) => setLine(i, { label: e.target.value })} maxLength={300} />
-                <input className="field text-right" inputMode="decimal" aria-label="Quantité" value={l.qty} onChange={(e) => setLine(i, { qty: e.target.value })} />
+                <span className="col-span-4 sm:col-span-1 min-w-0">
+                  <input className="field" placeholder="Ex. Reportage photo (8 h)" value={l.label} onChange={(e) => setLine(i, { label: e.target.value })} maxLength={300} />
+                  <textarea
+                    className="block w-full mt-1 bg-transparent text-xs text-muted leading-relaxed outline-none resize-none placeholder:text-muted/60"
+                    rows={l.desc ? Math.min(4, Math.ceil(l.desc.length / 70)) : 1}
+                    placeholder="Description (facultatif)"
+                    value={l.desc}
+                    onChange={(e) => setLine(i, { desc: e.target.value })}
+                    maxLength={1000}
+                  />
+                </span>
+                <span className="min-w-0">
+                  <input className="field text-right" inputMode="decimal" aria-label="Quantité" value={l.qty} onChange={(e) => setLine(i, { qty: e.target.value })} />
+                  <select
+                    aria-label="Unité"
+                    className="block w-full mt-1 bg-transparent text-[11px] text-muted text-right outline-none"
+                    value={l.uom}
+                    onChange={(e) => setLine(i, { uom: e.target.value })}
+                  >
+                    <option value="">—</option>
+                    {[...new Set([...UNITS, ...(l.uom ? [l.uom] : [])])].map((u) => (
+                      <option key={u} value={u}>{u.toLowerCase()}</option>
+                    ))}
+                  </select>
+                </span>
                 <input className="field text-right" inputMode="decimal" aria-label="Prix unitaire" placeholder="0,00" value={l.unit} onChange={(e) => setLine(i, { unit: e.target.value })} />
                 <span className="hidden sm:block text-right text-sm tabular-nums">{formatCents(Math.round(t.qty * t.unit_cents))}</span>
                 <button
                   className="icon-btn"
                   aria-label="Retirer la ligne"
                   onClick={() => {
-                    setLines((ls) => (ls.length > 1 ? ls.filter((_, j) => j !== i) : [{ label: "", qty: "1", unit: "" }]));
+                    setLines((ls) => (ls.length > 1 ? ls.filter((_, j) => j !== i) : [EMPTY]));
                     setDirty(true);
                   }}
                 >
@@ -230,15 +281,23 @@ export function QuoteEditor({
               </div>
             );
           })}
-          <button
-            className="mt-3 flex items-center gap-2 text-sm text-muted hover:text-ink"
-            onClick={() => {
-              setLines((ls) => [...ls, { label: "", qty: "1", unit: "" }]);
-              setDirty(true);
-            }}
-          >
-            <PlusIcon className="w-4 h-4" /> Ajouter une ligne
-          </button>
+          <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+            {catalog.length > 0 && (
+              <button className="flex items-center gap-2 text-sm hover:opacity-70" onClick={() => setPicker((v) => !v)}>
+                <PlusIcon className="w-4 h-4" /> Ajouter un article
+              </button>
+            )}
+            <button
+              className="flex items-center gap-2 text-sm text-muted hover:text-ink"
+              onClick={() => {
+                setLines((ls) => [...ls, EMPTY]);
+                setDirty(true);
+              }}
+            >
+              <PlusIcon className="w-4 h-4" /> Ligne libre
+            </button>
+          </div>
+          {picker && <CatalogPicker items={catalog} onPick={addFromCatalog} onClose={() => setPicker(false)} />}
         </div>
 
         <div className="mt-8 grid sm:grid-cols-2 gap-8 items-start">
@@ -562,6 +621,34 @@ Belle journée,`,
 function payClickedSincePayment(quote: Quote, payments: Payment[], remaining: number) {
   if (!quote.pay_clicked_at || remaining <= 0) return false;
   return payments.every((p) => (p.created_at ?? "") < quote.pay_clicked_at!);
+}
+
+/** Liste des articles du catalogue, avec recherche ; un clic ajoute la ligne au devis. */
+function CatalogPicker({ items, onPick, onClose }: { items: CatalogItem[]; onPick: (c: CatalogItem) => void; onClose: () => void }) {
+  const [q, setQ] = useState("");
+  const shown = items.filter((c) => `${c.name} ${c.reference} ${c.description}`.toLowerCase().includes(q.trim().toLowerCase()));
+  return (
+    <div className="mt-3 border border-line bg-bg shadow-xl animate-[fadeUp_0.2s_ease-out_both]">
+      <div className="flex items-center gap-2 px-4 border-b border-line">
+        <input className="field" style={{ borderBottom: 0 }} autoFocus placeholder="Rechercher un article…" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Escape" && onClose()} />
+        <button className="text-xs text-muted hover:text-ink shrink-0" onClick={onClose}>Fermer</button>
+      </div>
+      <ul className="max-h-80 overflow-y-auto">
+        {shown.map((c) => (
+          <li key={c.id}>
+            <button className="w-full flex items-start gap-4 px-4 py-3 text-left hover:bg-bg-soft" onClick={() => onPick(c)}>
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm">{c.name}</span>
+                {c.description && <span className="block text-xs text-muted truncate">{c.description}</span>}
+              </span>
+              <span className="text-sm tabular-nums shrink-0">{formatCents(c.price_cents)}<span className="text-[11px] text-muted"> / {c.unit.toLowerCase()}</span></span>
+            </button>
+          </li>
+        ))}
+        {shown.length === 0 && <li className="px-4 py-6 text-sm text-muted text-center">Aucun article.</li>}
+      </ul>
+    </div>
+  );
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

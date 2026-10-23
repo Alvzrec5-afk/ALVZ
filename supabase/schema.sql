@@ -480,3 +480,4 @@ alter table public.galleries add column if not exists payment_locked boolean not
 -- public.expenses (label, category, amount_cents, spent_on, note). RLS admin + grant à authenticated, service_role.
 alter table public.quotes add column if not exists payment_link text not null default ''; -- migration « quotes_payment_link »
 alter table public.quotes add column if not exists pay_clicked_at timestamptz; -- migration « quotes_pay_clicked »
+-- Catalogue d'articles : table public.catalog_items (migration « catalog_items », RLS admin + grant authenticated/service_role).

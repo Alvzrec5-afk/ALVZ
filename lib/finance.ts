@@ -1,6 +1,30 @@
 /** Finances du studio : types et calculs partagés (studio, page publique d'un devis). Montants en centimes. */
 
-export type QuoteLine = { label: string; qty: number; unit_cents: number };
+/** Ligne de devis ; `description` et `unit` (Heure, Forfait…) viennent en général d'un article du catalogue. */
+export type QuoteLine = { label: string; description?: string; unit?: string; qty: number; unit_cents: number };
+
+/** Article du catalogue (Finances → Articles), repris dans les devis en un clic. */
+export type CatalogItem = {
+  id: string;
+  name: string;
+  reference: string;
+  description: string;
+  unit: string;
+  price_cents: number;
+  kind: "service" | "debours";
+  position: number;
+  archived: boolean;
+};
+export const CATALOG_FIELDS = "id, name, reference, description, unit, price_cents, kind, position, archived";
+export const UNITS = ["Forfait", "Heure", "Jour", "Unité", "Photo", "Vidéo", "Km"];
+
+/** « 2 » + « Heure » → « 2 h » ; « 1 » + « Forfait » → « 1 forfait ». */
+export function qtyWithUnit(qty: number, unit?: string) {
+  const n = String(qty).replace(".", ",");
+  if (!unit) return n;
+  const short: Record<string, string> = { Heure: "h", Jour: "j", Km: "km" };
+  return `${n} ${short[unit] ?? unit.toLowerCase()}`;
+}
 export type QuoteStatus = "draft" | "sent" | "accepted" | "refused" | "cancelled";
 export type PaymentMethod = "virement" | "especes" | "carte" | "cheque" | "autre";
 
@@ -190,7 +214,12 @@ export function cleanLines(src: unknown): QuoteLine[] {
       const r = (l ?? {}) as Record<string, unknown>;
       const qty = Math.round(Math.min(100000, Math.max(0, Number(r.qty) || 0)) * 100) / 100;
       const unit = Math.round(Math.min(100_000_000, Math.max(0, Number(r.unit_cents) || 0)));
-      return { label: String(r.label ?? "").trim().slice(0, 300), qty, unit_cents: unit };
+      const line: QuoteLine = { label: String(r.label ?? "").trim().slice(0, 300), qty, unit_cents: unit };
+      const description = String(r.description ?? "").trim().slice(0, 1000);
+      const u = String(r.unit ?? "").trim().slice(0, 30);
+      if (description) line.description = description;
+      if (u) line.unit = u;
+      return line;
     })
     .filter((l) => l.label || l.unit_cents);
 }
