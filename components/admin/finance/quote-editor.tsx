@@ -5,6 +5,7 @@ import { useMemo, useState, useTransition } from "react";
 import {
   FRANCHISE_MENTION,
   METHOD_LABEL,
+  cleanLink,
   STATUS_LABEL,
   depositCents,
   formatCents,
@@ -71,6 +72,7 @@ export function QuoteEditor({
     lock_gallery: quote.lock_gallery,
     invoice_ref: quote.invoice_ref,
     notes: quote.notes,
+    payment_link: quote.payment_link,
   });
   const [lines, setLines] = useState<Line[]>(() => (quote.lines.length ? quote.lines.map(toLine) : [{ label: "", qty: "1", unit: "" }]));
   const [dirty, setDirty] = useState(false);
@@ -306,7 +308,22 @@ export function QuoteEditor({
         </div>
       </Section>
 
-      <Payments quoteId={quote.id} payments={payments} state={state} deposit={deposit} total={totals.ttc} dirty={dirty} />
+      <Payments quoteId={quote.id} payments={payments} state={state} deposit={deposit} total={totals.ttc} dirty={dirty}>
+        <Field label="Lien de paiement en ligne pour ce devis (facultatif)">
+          <input
+            className="field"
+            inputMode="url"
+            placeholder={settings.payment_link || "https://revolut.me/votre-nom"}
+            value={form.payment_link}
+            onChange={(e) => set("payment_link", e.target.value)}
+            maxLength={500}
+          />
+        </Field>
+        <p className="text-xs text-muted mt-2">
+          {settings.payment_link ? "Vide = votre lien habituel (Réglages). " : ""}Le client voit un bouton « Payer » sur la page du devis. Avec Revolut Business, vous
+          pouvez coller ici un lien créé pour le montant exact.
+        </p>
+      </Payments>
 
       <Mail quote={quote} mailer={mailer} settings={settings} state={state} deposit={deposit} total={totals.ttc} form={form} save={save} dirty={dirty} />
 
@@ -332,7 +349,9 @@ function Payments({
   deposit,
   total,
   dirty,
+  children,
 }: {
+  children: React.ReactNode;
   quoteId: string;
   payments: Payment[];
   state: ReturnType<typeof quoteState>;
@@ -371,6 +390,7 @@ function Payments({
         {state.remaining > 0 ? <span className="text-muted"> · reste {formatCents(state.remaining)}</span> : total > 0 ? <span className="text-accent"> · tout est réglé</span> : null}
       </p>
       {dirty && <p className="text-xs text-warn mt-2">Enregistrez d&apos;abord le devis pour que le total soit à jour.</p>}
+      <div className="mt-8">{children}</div>
 
       {payments.length > 0 && (
         <ul className="mt-6">
@@ -434,7 +454,7 @@ function Mail({
   state: ReturnType<typeof quoteState>;
   deposit: number;
   total: number;
-  form: { title: string; client_name: string; client_email: string; due_on: string };
+  form: { title: string; client_name: string; client_email: string; due_on: string; payment_link: string };
   save: () => Promise<{ error?: string }>;
   dirty: boolean;
 }) {
@@ -443,7 +463,10 @@ function Mail({
   const [kind, setKind] = useState<"send" | "reminder">(reminder ? "reminder" : "send");
   const hello = form.client_name ? `Bonjour ${form.client_name.split(/\s+/)[0]},` : "Bonjour,";
   const what = form.title || "votre projet";
-  const bank = settings.iban ? `\n\nPour un virement : IBAN ${settings.iban}${settings.bic ? ` · BIC ${settings.bic}` : ""}.` : "";
+  const payLink = cleanLink(form.payment_link) || settings.payment_link || "";
+  const bank =
+    (payLink ? `\n\nPour payer en ligne : ${payLink}` : "") +
+    (settings.iban ? `\n\nPour un virement : IBAN ${settings.iban}${settings.bic ? ` · BIC ${settings.bic}` : ""}.` : "");
   const templates = {
     send: {
       subject: `Devis ${quote.number}${form.title ? ` — ${form.title}` : ""}`,

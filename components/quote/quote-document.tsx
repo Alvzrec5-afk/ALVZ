@@ -1,9 +1,11 @@
 import {
   FRANCHISE_MENTION,
+  amountDueNow,
   depositCents,
   formatCents,
   formatDay,
   lineTotal,
+  payService,
   quoteState,
   quoteTotals,
   type FinanceSettings,
@@ -21,6 +23,10 @@ export function QuoteDocument({ q, paid, f, slug }: { q: Quote; paid: number; f:
   const franchise = q.vat_rate === 0;
   const canAccept = q.status === "sent" && !state.expired;
   const terms = q.notes || f.terms;
+  const payLink = q.payment_link || f.payment_link || "";
+  const due = amountDueNow(q, paid);
+  const canPay = Boolean(payLink) && (q.status === "sent" || q.status === "accepted") && due.cents > 0;
+  const service = payLink ? payService(payLink) : null;
 
   return (
     <div data-theme="blanc" className="min-h-svh bg-bg-soft text-ink print:bg-white">
@@ -124,6 +130,20 @@ export function QuoteDocument({ q, paid, f, slug }: { q: Quote; paid: number; f:
           </div>
         </article>
 
+        {canPay && (
+          <section className="no-print mt-8 bg-bg border border-line px-6 sm:px-12 py-8 flex flex-wrap items-center gap-x-8 gap-y-4">
+            <div className="flex-1 min-w-48">
+              <p className="display text-2xl">{due.label}</p>
+              <p className="text-sm text-muted mt-1">
+                {formatCents(due.cents)}
+                {service ? ` · paiement sécurisé par ${service}` : ""}
+              </p>
+            </div>
+            <a href={payLink} target="_blank" rel="noopener noreferrer" className="btn w-full sm:w-auto">
+              {service ? `Payer avec ${service}` : "Payer en ligne"}
+            </a>
+          </section>
+        )}
         {canAccept && (
           <section className="no-print mt-8 bg-bg border border-line px-6 sm:px-12 py-10">
             <h2 className="display text-2xl mb-6">Accepter le devis</h2>

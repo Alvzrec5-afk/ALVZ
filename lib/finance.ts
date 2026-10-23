@@ -23,6 +23,8 @@ export type Quote = {
   lock_gallery: boolean;
   invoice_ref: string;
   notes: string;
+  /** Lien de paiement de ce devis (vide = celui des réglages). */
+  payment_link: string;
   share_slug: string;
   sent_at: string | null;
   accepted_at: string | null;
@@ -47,13 +49,15 @@ export type FinanceSettings = {
   vat_rate?: number;
   iban?: string;
   bic?: string;
+  /** Lien de paiement en ligne (Revolut, PayPal, Lydia, Stripe…), bouton « Payer » sur la page du devis. */
+  payment_link?: string;
   validity_days?: number;
   deposit_pct?: number;
   terms?: string;
 };
 
 export const QUOTE_FIELDS =
-  "id, number, title, client_name, client_email, client_address, gallery_id, lines, vat_rate, total_cents, deposit_pct, status, issued_on, valid_until, due_on, lock_gallery, invoice_ref, notes, share_slug, sent_at, accepted_at, accepted_name, last_reminder_at, created_at";
+  "id, number, title, client_name, client_email, client_address, gallery_id, lines, vat_rate, total_cents, deposit_pct, status, issued_on, valid_until, due_on, lock_gallery, invoice_ref, notes, payment_link, share_slug, sent_at, accepted_at, accepted_name, last_reminder_at, created_at";
 
 export const STATUS_LABEL: Record<QuoteStatus, string> = {
   draft: "Brouillon",
@@ -167,6 +171,7 @@ export function cleanSettings(src: Record<string, unknown>): FinanceSettings {
     vat_rate: src.vat_mode === "vat" ? Math.min(100, Math.max(0, Number(String(src.vat_rate ?? 20).replace(",", ".")) || 0)) : 0,
     iban: text(src.iban, 40).toUpperCase(),
     bic: text(src.bic, 15).toUpperCase(),
+    payment_link: cleanLink(src.payment_link),
     validity_days: int(src.validity_days, 1, 365) ?? 30,
     deposit_pct: int(src.deposit_pct, 0, 100) ?? 30,
     terms: text(src.terms, 2000),
@@ -186,6 +191,38 @@ export function cleanLines(src: unknown): QuoteLine[] {
       return { label: String(r.label ?? "").trim().slice(0, 300), qty, unit_cents: unit };
     })
     .filter((l) => l.label || l.unit_cents);
+}
+
+/** Lien de paiement accepté seulement en https (« revolut.me/xxx » → « https://revolut.me/xxx »). */
+export function cleanLink(v: unknown) {
+  const s = typeof v === "string" ? v.trim().slice(0, 500) : "";
+  if (!s) return "";
+  try {
+    const url = new URL(/^https?:\/\//i.test(s) ? s : `https://${s}`);
+    return url.protocol === "https:" && url.hostname.includes(".") ? url.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
+/** Ce que le client peut payer maintenant : l'acompte s'il n'est pas réglé, sinon le reste. */
+export function amountDueNow(q: Pick<Quote, "total_cents" | "deposit_pct">, paid: number) {
+  const deposit = depositCents(q);
+  if (deposit > 0 && paid < deposit) return { cents: deposit - paid, label: "Payer l'acompte" };
+  return { cents: Math.max(0, q.total_cents - paid), label: paid > 0 ? "Payer le solde" : "Payer" };
+}
+
+/** Nom du service d'après le lien, pour le bouton (« Payer avec Revolut »). */
+export function payService(link: string) {
+  const host = (() => {
+    try {
+      return new URL(link).hostname;
+    } catch {
+      return "";
+    }
+  })();
+  const known: [RegExp, string][] = [[/revolut/, "Revolut"], [/paypal/, "PayPal"], [/lydia/, "Lydia"], [/stripe/, "Stripe"], [/sumup/, "SumUp"], [/wise\./, "Wise"]];
+  return known.find(([re]) => re.test(host))?.[1] ?? null;
 }
 
 /** Mention obligatoire en micro-entreprise sans TVA. */

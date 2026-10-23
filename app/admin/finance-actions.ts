@@ -10,6 +10,7 @@ import {
   METHOD_LABEL,
   addDays,
   cleanLines,
+  cleanLink,
   cleanSettings,
   quoteTotals,
   todayParis,
@@ -98,6 +99,7 @@ export type QuoteInput = {
   lock_gallery: boolean;
   invoice_ref: string;
   notes: string;
+  payment_link: string;
 };
 
 export async function saveQuote(id: string, input: QuoteInput): Promise<Result> {
@@ -124,6 +126,7 @@ export async function saveQuote(id: string, input: QuoteInput): Promise<Result> 
       lock_gallery: Boolean(input.lock_gallery),
       invoice_ref: text(input.invoice_ref, 200),
       notes: text(input.notes, 4000),
+      payment_link: cleanLink(input.payment_link),
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);

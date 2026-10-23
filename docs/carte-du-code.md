@@ -296,3 +296,6 @@ agréé (facture électronique obligatoire pour les micro en 2027) ; seul leur n
 Blocage : `galleries.payment_locked` (déclencheurs SQL) ; `findGalleryBySlug` renvoie alors `downloads_enabled = false`
 (photos, ZIP, vidéos) et la galerie / la page vidéo affichent « Le téléchargement sera disponible dès le règlement ».
 `buildMessage` (`lib/mailer.ts`) : sans `unsubscribeUrl`, pas de pied de désinscription (e-mails de devis).
+Lien de paiement (23 oct.) : `studio_settings.finance.payment_link` (Réglages) ou `quotes.payment_link` (un devis, prioritaire ;
+migration « quotes_payment_link ») ; https seulement (`cleanLink`). Page client : encadré « Payer l'acompte / le solde » +
+bouton « Payer avec Revolut » (`amountDueNow`, `payService`) si devis envoyé ou accepté et reste > 0 ; lien ajouté aux e-mails.

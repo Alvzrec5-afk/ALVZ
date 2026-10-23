@@ -17,6 +17,7 @@ export function FinanceSettingsForm({ settings }: { settings: FinanceSettings })
     vat_rate: String(settings.vat_rate ?? 20),
     iban: settings.iban ?? "",
     bic: settings.bic ?? "",
+    payment_link: settings.payment_link ?? "",
     validity_days: String(settings.validity_days ?? 30),
     deposit_pct: String(settings.deposit_pct ?? 30),
     terms: settings.terms ?? "",
@@ -59,6 +60,12 @@ export function FinanceSettingsForm({ settings }: { settings: FinanceSettings })
         <div className="grid sm:grid-cols-[1fr_10rem] gap-6">
           <F label="IBAN (affiché sur le devis pour les virements)"><input className="field" value={s.iban} onChange={set("iban")} /></F>
           <F label="BIC"><input className="field" value={s.bic} onChange={set("bic")} /></F>
+          <div className="sm:col-span-2">
+            <F label="Lien de paiement en ligne (Revolut, PayPal, Lydia…)">
+              <input className="field" inputMode="url" placeholder="https://revolut.me/votre-nom" value={s.payment_link} onChange={set("payment_link")} />
+            </F>
+            <p className="text-xs text-muted mt-2">Ajoute un bouton « Payer » sur vos devis et le lien dans les e-mails. Un devis peut avoir son propre lien.</p>
+          </div>
           <F label="Acompte habituel (%)"><input className="field" inputMode="numeric" value={s.deposit_pct} onChange={set("deposit_pct")} /></F>
           <F label="Devis valable (jours)"><input className="field" inputMode="numeric" value={s.validity_days} onChange={set("validity_days")} /></F>
         </div>
