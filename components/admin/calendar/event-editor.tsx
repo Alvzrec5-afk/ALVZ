@@ -36,6 +36,7 @@ export function EventEditor({
     notes: event?.notes ?? "",
     want_photo: event?.want_photo ?? false,
     want_video: event?.want_video ?? false,
+    want_board: event?.want_board ?? false,
     price: event?.price_cents ? (event.price_cents / 100).toFixed(2).replace(".", ",") : "",
   });
   const [id, setId] = useState(event?.id ?? null);
@@ -58,8 +59,8 @@ export function EventEditor({
   function save(confirm = false) {
     const data = input();
     if (!data) return;
-    if (confirm && prestation && !f.want_photo && !f.want_video && !confirmed) {
-      if (!window.confirm("Aucun projet coché (photo / vidéo) : confirmer la date sans rien créer ?")) return;
+    if (confirm && prestation && !f.want_photo && !f.want_video && !f.want_board && !confirmed) {
+      if (!window.confirm("Rien n'est coché (galerie, vidéo, tableau) : confirmer la date sans rien créer ?")) return;
     }
     start(async () => {
       const r = await saveEvent(id, data, confirm);
@@ -116,7 +117,7 @@ export function EventEditor({
             <L label="Date">
               <input className="field" type="date" value={f.starts_on} onChange={(e) => set("starts_on", e.target.value)} />
             </L>
-            <L label="Jusqu'au (facultatif)">
+            <L label="Jusqu'au">
               <input className="field" type="date" value={f.ends_on} min={f.starts_on} onChange={(e) => set("ends_on", e.target.value)} />
             </L>
             <L label="Heure de début">
@@ -144,9 +145,17 @@ export function EventEditor({
             <>
               <div>
                 <span className="label">À créer quand la date est validée</span>
-                <div className="flex gap-3 mt-2">
-                  <Check checked={f.want_photo} onChange={(v) => set("want_photo", v)} icon={<ImageIcon className="w-4 h-4" />} label="Galerie photo" disabled={Boolean(event?.gallery_id)} />
-                  <Check checked={f.want_video} onChange={(v) => set("want_video", v)} icon={<FilmIcon className="w-4 h-4" />} label="Vidéo + tableau" disabled={Boolean(event?.video_id)} />
+                <div className="mt-2 border border-line divide-y divide-line">
+                  <Check checked={f.want_photo} onChange={(v) => set("want_photo", v)} icon={<ImageIcon className="w-4 h-4" />} label="Galerie photo" done={Boolean(event?.gallery_id)} />
+                  <Check checked={f.want_video} onChange={(v) => set("want_video", v)} icon={<FilmIcon className="w-4 h-4" />} label="Projet vidéo" done={Boolean(event?.video_id)} />
+                  <Check
+                    checked={f.want_board}
+                    onChange={(v) => set("want_board", v)}
+                    icon={<BoardIcon className="w-4 h-4" />}
+                    label="Tableau de préparation"
+                    hint="Copie de votre modèle des nouveaux tableaux"
+                    done={Boolean(event?.board_id)}
+                  />
                 </div>
               </div>
               <L label="Prix convenu (€)">
@@ -230,16 +239,18 @@ function L({ label, children }: { label: string; children: React.ReactNode }) {
   );
 }
 
-function Check({ checked, onChange, icon, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; icon: React.ReactNode; label: string; disabled?: boolean }) {
+/** Case à cocher d'un projet à créer ; `done` = déjà créé (case figée). */
+function Check({ checked, onChange, icon, label, hint, done }: { checked: boolean; onChange: (v: boolean) => void; icon: React.ReactNode; label: string; hint?: string; done?: boolean }) {
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm border transition-colors ${checked ? "border-ink bg-ink text-bg" : "border-line text-muted hover:text-ink"} ${disabled ? "opacity-60 cursor-default" : ""}`}
-    >
-      {icon} {label}{disabled ? " ✓" : ""}
-    </button>
+    <label className={`flex items-center gap-3 px-4 py-3 ${done ? "cursor-default" : "cursor-pointer hover:bg-bg-soft"}`}>
+      <input type="checkbox" className="w-4 h-4 accent-current shrink-0" checked={checked || Boolean(done)} disabled={done} onChange={(e) => onChange(e.target.checked)} />
+      <span className="text-muted">{icon}</span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-sm">{label}</span>
+        {hint && <span className="block text-[11px] text-muted">{hint}</span>}
+      </span>
+      {done && <span className="text-[11px] text-accent shrink-0">Créé ✓</span>}
+    </label>
   );
 }
 

@@ -317,7 +317,7 @@ description, unité, prix HT en centimes, kind service|debours, position, archiv
 le catalogue ne modifie pas les devis déjà faits. Page client : description sous le nom, quantité + unité (`qtyWithUnit` : « 2 h »).
 
 **Calendrier (`/admin/calendrier`, 23 oct.)** — table `calendar_events` (migration « calendar_events » : titre, client, e-mail,
-starts_on / ends_on, heures, lieu, notes, kind prestation|rdv|autre, status option|confirmed|cancelled, want_photo / want_video,
+starts_on / ends_on, heures, lieu, notes, kind prestation|rdv|autre, status option|confirmed|cancelled, want_photo / want_video / want_board (cases séparées, migration « calendar_events_want_board »),
 price_cents, quote_id, gallery_id, video_id, board_id). Page `app/admin/(protected)/calendrier/page.tsx` : événements + galeries datées
 hors calendrier + soldes à recevoir (devis acceptés avec `due_on`) → `CalendarEntry` ; `components/admin/calendar/calendar-view.tsx`
 (mois, légende, jour choisi, « À venir », double-clic = nouvel événement, `?e=<id>` ouvre un événement), `event-editor.tsx` (panneau),

@@ -32,7 +32,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
   const items: string[] = [];
   for (const e of evs) {
     const prefix = e.status === "option" ? "Option · " : "";
-    const what = [e.want_photo && "photo", e.want_video && "vidéo"].filter(Boolean).join(" + ");
+    const what = [e.want_photo && "photo", e.want_video && "vidéo", e.want_board && "tableau"].filter(Boolean).join(" + ");
     items.push(
       vevent({
         uid: `ev-${e.id}`,

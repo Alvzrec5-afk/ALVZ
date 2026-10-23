@@ -18,6 +18,7 @@ export type CalendarEvent = {
   status: EventStatus;
   want_photo: boolean;
   want_video: boolean;
+  want_board: boolean;
   price_cents: number | null;
   quote_id: string | null;
   gallery_id: string | null;
@@ -27,7 +28,7 @@ export type CalendarEvent = {
 };
 
 export const EVENT_FIELDS =
-  "id, title, client_name, client_email, starts_on, ends_on, start_time, end_time, location, notes, kind, status, want_photo, want_video, price_cents, quote_id, gallery_id, video_id, board_id, confirmed_at";
+  "id, title, client_name, client_email, starts_on, ends_on, start_time, end_time, location, notes, kind, status, want_photo, want_video, want_board, price_cents, quote_id, gallery_id, video_id, board_id, confirmed_at";
 
 export const KIND_LABEL: Record<EventKind, string> = { prestation: "Prestation", rdv: "Rendez-vous", autre: "Autre" };
 export const STATUS_LABEL: Record<EventStatus, string> = { option: "Option (pas sûr)", confirmed: "Confirmé", cancelled: "Annulé" };

@@ -60,7 +60,7 @@ export async function createAgreedQuote(
 }
 
 /**
- * Date validée : crée ce qui manque (galerie photo, projet vidéo + son tableau copié du modèle, devis au prix convenu),
+ * Date validée : crée ce qui est coché et manque encore (galerie photo, projet vidéo, tableau copié du modèle, devis au prix convenu),
  * puis marque l'événement « confirmé ». Peut être relancée sans rien créer en double.
  */
 export async function confirmEvent(db: SupabaseClient, eventId: string) {
@@ -73,9 +73,11 @@ export async function confirmEvent(db: SupabaseClient, eventId: string) {
   if (ev.want_photo && !ev.gallery_id) patch.gallery_id = await createProject(db, "photo", title, ev.starts_on);
   if (ev.want_video && !ev.video_id) patch.video_id = await createProject(db, "video", title, ev.starts_on);
   const videoId = patch.video_id ?? ev.video_id;
-  if (ev.want_video && !ev.board_id) {
+  if (ev.want_board && !ev.board_id) {
+    // Tableau copié du modèle, relié au projet vidéo (sinon à la galerie photo).
     const boardId = await duplicateBoard(db, await templateBoardId(db), title, { parentId: null });
-    if (videoId) await db.from("boards").update({ gallery_id: videoId }).eq("id", boardId);
+    const owner = videoId ?? patch.gallery_id ?? ev.gallery_id;
+    if (owner) await db.from("boards").update({ gallery_id: owner }).eq("id", boardId);
     patch.board_id = boardId;
   }
   const mainProject = patch.gallery_id ?? ev.gallery_id ?? videoId ?? null;

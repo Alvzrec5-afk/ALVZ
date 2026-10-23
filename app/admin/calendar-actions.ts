@@ -30,11 +30,13 @@ export type EventInput = {
   kind: EventKind;
   want_photo: boolean;
   want_video: boolean;
+  want_board: boolean;
   price_cents: number | null;
 };
 
 /** Ajoute (id null) ou modifie un événement. Un nouvel événement « prestation » commence en option. */
-export async function saveEvent(id: string | null, input: EventInput, confirmed = false): Promise<Result> {
+export async function saveEvent(id: string | null, input: EventInput, confirm = false): Promise<Result> {
+  let confirmed = confirm;
   const { supabase } = await requireAdminApi();
   const title = text(input.title, 200) || text(input.client_name, 160);
   if (!title) return { error: "Donnez un titre (ou le nom du client)." };
@@ -56,6 +58,7 @@ export async function saveEvent(id: string | null, input: EventInput, confirmed 
     kind,
     want_photo: kind === "prestation" && Boolean(input.want_photo),
     want_video: kind === "prestation" && Boolean(input.want_video),
+    want_board: kind === "prestation" && Boolean(input.want_board),
     price_cents: input.price_cents && input.price_cents > 0 ? Math.min(100_000_000, Math.round(input.price_cents)) : null,
     updated_at: new Date().toISOString(),
   };
@@ -64,9 +67,11 @@ export async function saveEvent(id: string | null, input: EventInput, confirmed 
     const { error } = await supabase.from("calendar_events").update(row).eq("id", id);
     if (error) return { error: error.message };
     // Projets déjà créés : la date suit.
-    const { data: ev } = await supabase.from("calendar_events").select("gallery_id, video_id").eq("id", id).maybeSingle();
+    const { data: ev } = await supabase.from("calendar_events").select("gallery_id, video_id, status").eq("id", id).maybeSingle();
     const ids = [ev?.gallery_id, ev?.video_id].filter(Boolean) as string[];
     if (ids.length) await supabase.from("galleries").update({ event_date: row.starts_on }).in("id", ids);
+    // Date déjà confirmée : ce qui vient d'être coché est créé tout de suite.
+    if (ev?.status === "confirmed" && kind === "prestation") confirmed = true;
   } else {
     const { data, error } = await supabase
       .from("calendar_events")
@@ -84,7 +89,7 @@ export async function saveEvent(id: string | null, input: EventInput, confirmed 
     }
   }
   refresh();
-  return { ok: confirmed ? "Date confirmée, projets créés." : "Enregistré", id: eventId ?? undefined };
+  return { ok: confirm ? "Date confirmée, projets créés." : "Enregistré", id: eventId ?? undefined };
 }
 
 /** Le client a validé la date : galerie / projet vidéo / tableau / devis créés. */
