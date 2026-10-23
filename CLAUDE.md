@@ -149,13 +149,13 @@ Publié aussi : **onglets en bas de l'écran au téléphone** (Accueil, Galeries
 Publié aussi : logo **ALVZ .STUDIO** (même style pochoir) dans le studio, icônes de l'app iPhone et Mac ; ALVZ.REC gardé
 pour les galeries, vidéos et pages des clients. Au push, `desktop/icon.png` relance la fabrication du .dmg (GitHub Actions).
 
-Fait le 23 oct. (pas encore publié) : **Finances** (`/admin/finances`) — devis (page client `/d/<lien>` : PDF + bon pour
+Publié le 23 oct. : **Finances** (`/admin/finances`) — devis (page client `/d/<lien>` : PDF + bon pour
 accord), paiements reçus, relances Gmail, dépenses, tableau de bord, galerie bloquée tant que le devis lié n'est pas payé
 (`galleries.payment_locked`, migration « finances » déjà appliquée en base US). Les vraies factures restent dans un logiciel
-agréé (seul leur n° est noté). Bouton « Payer » (lien Revolut / PayPal… dans Réglages ou par devis). E-mail au studio quand le client accepte ou clique « Payer ». Détail : `docs/carte-du-code.md`, section « Finances ».
+agréé (seul leur n° est noté). Bouton « Payer » (lien Revolut / PayPal… dans Réglages ou par devis). E-mail au studio quand le client accepte ou clique « Payer ». Publié aussi : logo du studio au téléphone plus bas (Dynamic Island), Accueil sans titre « Studio » au téléphone. Détail : `docs/carte-du-code.md`, section « Finances ».
 
 - **À faire par le propriétaire** : poser une fois l'index.html (Studio → Site → Relier alvzrec.com) sur l'ancien compte Netlify, puis vérifier alvzrec.com (clips, photos, coulisses).
-- **À vérifier en vrai par le propriétaire** : tableau modifié en mode avion puis réseau remis (iPhone et Mac), panneau « Images projet » (déplacer, agrandir, glisser une image sur le tableau), onglets des planches, Studio → Site (ajout d'un lien YouTube, envoi de photos), Accueil `/admin` (chiffres, stockage détaillé), Banque d'images (copie d'office d'une photo envoyée, onglet, corbeille), ouverture d'une planche ; menu « … » (plan Google Maps, envoi d'un PDF / MP3 vers Oracle), case photo vide (choix parmi les photos du projet) ;
+- **À vérifier en vrai par le propriétaire** : Finances (remplir Réglages, devis test envoyé à soi-même, bon pour accord, bouton Payer, e-mails reçus, galerie bloquée puis débloquée) ; tableau modifié en mode avion puis réseau remis (iPhone et Mac), panneau « Images projet » (déplacer, agrandir, glisser une image sur le tableau), onglets des planches, Studio → Site (ajout d'un lien YouTube, envoi de photos), Accueil `/admin` (chiffres, stockage détaillé), Banque d'images (copie d'office d'une photo envoyée, onglet, corbeille), ouverture d'une planche ; menu « … » (plan Google Maps, envoi d'un PDF / MP3 vers Oracle), case photo vide (choix parmi les photos du projet) ;
   vidéo dans un tableau (envoi depuis l'iPhone, lecture, plein écran) ; capture d'un tableau **depuis l'iPhone** (nette au zoom ? photos présentes ? non testé sur vrai Safari) et avec de vraies photos Oracle (si elles sortent
   grises → CORS : passer les images par une route du site ou régler le bucket) ; défilement au doigt sur une grille ;
   Ctrl + clic sur Mac ; envoi d'un clip (H.264/4K) ; e-mail de test Gmail ; images « disparues » des tableaux
