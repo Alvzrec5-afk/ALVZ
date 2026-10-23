@@ -40,3 +40,10 @@ export async function loadCatalog(supabase: SupabaseClient) {
   if (error) throw new Error(error.message);
   return ((data ?? []) as CatalogItem[]).map((c) => ({ ...c, price_cents: Number(c.price_cents) }));
 }
+
+/** Numéro suivant de l'année : D-2026-001, D-2026-002… (jamais réutilisé, même après suppression). */
+export async function nextQuoteNumber(supabase: SupabaseClient, year: string) {
+  const { data } = await supabase.from("quotes").select("number").like("number", `D-${year}-%`).order("number", { ascending: false }).limit(1);
+  const last = Number(String(data?.[0]?.number ?? "").split("-")[2]) || 0;
+  return `D-${year}-${String(last + 1).padStart(3, "0")}`;
+}

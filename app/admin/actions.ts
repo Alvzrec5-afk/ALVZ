@@ -9,6 +9,8 @@ import { sanitizeContact } from "@/lib/contact";
 import { pickDesign, sanitizeSettingsPatch } from "@/lib/design";
 import { createSessionClient } from "@/lib/supabase/server";
 import { newSlug } from "@/lib/tokens";
+import { parseEuros } from "@/lib/finance";
+import { createAgreedQuote } from "@/lib/calendar-server";
 import { VIDEO_PURGE_FIELDS, purgeVideos } from "@/lib/videos";
 
 export type FormState = { error?: string; ok?: string } | null;
@@ -40,6 +42,15 @@ export async function createGallery(_: FormState, form: FormData): Promise<FormS
     .single();
   if (error) return { error: error.message };
   if (kind === "photo") await supabase.from("collections").insert({ gallery_id: data.id, name: "Galerie", position: 0 });
+  // Prix convenu : devis déjà accepté, relié au projet (Finances suit les paiements, la date apparaît au calendrier).
+  const price = parseEuros(String(form.get("price") ?? "").trim() || "0");
+  if (price && price > 0) {
+    try {
+      await createAgreedQuote(supabase, { title, client_name: title, price_cents: price, gallery_id: data.id as string });
+    } catch (e) {
+      console.error("Devis du prix convenu impossible", e);
+    }
+  }
   revalidatePath(kind === "photo" ? "/admin/galleries" : "/admin/videos");
   redirect(`/admin/galleries/${data.id}`);
 }

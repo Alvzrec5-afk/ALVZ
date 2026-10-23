@@ -6,13 +6,14 @@ import { useEffect, useState } from "react";
 import { Wordmark } from "@/components/wordmark";
 import { BackgroundStatus } from "./background";
 import { clearOffline } from "./offline-support";
-import { BoardIcon, GlobeIcon, HomeIcon, TrashIcon, CardIcon, CloseIcon, DotsIcon, FilmIcon, ImageIcon, LogoutIcon, MegaphoneIcon, MoneyIcon } from "@/components/icons";
+import { BoardIcon, GlobeIcon, HomeIcon, TrashIcon, CardIcon, CloseIcon, DotsIcon, FilmIcon, ImageIcon, LogoutIcon, MegaphoneIcon, MoneyIcon, CalendarIcon } from "@/components/icons";
 
 const NAV = [
   { href: "/admin", label: "Accueil", Icon: HomeIcon, match: (p: string) => p === "/admin" },
   { href: "/admin/galleries", label: "Galeries", Icon: ImageIcon, match: (p: string) => p.startsWith("/admin/galleries") },
   { href: "/admin/videos", label: "Vidéos", Icon: FilmIcon, match: (p: string) => p.startsWith("/admin/videos") },
   { href: "/admin/boards", label: "Tableaux", Icon: BoardIcon, match: (p: string) => p.startsWith("/admin/boards") },
+  { href: "/admin/calendrier", label: "Calendrier", Icon: CalendarIcon, match: (p: string) => p.startsWith("/admin/calendrier") },
   { href: "/admin/finances", label: "Finances", Icon: MoneyIcon, match: (p: string) => p.startsWith("/admin/finances") },
   { href: "/admin/site", label: "Site", Icon: GlobeIcon, match: (p: string) => p.startsWith("/admin/site") },
   { href: "/admin/settings", label: "Coordonnées", Icon: CardIcon, match: (p: string) => p.startsWith("/admin/settings") },

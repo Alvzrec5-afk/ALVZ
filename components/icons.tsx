@@ -335,3 +335,9 @@ export const DocIcon = ({ className = "w-5 h-5" }: P) => (
     <path d="M7.5 13h3.5M9.25 13v5M13 14h4M13 17h4" />
   </svg>
 );
+export const CalendarIcon = ({ className = "w-5 h-5" }: P) => (
+  <svg viewBox="0 0 24 24" className={className} {...base} aria-hidden>
+    <rect x="3.5" y="5" width="17" height="15" rx="1.5" />
+    <path d="M3.5 9.5h17M8 3v4M16 3v4M7.5 13h2M11 13h2M14.5 13h2M7.5 16.5h2M11 16.5h2" />
+  </svg>
+);

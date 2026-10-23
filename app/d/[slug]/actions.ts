@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { amountDueNow, formatCents, todayParis } from "@/lib/finance";
 import { notifyStudio, siteOrigin } from "@/lib/finance-notify";
+import { confirmEventsForQuote } from "@/lib/calendar-server";
 import { createServiceClient } from "@/lib/supabase/server";
 
 /** « Bon pour accord » du client, depuis la page publique du devis (lien secret). */
@@ -38,7 +39,10 @@ export async function acceptQuote(slug: string, _: { error?: string; ok?: boolea
       ].filter(Boolean),
     }),
   );
+  // Date en option reliée à ce devis : validée, projets créés (galerie, vidéo, tableau), après la réponse au client.
+  after(() => confirmEventsForQuote(db, q.id));
   revalidatePath(`/d/${slug}`);
+  revalidatePath("/admin", "layout");
   revalidatePath("/admin/finances", "layout");
   return { ok: true };
 }

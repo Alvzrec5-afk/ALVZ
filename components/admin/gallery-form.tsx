@@ -18,6 +18,11 @@ export function CreateGalleryForm({ kind = "photo" }: { kind?: "photo" | "video"
         <input id="event_date" name="event_date" type="date" className="field" />
       </div>
       <div>
+        <label className="label" htmlFor="price">Prix convenu avec le client (optionnel)</label>
+        <input id="price" name="price" inputMode="decimal" className="field" placeholder="Ex. 1200" />
+        <p className="text-xs text-muted mt-2">Crée le devis (déjà accepté) dans Finances, relié à ce projet, pour suivre les paiements.</p>
+      </div>
+      <div>
         <label className="label" htmlFor="password">Mot de passe (optionnel)</label>
         <input id="password" name="password" type="text" autoComplete="off" className="field" placeholder="Aucun" />
       </div>

@@ -19,6 +19,8 @@ import {
   type QuoteStatus,
 } from "@/lib/finance";
 import { buildMessage, createMailer } from "@/lib/mailer";
+import { nextQuoteNumber } from "@/lib/finance-data";
+import { confirmEventsForQuote } from "@/lib/calendar-server";
 import { newSlug } from "@/lib/tokens";
 
 type Result = { error?: string; ok?: string };
@@ -36,13 +38,6 @@ function refresh(id?: string) {
 async function loadSettings(supabase: Awaited<ReturnType<typeof requireAdminApi>>["supabase"]) {
   const { data } = await supabase.from("studio_settings").select("finance, contact").eq("id", 1).maybeSingle();
   return { finance: (data?.finance ?? {}) as FinanceSettings, contact: (data?.contact ?? {}) as Contact };
-}
-
-/** Numéro suivant de l'année : D-2026-001, D-2026-002… (jamais réutilisé, même après suppression). */
-async function nextNumber(supabase: Awaited<ReturnType<typeof requireAdminApi>>["supabase"], year: string) {
-  const { data } = await supabase.from("quotes").select("number").like("number", `D-${year}-%`).order("number", { ascending: false }).limit(1);
-  const last = Number(String(data?.[0]?.number ?? "").split("-")[2]) || 0;
-  return `D-${year}-${String(last + 1).padStart(3, "0")}`;
 }
 
 /** Nouveau devis (brouillon) pré-rempli avec les réglages, puis ouverture de sa fiche. */
@@ -63,7 +58,7 @@ export async function createQuote(galleryId?: string) {
     const { data, error } = await supabase
       .from("quotes")
       .insert({
-        number: await nextNumber(supabase, today.slice(0, 4)),
+        number: await nextQuoteNumber(supabase, today.slice(0, 4)),
         title,
         gallery_id: gallery,
         vat_rate: finance.vat_mode === "vat" ? (finance.vat_rate ?? 20) : 0,
@@ -143,7 +138,9 @@ export async function setQuoteStatus(id: string, status: QuoteStatus): Promise<R
   if (status === "draft" || status === "sent") Object.assign(patch, { accepted_at: null, accepted_name: null });
   const { error } = await supabase.from("quotes").update(patch).eq("id", id);
   if (error) return { error: error.message };
+  if (status === "accepted") await confirmEventsForQuote(supabase, id);
   refresh(id);
+  revalidatePath("/admin", "layout");
   return {};
 }
 
@@ -167,7 +164,7 @@ export async function duplicateQuote(id: string) {
   const today = todayParis();
   const { data, error } = await supabase
     .from("quotes")
-    .insert({ ...q, number: await nextNumber(supabase, today.slice(0, 4)), issued_on: today, valid_until: addDays(today, finance.validity_days ?? 30), share_slug: newSlug() })
+    .insert({ ...q, number: await nextQuoteNumber(supabase, today.slice(0, 4)), issued_on: today, valid_until: addDays(today, finance.validity_days ?? 30), share_slug: newSlug() })
     .select("id")
     .single();
   if (error) throw new Error(error.message);
@@ -185,7 +182,13 @@ export async function addPayment(quoteId: string, input: { amount_cents: number;
     .insert({ quote_id: quoteId, amount_cents: amount, paid_on: day(input.paid_on) ?? todayParis(), method, note: text(input.note, 300) });
   if (error) return { error: error.message };
   // Un paiement reçu sur un devis encore « envoyé » vaut accord du client.
-  await supabase.from("quotes").update({ status: "accepted", accepted_at: new Date().toISOString() }).eq("id", quoteId).eq("status", "sent");
+  const { data: accepted } = await supabase
+    .from("quotes")
+    .update({ status: "accepted", accepted_at: new Date().toISOString() })
+    .eq("id", quoteId)
+    .eq("status", "sent")
+    .select("id");
+  if (accepted?.length) await confirmEventsForQuote(supabase, quoteId);
   refresh(quoteId);
   return {};
 }

@@ -315,3 +315,16 @@ description, unité, prix HT en centimes, kind service|debours, position, archiv
 `saveCatalogItem` / `archiveCatalogItem` / `deleteCatalogItem`. Devis : « Ajouter un article » (`CatalogPicker` dans
 `quote-editor.tsx`, articles non archivés) recopie l'article dans la ligne (`QuoteLine.description`, `QuoteLine.unit`) : changer
 le catalogue ne modifie pas les devis déjà faits. Page client : description sous le nom, quantité + unité (`qtyWithUnit` : « 2 h »).
+
+**Calendrier (`/admin/calendrier`, 23 oct.)** — table `calendar_events` (migration « calendar_events » : titre, client, e-mail,
+starts_on / ends_on, heures, lieu, notes, kind prestation|rdv|autre, status option|confirmed|cancelled, want_photo / want_video,
+price_cents, quote_id, gallery_id, video_id, board_id). Page `app/admin/(protected)/calendrier/page.tsx` : événements + galeries datées
+hors calendrier + soldes à recevoir (devis acceptés avec `due_on`) → `CalendarEntry` ; `components/admin/calendar/calendar-view.tsx`
+(mois, légende, jour choisi, « À venir », double-clic = nouvel événement, `?e=<id>` ouvre un événement), `event-editor.tsx` (panneau),
+`sync-button.tsx`. Confirmation : `lib/calendar-server.ts` `confirmEvent` (idempotent) crée la galerie photo (`createProject`), le projet
+vidéo + un tableau copié du modèle (`duplicateBoard(templateBoardId)`, relié au projet vidéo), le devis au prix convenu
+(`createAgreedQuote`, accepté) ou relie le devis existant. « Préparer le devis » = brouillon relié (`createEventQuote`) ; quand le
+client l'accepte (en ligne, ou passage à « accepté » / paiement noté au studio) → `confirmEventsForQuote`. Nouvelle galerie /
+projet vidéo : champ « Prix convenu » → `createAgreedQuote` relié. Abonnement iPhone / Mac / Google : `/api/calendar/<jeton>`
+(`studio_settings.calendar_token`, `calendarFeedUrl`, format `lib/ical.ts`, options en STATUS:TENTATIVE).
+Numérotation des devis partagée : `nextQuoteNumber` (`lib/finance-data.ts`).
