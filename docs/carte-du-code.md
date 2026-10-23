@@ -304,3 +304,8 @@ sinon SMTP_USER ; envoyé dans `after`, jamais bloquant). Envoyé quand le clien
 et quand il clique « Payer » : le bouton passe par `/d/<lien>/pay` (note `quotes.pay_clicked_at`, migration
 « quotes_pay_clicked », 1 e-mail max / 6 h, puis redirige vers le lien). Studio : « A cliqué sur Payer… vérifiez votre compte »
 sur la fiche et dans « À relancer / à vérifier » tant qu'aucun paiement n'a été noté après le clic.
+E-mails (23 oct.) : `buildMessage` (`lib/mailer.ts`) prend `buttons` (repère seul sur sa ligne, ex. « {lien} » → bouton noir
+« Voir le devis » ; ailleurs → lien ; texte brut → adresse) et `origin` (images de la signature) ; signature = logo rond
+`public/brand/mail/avatar.png` + icônes rondes `public/brand/mail/<whatsapp|instagram|tiktok|email|website>.png`
+(glyphes Simple Icons CC0, rendus en PNG car Gmail n'affiche pas le SVG). Pas de lien de paiement dans les e-mails :
+le bouton « Payer l'acompte » / « Payer la facture » est sur la page du devis. Logo du devis forcé foncé (`Wordmark tone="dark"`).

@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     const failed: { email: string; error: string }[] = [];
     for (const to of recipients) {
       const unsubscribeUrl = `${req.nextUrl.origin}/desinscription?t=${encodeURIComponent(unsubscribeToken(to))}`;
-      const { text, html } = buildMessage({ body, contact, unsubscribeUrl });
+      const { text, html } = buildMessage({ body, contact, unsubscribeUrl, origin: req.nextUrl.origin });
       try {
         await transport.sendMail({
           from: sender,

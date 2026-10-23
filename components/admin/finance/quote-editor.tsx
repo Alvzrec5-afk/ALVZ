@@ -470,10 +470,8 @@ function Mail({
   const [kind, setKind] = useState<"send" | "reminder">(reminder ? "reminder" : "send");
   const hello = form.client_name ? `Bonjour ${form.client_name.split(/\s+/)[0]},` : "Bonjour,";
   const what = form.title || "votre projet";
-  const payLink = cleanLink(form.payment_link) || settings.payment_link || "";
-  const bank =
-    (payLink ? `\n\nPour payer en ligne : ${payLink}` : "") +
-    (settings.iban ? `\n\nPour un virement : IBAN ${settings.iban}${settings.bic ? ` · BIC ${settings.bic}` : ""}.` : "");
+  // Le paiement en ligne est sur la page du devis (bouton « Payer ») : pas de lien de paiement dans l'e-mail.
+  const online = Boolean(cleanLink(form.payment_link) || settings.payment_link);
   const templates = {
     send: {
       subject: `Devis ${quote.number}${form.title ? ` — ${form.title}` : ""}`,
@@ -481,9 +479,9 @@ function Mail({
 
 Voici mon devis pour ${what}, d'un montant de ${formatCents(total)}.
 
-Vous pouvez le consulter, l'enregistrer en PDF et l'accepter en ligne ici :
+${deposit > 0 ? `Un acompte de ${formatCents(deposit)} est demandé pour réserver la date${online ? ", à régler directement depuis la page du devis" : ""}.\n\n` : ""}Vous pouvez le consulter, l'enregistrer en PDF et l'accepter en ligne :
 {lien}
-${deposit > 0 ? `\nUn acompte de ${formatCents(deposit)} est demandé pour réserver la date.${bank}\n` : ""}
+
 Je reste disponible pour toute question.
 
 À très vite,`,
@@ -494,7 +492,8 @@ Je reste disponible pour toute question.
 
 Petit rappel concernant ${what} : il reste ${formatCents(state.remaining)} à régler${form.due_on ? ` (échéance du ${formatDay(form.due_on)})` : ""}.
 
-Le détail est ici : {lien}${bank}
+${online ? "Vous pouvez régler en ligne depuis la page du devis :" : "Le détail est ici :"}
+{lien}
 
 Si le paiement est déjà parti, merci de ne pas tenir compte de ce message.
 
@@ -546,7 +545,7 @@ Belle journée,`,
         <Field label="Message">
           <textarea className="field leading-relaxed" rows={11} style={{ minHeight: "16rem", resize: "vertical" }} value={body} onChange={(e) => setBody(e.target.value)} maxLength={10000} />
         </Field>
-        <p className="text-xs text-muted -mt-3">« {"{lien}"} » est remplacé par le lien de la page du devis. Votre carte de visite est ajoutée en bas.</p>
+        <p className="text-xs text-muted -mt-3">« {"{lien}"} » seul sur sa ligne devient le bouton « Voir le devis ». Votre signature (logo et réseaux) est ajoutée en bas.</p>
         <div className="flex flex-wrap items-center gap-4">
           <button className="btn" onClick={send} disabled={!mailer || busy}>{busy ? "Envoi…" : kind === "send" ? "Envoyer le devis" : "Envoyer la relance"}</button>
           {quote.sent_at && <span className="text-xs text-muted">Devis envoyé le {formatDay(quote.sent_at.slice(0, 10))}</span>}

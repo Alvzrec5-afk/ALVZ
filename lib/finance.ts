@@ -211,20 +211,7 @@ export function cleanLink(v: unknown) {
 export function amountDueNow(q: Pick<Quote, "total_cents" | "deposit_pct">, paid: number) {
   const deposit = depositCents(q);
   if (deposit > 0 && paid < deposit) return { cents: deposit - paid, label: "Payer l'acompte" };
-  return { cents: Math.max(0, q.total_cents - paid), label: paid > 0 ? "Payer le solde" : "Payer" };
-}
-
-/** Nom du service d'après le lien, pour le bouton (« Payer avec Revolut »). */
-export function payService(link: string) {
-  const host = (() => {
-    try {
-      return new URL(link).hostname;
-    } catch {
-      return "";
-    }
-  })();
-  const known: [RegExp, string][] = [[/revolut/, "Revolut"], [/paypal/, "PayPal"], [/lydia/, "Lydia"], [/stripe/, "Stripe"], [/sumup/, "SumUp"], [/wise\./, "Wise"]];
-  return known.find(([re]) => re.test(host))?.[1] ?? null;
+  return { cents: Math.max(0, q.total_cents - paid), label: "Payer la facture" };
 }
 
 /** Mention obligatoire en micro-entreprise sans TVA. */

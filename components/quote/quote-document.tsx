@@ -5,7 +5,6 @@ import {
   formatCents,
   formatDay,
   lineTotal,
-  payService,
   quoteState,
   quoteTotals,
   type FinanceSettings,
@@ -26,7 +25,6 @@ export function QuoteDocument({ q, paid, f, slug }: { q: Quote; paid: number; f:
   const payLink = q.payment_link || f.payment_link || "";
   const due = amountDueNow(q, paid);
   const canPay = Boolean(payLink) && (q.status === "sent" || q.status === "accepted") && due.cents > 0;
-  const service = payLink ? payService(payLink) : null;
 
   return (
     <div data-theme="blanc" className="min-h-svh bg-bg-soft text-ink print:bg-white">
@@ -40,7 +38,7 @@ export function QuoteDocument({ q, paid, f, slug }: { q: Quote; paid: number; f:
         <article className="bg-bg border border-line px-6 sm:px-12 py-10 sm:py-14 print:border-0 print:px-0 print:py-0">
           <header className="flex flex-wrap items-start justify-between gap-8">
             <div>
-              <Wordmark height={34} />
+              <Wordmark height={34} tone="dark" />
               <div className="text-xs text-muted mt-5 leading-relaxed whitespace-pre-line">
                 {[f.business_name, f.owner_name && f.owner_name !== f.business_name ? `${f.owner_name}, entrepreneur individuel` : null, f.address, f.siret && `SIRET ${f.siret}`, f.email, f.phone]
                   .filter(Boolean)
@@ -133,14 +131,11 @@ export function QuoteDocument({ q, paid, f, slug }: { q: Quote; paid: number; f:
         {canPay && (
           <section className="no-print mt-8 bg-bg border border-line px-6 sm:px-12 py-8 flex flex-wrap items-center gap-x-8 gap-y-4">
             <div className="flex-1 min-w-48">
-              <p className="display text-2xl">{due.label}</p>
-              <p className="text-sm text-muted mt-1">
-                {formatCents(due.cents)}
-                {service ? ` · paiement sécurisé par ${service}` : ""}
-              </p>
+              <p className="display text-2xl">{due.label === "Payer l'acompte" ? "Acompte à régler" : "Reste à régler"}</p>
+              <p className="text-sm text-muted mt-1 tabular-nums">{formatCents(due.cents)}</p>
             </div>
             <a href={`/d/${slug}/pay`} target="_blank" rel="noopener noreferrer nofollow" className="btn w-full sm:w-auto">
-              {service ? `Payer avec ${service}` : "Payer en ligne"}
+              {due.label}
             </a>
           </section>
         )}

@@ -248,7 +248,7 @@ export async function emailQuote(id: string, input: { subject: string; body: str
   const { contact, finance } = await loadSettings(supabase);
   try {
     const { transport, from } = createMailer();
-    const { text: plain, html } = buildMessage({ body: body.replaceAll("{lien}", link), contact });
+    const { text: plain, html } = buildMessage({ body, contact, origin, buttons: { "{lien}": { label: "Voir le devis", href: link } } });
     await transport.sendMail({
       from: { name: finance.business_name || contact.name?.split(/\s+[—-]\s+/)[0] || "ALVZ.REC", address: from },
       to: q.client_email,
