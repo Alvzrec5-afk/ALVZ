@@ -145,18 +145,12 @@ export function EventEditor({
             <>
               <div>
                 <span className="label">À créer quand la date est validée</span>
-                <div className="mt-2 border border-line divide-y divide-line">
-                  <Check checked={f.want_photo} onChange={(v) => set("want_photo", v)} icon={<ImageIcon className="w-4 h-4" />} label="Galerie photo" done={Boolean(event?.gallery_id)} />
-                  <Check checked={f.want_video} onChange={(v) => set("want_video", v)} icon={<FilmIcon className="w-4 h-4" />} label="Projet vidéo" done={Boolean(event?.video_id)} />
-                  <Check
-                    checked={f.want_board}
-                    onChange={(v) => set("want_board", v)}
-                    icon={<BoardIcon className="w-4 h-4" />}
-                    label="Tableau de préparation"
-                    hint="Copie de votre modèle des nouveaux tableaux"
-                    done={Boolean(event?.board_id)}
-                  />
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  <Check checked={f.want_photo} onChange={(v) => set("want_photo", v)} icon={<ImageIcon className="w-5 h-5" />} label="Galerie" done={Boolean(event?.gallery_id)} />
+                  <Check checked={f.want_video} onChange={(v) => set("want_video", v)} icon={<FilmIcon className="w-5 h-5" />} label="Vidéo" done={Boolean(event?.video_id)} />
+                  <Check checked={f.want_board} onChange={(v) => set("want_board", v)} icon={<BoardIcon className="w-5 h-5" />} label="Tableau" done={Boolean(event?.board_id)} />
                 </div>
+                <p className="text-[11px] text-muted mt-2">Le tableau est une copie de votre modèle des nouveaux tableaux.</p>
               </div>
               <L label="Prix convenu (€)">
                 <input className="field" inputMode="decimal" placeholder="Ex. 1200" value={f.price} onChange={(e) => set("price", e.target.value)} />
@@ -239,18 +233,21 @@ function L({ label, children }: { label: string; children: React.ReactNode }) {
   );
 }
 
-/** Case à cocher d'un projet à créer ; `done` = déjà créé (case figée). */
-function Check({ checked, onChange, icon, label, hint, done }: { checked: boolean; onChange: (v: boolean) => void; icon: React.ReactNode; label: string; hint?: string; done?: boolean }) {
+/** Bouton à basculer (noir = sera créé) ; `done` = déjà créé (figé). */
+function Check({ checked, onChange, icon, label, done }: { checked: boolean; onChange: (v: boolean) => void; icon: React.ReactNode; label: string; done?: boolean }) {
+  const on = checked || Boolean(done);
   return (
-    <label className={`flex items-center gap-3 px-4 py-3 ${done ? "cursor-default" : "cursor-pointer hover:bg-bg-soft"}`}>
-      <input type="checkbox" className="w-4 h-4 accent-current shrink-0" checked={checked || Boolean(done)} disabled={done} onChange={(e) => onChange(e.target.checked)} />
-      <span className="text-muted">{icon}</span>
-      <span className="flex-1 min-w-0">
-        <span className="block text-sm">{label}</span>
-        {hint && <span className="block text-[11px] text-muted">{hint}</span>}
-      </span>
-      {done && <span className="text-[11px] text-accent shrink-0">Créé ✓</span>}
-    </label>
+    <button
+      type="button"
+      aria-pressed={on}
+      disabled={done}
+      onClick={() => onChange(!checked)}
+      className={`flex flex-col items-center justify-center gap-1.5 py-3.5 text-sm border transition-colors ${on ? "border-ink bg-ink text-bg" : "border-line text-muted hover:text-ink hover:border-muted"} ${done ? "cursor-default opacity-80" : ""}`}
+    >
+      {icon}
+      <span>{label}</span>
+      {done && <span className="text-[10px] opacity-80">Créé ✓</span>}
+    </button>
   );
 }
 
