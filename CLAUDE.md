@@ -152,7 +152,7 @@ pour les galeries, vidéos et pages des clients. Au push, `desktop/icon.png` rel
 Fait le 23 oct. (pas encore publié) : **Finances** (`/admin/finances`) — devis (page client `/d/<lien>` : PDF + bon pour
 accord), paiements reçus, relances Gmail, dépenses, tableau de bord, galerie bloquée tant que le devis lié n'est pas payé
 (`galleries.payment_locked`, migration « finances » déjà appliquée en base US). Les vraies factures restent dans un logiciel
-agréé (seul leur n° est noté). Bouton « Payer » (lien Revolut / PayPal… dans Réglages ou par devis). Détail : `docs/carte-du-code.md`, section « Finances ».
+agréé (seul leur n° est noté). Bouton « Payer » (lien Revolut / PayPal… dans Réglages ou par devis). E-mail au studio quand le client accepte ou clique « Payer ». Détail : `docs/carte-du-code.md`, section « Finances ».
 
 - **À faire par le propriétaire** : poser une fois l'index.html (Studio → Site → Relier alvzrec.com) sur l'ancien compte Netlify, puis vérifier alvzrec.com (clips, photos, coulisses).
 - **À vérifier en vrai par le propriétaire** : tableau modifié en mode avion puis réseau remis (iPhone et Mac), panneau « Images projet » (déplacer, agrandir, glisser une image sur le tableau), onglets des planches, Studio → Site (ajout d'un lien YouTube, envoi de photos), Accueil `/admin` (chiffres, stockage détaillé), Banque d'images (copie d'office d'une photo envoyée, onglet, corbeille), ouverture d'une planche ; menu « … » (plan Google Maps, envoi d'un PDF / MP3 vers Oracle), case photo vide (choix parmi les photos du projet) ;

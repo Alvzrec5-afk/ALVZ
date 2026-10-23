@@ -479,3 +479,4 @@ alter table public.galleries add column if not exists payment_locked boolean not
 -- public.quote_payments (quote_id, amount_cents, paid_on, method virement|especes|carte|cheque|autre, note),
 -- public.expenses (label, category, amount_cents, spent_on, note). RLS admin + grant à authenticated, service_role.
 alter table public.quotes add column if not exists payment_link text not null default ''; -- migration « quotes_payment_link »
+alter table public.quotes add column if not exists pay_clicked_at timestamptz; -- migration « quotes_pay_clicked »

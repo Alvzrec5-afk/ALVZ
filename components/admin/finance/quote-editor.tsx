@@ -308,7 +308,7 @@ export function QuoteEditor({
         </div>
       </Section>
 
-      <Payments quoteId={quote.id} payments={payments} state={state} deposit={deposit} total={totals.ttc} dirty={dirty}>
+      <Payments quote={quote} quoteId={quote.id} payments={payments} state={state} deposit={deposit} total={totals.ttc} dirty={dirty}>
         <Field label="Lien de paiement en ligne pour ce devis (facultatif)">
           <input
             className="field"
@@ -350,8 +350,10 @@ function Payments({
   total,
   dirty,
   children,
+  quote,
 }: {
   children: React.ReactNode;
+  quote: Quote;
   quoteId: string;
   payments: Payment[];
   state: ReturnType<typeof quoteState>;
@@ -389,6 +391,11 @@ function Payments({
         <b className="font-medium">{formatCents(state.paid)}</b> reçus sur {formatCents(total)}
         {state.remaining > 0 ? <span className="text-muted"> · reste {formatCents(state.remaining)}</span> : total > 0 ? <span className="text-accent"> · tout est réglé</span> : null}
       </p>
+      {payClickedSincePayment(quote, payments, state.remaining) && (
+        <p className="text-sm text-warn mt-3">
+          Le client a cliqué sur « Payer » le {formatDay(quote.pay_clicked_at!.slice(0, 10))}. Vérifiez votre compte (Revolut…), puis notez le paiement ci-dessous.
+        </p>
+      )}
       {dirty && <p className="text-xs text-warn mt-2">Enregistrez d&apos;abord le devis pour que le total soit à jour.</p>}
       <div className="mt-8">{children}</div>
 
@@ -550,6 +557,12 @@ Belle journée,`,
       </div>
     </Section>
   );
+}
+
+/** Clic sur « Payer » plus récent que le dernier paiement noté, et il reste à payer. */
+function payClickedSincePayment(quote: Quote, payments: Payment[], remaining: number) {
+  if (!quote.pay_clicked_at || remaining <= 0) return false;
+  return payments.every((p) => (p.created_at ?? "") < quote.pay_clicked_at!);
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

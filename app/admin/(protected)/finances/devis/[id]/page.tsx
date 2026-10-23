@@ -13,7 +13,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   const { supabase } = await requireAdminPage();
   const [{ data: quote }, { data: payments }, settings, projects] = await Promise.all([
     supabase.from("quotes").select(QUOTE_FIELDS).eq("id", id).is("deleted_at", null).maybeSingle(),
-    supabase.from("quote_payments").select("id, quote_id, amount_cents, paid_on, method, note").eq("quote_id", id).order("paid_on"),
+    supabase.from("quote_payments").select("id, quote_id, amount_cents, paid_on, method, note, created_at").eq("quote_id", id).order("paid_on"),
     loadFinanceSettings(supabase),
     loadProjects(supabase),
   ]);

@@ -139,7 +139,7 @@ export function QuoteDocument({ q, paid, f, slug }: { q: Quote; paid: number; f:
                 {service ? ` · paiement sécurisé par ${service}` : ""}
               </p>
             </div>
-            <a href={payLink} target="_blank" rel="noopener noreferrer" className="btn w-full sm:w-auto">
+            <a href={`/d/${slug}/pay`} target="_blank" rel="noopener noreferrer nofollow" className="btn w-full sm:w-auto">
               {service ? `Payer avec ${service}` : "Payer en ligne"}
             </a>
           </section>

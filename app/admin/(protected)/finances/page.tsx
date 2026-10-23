@@ -28,12 +28,18 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
   const overdue = open.filter((q) => states.get(q.id)!.overdue);
   const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
 
-  // À relancer : en retard, acompte attendu, ou devis envoyé sans réponse depuis une semaine.
+  const lastPaid = new Map<string, string>();
+  for (const p of payments) if (p.created_at && (lastPaid.get(p.quote_id) ?? "") < p.created_at) lastPaid.set(p.quote_id, p.created_at);
+
+  // À relancer : clic sur « Payer » sans paiement noté depuis, en retard, acompte attendu, ou devis envoyé sans réponse depuis une semaine.
   const followUps = open
     .map((q) => {
       const s = states.get(q.id)!;
       const deposit = Math.round((q.total_cents * q.deposit_pct) / 100);
-      const reason = s.overdue
+      const clicked = q.pay_clicked_at && s.remaining > 0 && (lastPaid.get(q.id) ?? "") < q.pay_clicked_at;
+      const reason = clicked
+        ? `A cliqué sur « Payer » le ${formatDay(q.pay_clicked_at!.slice(0, 10))} : vérifiez votre compte, puis notez le paiement`
+        : s.overdue
         ? `Solde de ${formatCents(s.remaining)} attendu depuis le ${formatDay(q.due_on)}`
         : q.status === "accepted" && deposit > 0 && s.paid < deposit
           ? `Acompte de ${formatCents(deposit - s.paid)} pas encore reçu`
@@ -97,7 +103,7 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
       </section>
 
       <section>
-        <h2 className="eyebrow text-muted mb-4">À relancer</h2>
+        <h2 className="eyebrow text-muted mb-4">À relancer / à vérifier</h2>
         {followUps.length === 0 ? (
           <p className="text-sm text-muted py-6 border-t border-line">Rien à relancer pour l&apos;instant.</p>
         ) : (

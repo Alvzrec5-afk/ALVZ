@@ -299,3 +299,8 @@ Blocage : `galleries.payment_locked` (déclencheurs SQL) ; `findGalleryBySlug` r
 Lien de paiement (23 oct.) : `studio_settings.finance.payment_link` (Réglages) ou `quotes.payment_link` (un devis, prioritaire ;
 migration « quotes_payment_link ») ; https seulement (`cleanLink`). Page client : encadré « Payer l'acompte / le solde » +
 bouton « Payer avec Revolut » (`amountDueNow`, `payService`) si devis envoyé ou accepté et reste > 0 ; lien ajouté aux e-mails.
+Prévenir le studio (23 oct.) : `lib/finance-notify.ts` `notifyStudio` (e-mail à soi-même : finance.email, sinon contact.email,
+sinon SMTP_USER ; envoyé dans `after`, jamais bloquant). Envoyé quand le client accepte en ligne (`app/d/[slug]/actions.ts`)
+et quand il clique « Payer » : le bouton passe par `/d/<lien>/pay` (note `quotes.pay_clicked_at`, migration
+« quotes_pay_clicked », 1 e-mail max / 6 h, puis redirige vers le lien). Studio : « A cliqué sur Payer… vérifiez votre compte »
+sur la fiche et dans « À relancer / à vérifier » tant qu'aucun paiement n'a été noté après le clic.

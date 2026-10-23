@@ -30,10 +30,12 @@ export type Quote = {
   accepted_at: string | null;
   accepted_name: string | null;
   last_reminder_at: string | null;
+  /** Dernier clic du client sur « Payer » (page du devis). */
+  pay_clicked_at: string | null;
   created_at: string;
 };
 
-export type Payment = { id: string; quote_id: string; amount_cents: number; paid_on: string; method: PaymentMethod; note: string };
+export type Payment = { id: string; quote_id: string; amount_cents: number; paid_on: string; method: PaymentMethod; note: string; created_at?: string };
 export type Expense = { id: string; label: string; category: string; amount_cents: number; spent_on: string; note: string };
 
 /** Infos légales et habitudes de facturation (Finances → Réglages), gardées dans studio_settings.finance. */
@@ -57,7 +59,7 @@ export type FinanceSettings = {
 };
 
 export const QUOTE_FIELDS =
-  "id, number, title, client_name, client_email, client_address, gallery_id, lines, vat_rate, total_cents, deposit_pct, status, issued_on, valid_until, due_on, lock_gallery, invoice_ref, notes, payment_link, share_slug, sent_at, accepted_at, accepted_name, last_reminder_at, created_at";
+  "id, number, title, client_name, client_email, client_address, gallery_id, lines, vat_rate, total_cents, deposit_pct, status, issued_on, valid_until, due_on, lock_gallery, invoice_ref, notes, payment_link, share_slug, sent_at, accepted_at, accepted_name, last_reminder_at, pay_clicked_at, created_at";
 
 export const STATUS_LABEL: Record<QuoteStatus, string> = {
   draft: "Brouillon",

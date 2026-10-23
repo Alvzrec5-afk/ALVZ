@@ -11,7 +11,7 @@ export async function loadFinanceSettings(supabase: SupabaseClient) {
 export async function loadQuotes(supabase: SupabaseClient) {
   const [{ data: quotes, error }, { data: payments }] = await Promise.all([
     supabase.from("quotes").select(QUOTE_FIELDS).is("deleted_at", null).order("issued_on", { ascending: false }).order("number", { ascending: false }),
-    supabase.from("quote_payments").select("id, quote_id, amount_cents, paid_on, method, note").order("paid_on", { ascending: false }),
+    supabase.from("quote_payments").select("id, quote_id, amount_cents, paid_on, method, note, created_at").order("paid_on", { ascending: false }),
   ]);
   if (error) throw new Error(error.message);
   const list = ((quotes ?? []) as Quote[]).map((q) => ({ ...q, total_cents: Number(q.total_cents), vat_rate: Number(q.vat_rate) }));
