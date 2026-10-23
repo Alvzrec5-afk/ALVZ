@@ -19,17 +19,21 @@ export type PublicGallery = {
   favorites_enabled: boolean;
   download_web_enabled: boolean;
   download_email_required: boolean;
+  /** Devis lié pas encore réglé (Finances) : téléchargements coupés, voir findGalleryBySlug. */
+  payment_locked: boolean;
   design: Record<string, unknown> | null;
 } & Omit<GalleryDesign, "nav_style" | "show_contact">;
 
-export const GALLERY_FIELDS = `id, kind, slug, title, event_date, cover_photo_id, password_hash, expires_at, watermark, downloads_enabled, favorites_enabled, download_web_enabled, download_email_required, ${DESIGN_FIELDS}`;
+export const GALLERY_FIELDS = `id, kind, slug, title, event_date, cover_photo_id, password_hash, expires_at, watermark, downloads_enabled, favorites_enabled, download_web_enabled, download_email_required, payment_locked, ${DESIGN_FIELDS}`;
 
 /** Une seule lecture par requête (titre de l'onglet et page la partagent). */
 export const findGalleryBySlug = cache(async (slug: string) => {
   if (!/^[A-Za-z0-9_-]{3,64}$/.test(slug)) return null;
   const db = createServiceClient();
   const { data } = await db.from("galleries").select(GALLERY_FIELDS).eq("slug", slug).is("deleted_at", null).maybeSingle();
-  return (data as PublicGallery | null) ?? null;
+  const g = (data as PublicGallery | null) ?? null;
+  // En attente de paiement : tout se passe comme si le téléchargement était désactivé (pages, ZIP, photos, vidéos).
+  return g?.payment_locked ? { ...g, downloads_enabled: false } : g;
 });
 
 export function isExpired(g: PublicGallery) {

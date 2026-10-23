@@ -346,3 +346,10 @@ body {
     --series-5: #d55181;
   }
 }
+
+/* Page d'un devis : « Enregistrer en PDF » = impression du navigateur, sans les boutons. */
+@media print {
+  .no-print { display: none !important; }
+  @page { margin: 14mm; }
+  body { background: #fff; }
+}

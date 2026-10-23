@@ -64,6 +64,7 @@ export default async function GalleryPage({ params }: { params: Promise<{ slug: 
       downloadsEnabled={gallery.downloads_enabled}
       downloadWebEnabled={gallery.download_web_enabled}
       downloadEmailRequired={gallery.download_email_required}
+      paymentPending={gallery.payment_locked}
       favoritesEnabled={gallery.favorites_enabled}
       cover={cover ? { src: cover.web, width: cover.width, height: cover.height } : videos[0] ? { src: videos[0].poster, width: 16, height: 9 } : null}
       coverAlt={views.find((p) => p.id !== cover?.id)?.web ?? null}

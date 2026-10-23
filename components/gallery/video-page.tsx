@@ -24,6 +24,8 @@ export function VideoPage(props: {
   others: VideoCard[];
   /** Option de la galerie : l'e-mail est demandé avant le téléchargement (pas encore donné). */
   askEmail?: boolean;
+  /** Devis lié pas encore réglé : téléchargement disponible après le paiement. */
+  paymentPending?: boolean;
   /** Retour à la galerie (absent pour un projet vidéo d'un seul clip). */
   backHref: string | null;
 }) {
@@ -114,6 +116,7 @@ export function VideoPage(props: {
               <div className="min-w-0">
                 <h1 className="gallery-title text-2xl sm:text-4xl break-words">{video.title}</h1>
                 <p className="eyebrow text-muted text-[10px] mt-2">ALVZ.REC · {formatTime(video.duration)}</p>
+                {props.paymentPending && <p className="text-xs text-muted mt-3">Le téléchargement sera disponible dès le règlement de la prestation.</p>}
               </div>
               {video.downloads.length > 0 && (
                 <div className="relative shrink-0">

@@ -279,3 +279,20 @@ images des tableaux). Schéma de référence :
 `public/brand/studio-logo-{white,dark}.png`, icônes `public/studio-icon.png` / `studio-apple-icon.png` (métadonnées de
 `app/admin/layout.tsx` + `studio.webmanifest`) et `desktop/icon.png` (app Mac). Fabriqués par `scripts/studio-logo.py`
 (« ALVZ » repris du logo d'origine, « .STUDIO » redessiné en pochoir : `python3 scripts/studio-logo.py . <dossier>`).
+
+**Finances (`/admin/finances`, 23 oct.)** — onglets `components/admin/finance/finance-tabs.tsx` : Vue d'ensemble (`page.tsx` :
+encaissé de l'année / du mois, résultat, reste à encaisser, graphique `month-chart.tsx` encaissé vs dépenses par mois avec
+tableau des chiffres, liste « À relancer » : retard, acompte non reçu, envoyé sans réponse depuis 7 jours), Devis
+(`devis/page.tsx` + `quotes-list.tsx`, fiche `devis/[id]` = `quote-editor.tsx` : état, client, lignes, TVA (si réglages
+« Je facture la TVA »), acompte %, dates, galerie liée + blocage, conditions, n° de facture externe, paiements reçus,
+e-mail Gmail « Envoyer le devis » / « Relance de paiement » avec `{lien}`), Dépenses (`expenses-manager.tsx`),
+Réglages (`finance-settings-form.tsx` → `studio_settings.finance` : nom, SIRET, adresse, TVA, IBAN, acompte, validité, conditions).
+Calculs partagés : `lib/finance.ts` (centimes, `quoteTotals`, `quoteState`, `quoteBadge`) ; lectures : `lib/finance-data.ts` ;
+actions : `app/admin/finance-actions.ts` (numéro suivant `D-AAAA-NNN`, paiement sur devis « envoyé » ⇒ « accepté »).
+Page client `/d/<share_slug>` (`components/quote/quote-document.tsx`, client de service, brouillons cachés) : devis avec
+mentions (SIRET, « TVA non applicable, art. 293 B du CGI »), « Enregistrer en PDF » = impression (`.no-print`), bon pour accord
+en ligne (`app/d/[slug]/actions.ts`, seulement si envoyé et non expiré). Pas de vraie facture : elles restent dans un logiciel
+agréé (facture électronique obligatoire pour les micro en 2027) ; seul leur numéro est noté.
+Blocage : `galleries.payment_locked` (déclencheurs SQL) ; `findGalleryBySlug` renvoie alors `downloads_enabled = false`
+(photos, ZIP, vidéos) et la galerie / la page vidéo affichent « Le téléchargement sera disponible dès le règlement ».
+`buildMessage` (`lib/mailer.ts`) : sans `unsubscribeUrl`, pas de pied de désinscription (e-mails de devis).

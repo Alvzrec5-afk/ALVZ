@@ -23,8 +23,11 @@ export function createMailer() {
 
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
-/** Message sobre, comme un e-mail écrit à la main : texte, signature, coordonnées, lien de désinscription. */
-export function buildMessage({ body, contact, unsubscribeUrl }: { body: string; contact: Contact; unsubscribeUrl: string }) {
+/**
+ * Message sobre, comme un e-mail écrit à la main : texte, signature, coordonnées, lien de désinscription.
+ * Sans `unsubscribeUrl` (e-mail lié à une prestation : devis, relance), pas de pied de désinscription.
+ */
+export function buildMessage({ body, contact, unsubscribeUrl }: { body: string; contact: Contact; unsubscribeUrl?: string }) {
   const links = contactLinks(contact);
   const signature = [contact.name, contact.tagline].filter(Boolean) as string[];
   const footer = "Vous recevez ce message car vous avez utilisé une galerie ALVZ.REC. Ne plus recevoir de messages :";
@@ -35,8 +38,7 @@ export function buildMessage({ body, contact, unsubscribeUrl }: { body: string; 
     "—",
     ...signature,
     ...links.map((l) => `${l.label} : ${l.value} (${l.href})`),
-    "",
-    `${footer} ${unsubscribeUrl}`,
+    ...(unsubscribeUrl ? ["", `${footer} ${unsubscribeUrl}`] : []),
   ].join("\n");
 
   const paragraphs = body
@@ -49,7 +51,7 @@ export function buildMessage({ body, contact, unsubscribeUrl }: { body: string; 
 <p style="margin:28px 0 4px;color:#555">—</p>
 ${signature.map((s, i) => `<p style="margin:0;${i === 0 ? "font-weight:600" : "color:#555"}">${escapeHtml(s)}</p>`).join("")}
 <p style="margin:12px 0 0">${links.map((l) => `<a href="${escapeHtml(l.href)}" style="color:#1a1a1a">${escapeHtml(l.label)} · ${escapeHtml(l.value)}</a>`).join("<br>")}</p>
-<p style="margin:36px 0 0;font-size:12px;color:#999">${escapeHtml(footer)} <a href="${escapeHtml(unsubscribeUrl)}" style="color:#999">se désinscrire</a></p>
+${unsubscribeUrl ? `<p style="margin:36px 0 0;font-size:12px;color:#999">${escapeHtml(footer)} <a href="${escapeHtml(unsubscribeUrl)}" style="color:#999">se désinscrire</a></p>` : ""}
 </div></body></html>`;
   return { text, html };
 }

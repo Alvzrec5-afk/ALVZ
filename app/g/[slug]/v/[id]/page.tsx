@@ -54,6 +54,7 @@ export default async function VideoRoute({ params }: { params: Promise<{ slug: s
       comments={(comments ?? []) as VideoComment[]}
       others={more}
       askEmail={gallery.download_email_required && !email}
+      paymentPending={gallery.payment_locked}
       backHref={gallery.kind === "video" && more.length === 0 ? null : `/g/${slug}`}
     />
   );

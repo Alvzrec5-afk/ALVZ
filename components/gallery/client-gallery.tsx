@@ -23,6 +23,8 @@ type Props = {
   downloadWebEnabled: boolean;
   /** Le client donne son e-mail avant de télécharger. */
   downloadEmailRequired?: boolean;
+  /** Devis lié pas encore réglé : téléchargement disponible après le paiement. */
+  paymentPending?: boolean;
   favoritesEnabled: boolean;
   cover: { src: string; width: number; height: number } | null;
   /** Deuxième photo (mise en page Diptyque). */
@@ -277,6 +279,9 @@ export function ClientGallery(props: Props) {
       </header>
 
       <main className="mx-auto max-w-[1700px] px-2 sm:px-8 lg:px-12 pt-2 sm:pt-8 lg:pt-10 pb-24 protect">
+        {props.paymentPending && (
+          <p className="text-center text-xs text-muted pt-4 pb-6">Le téléchargement sera disponible dès le règlement de la prestation.</p>
+        )}
         {tab === FAVORITES_TAB && favorites.size > 0 && (
           <p className="text-center text-xs text-muted py-6">
             Sélection enregistrée pour {email}. Elle est automatiquement transmise à ALVZ.REC.

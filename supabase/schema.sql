@@ -466,3 +466,15 @@ alter table public.site_settings add column if not exists kit jsonb not null
 -- Limite des envois choisie dans le studio (Accueil, sous la jauge). Vide = STORAGE_LIMIT_GB ou 20 Go (partie gratuite d'Oracle).
 alter table public.studio_settings add column if not exists storage_limit_gb integer
   check (storage_limit_gb is null or storage_limit_gb between 1 and 10000);
+
+-- Finances (migration « finances ») : devis, paiements reçus, dépenses ; réglages dans studio_settings.finance.
+-- Galerie bloquée (téléchargements) tant qu'un devis envoyé/accepté avec lock_gallery n'est pas entièrement payé :
+-- galleries.payment_locked, tenu à jour par les déclencheurs quotes_sync_lock / quote_payments_sync_lock
+-- (fonction private.sync_gallery_lock). Texte complet : voir la migration « finances » dans Supabase.
+alter table public.studio_settings add column if not exists finance jsonb not null default '{}'::jsonb;
+alter table public.galleries add column if not exists payment_locked boolean not null default false;
+-- Tables : public.quotes (number unique D-AAAA-NNN, lines jsonb [{label, qty, unit_cents}], vat_rate, total_cents TTC,
+-- deposit_pct, status draft|sent|accepted|refused|cancelled, issued_on, valid_until, due_on, lock_gallery, invoice_ref,
+-- notes, share_slug (page publique /d/<lien>), sent_at, accepted_at, accepted_name, last_reminder_at, deleted_at),
+-- public.quote_payments (quote_id, amount_cents, paid_on, method virement|especes|carte|cheque|autre, note),
+-- public.expenses (label, category, amount_cents, spent_on, note). RLS admin + grant à authenticated, service_role.
