@@ -51,8 +51,9 @@ export function AdminShell({ children, signOut }: { children: React.ReactNode; s
 
   return (
     <div className="min-h-svh">
-      {/* Téléphone : logo au milieu, barre fixe en haut (l'app iPhone n'a pas de barre Safari), décalée sous l'heure. */}
-      <header className="border-b border-line lg:hidden sticky top-0 z-40 bg-bg pt-[env(safe-area-inset-top)]">
+      {/* Téléphone : logo au milieu, barre fixe en haut (l'app iPhone n'a pas de barre Safari), décalée sous l'heure
+          et un peu plus bas encore, pour ne pas coller à la Dynamic Island. */}
+      <header className="border-b border-line lg:hidden sticky top-0 z-40 bg-bg pt-[calc(env(safe-area-inset-top)+0.5rem)]">
         <div className="px-3 h-14 flex items-center justify-center">
           <Link href="/admin">
             <Wordmark height={30} variant="studio" />

@@ -148,17 +148,16 @@ export function StudioDashboard({ o, usage, activity, recent, galleries, boards 
 
   return (
     <div>
-      <div className="flex items-start justify-between gap-4">
-        <div className="motion-safe:animate-[fadeUp_0.6s_ease-out_both]">
+      {/* Téléphone : pas de titre (le logo ALVZ .STUDIO est déjà dans la barre du haut), seulement les boutons. */}
+      <div className="flex items-start justify-end lg:justify-between gap-4">
+        <div className="hidden lg:block motion-safe:animate-[fadeUp_0.6s_ease-out_both]">
           <h1>
             <span className="sr-only">Studio</span>
-            <span className="hidden lg:block">
-              <Wordmark variant="studio" height={64} />
-            </span>
-            <span className="display text-4xl sm:text-5xl lg:hidden">Studio</span>
+            <Wordmark variant="studio" height={64} />
           </h1>
           <p className="text-sm text-muted mt-3">Vue d&apos;ensemble de vos galeries, vidéos et tableaux.</p>
         </div>
+        <h1 className="sr-only lg:hidden">Studio</h1>
         <DashboardActions galleries={galleries} boards={boards} />
       </div>
 
