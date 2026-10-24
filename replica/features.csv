@@ -1,0 +1,51 @@
+feature,area,priority,original,clone,notes
+Panneau qui s'ouvre depuis Color > Workspace > Scripts,panneau,must,yes,no,S03 ; Resolve Studio uniquement
+Le panneau suit le clip sélectionné et recharge son état,panneau,must,yes,no,F09 ; « Loaded this clip's grade »
+Resynchro si le grade est modifié à la main dans Resolve,panneau,must,yes,no,F09
+Choisir un look (PowerGrade) dans un menu,looks,must,yes,no,S03 ; les looks de STV pas ceux de Sotoi
+Choisir la marque de caméra et le profil LOG (conversion d'espace couleur auto),caméra,must,yes,no,S03 ; liste des caméras de STV à définir
+Curseur Exposure,curseurs,must,yes,no,CDL probable
+Curseur Contrast,curseurs,must,yes,no,
+Curseurs Highlight et Shadow,curseurs,must,yes,no,LUT/DCTL régénéré
+Curseurs Temperature et Tint (sur tous les looks),curseurs,must,yes,no,CDL slope par canal
+Curseur Saturation,curseurs,must,yes,no,CDL saturation
+Curseur Skin Tone,curseurs,must,yes,no,
+Champ numérique à côté de chaque curseur,curseurs,must,yes,no,précision à l'image près
+Curseurs en temps réel (latence faible),curseurs,must,yes,no,risque technique n°1 : à prototyper en premier
+Reset vers valeurs neutres,panneau,must,yes,no,F10
+Appliquer n'importe quel LUT installé,looks,must,yes,no,S07
+CopyCat : étalonnage depuis une image de référence JPEG/PNG,copycat,must,yes,no,S04 ; risque technique n°2
+CopyCat : choix caméra + profil pour la référence,copycat,must,yes,no,
+CopyCat : force du match en %,copycat,must,yes,no,70 % par défaut
+CopyCat : résultat en nodes modifiables (pas un filtre figé),copycat,must,yes,no,retour aux curseurs avec Back to Grade
+CopyCat : Restore original,copycat,must,yes,no,
+Film Module : grain (8/16/35/65 mm ; ISO 50–500),film,must,yes,no,doit bouger à chaque image
+Film Module : émulation pellicule (3 stocks),film,must,yes,no,noms Kodak à remplacer
+CopyCat : séparer peau du visage et décor,copycat,should,yes,no,détection de visage
+CopyCat : protéger les tons chair,copycat,should,yes,no,
+Shifter (une couleur -> R/G/B),curseurs,should,yes,no,
+Curseur Film Look,curseurs,should,yes,no,
+Cases NR et Glow (+ intensité),curseurs,should,yes,no,NR natif Studio ?
+Film Module : compressor (hautes lumières douces),film,should,yes,no,
+Film Module : bleach bypass,film,should,yes,no,
+Film Module : noirs délavés,film,should,yes,no,
+Film Module : vignette ovale ou rectangulaire,film,should,yes,no,
+Film Module : bandes de ratio cinéma,film,should,yes,no,
+LAB : halation (lueur rouge des hautes lumières),lab,should,yes,no,
+LAB : bloom,lab,should,yes,no,
+Empiler plusieurs modules film,film,should,yes,no,compteur « N on »
+Exporter l'image courante en JPEG (Still),export,should,yes,no,ExportCurrentFrameAsStill
+Film Module : format Regular 8 -> IMAX (gate weave ; flicker ; perforations ; poussière),film,could,yes,no,
+Palette de couleurs en surimpression (1–8 couleurs ; taille ; position ; Update),palette,could,yes,no,rendu à l'export
+Avant/après animé rendu à l'export (0.5 à 10 s),export,could,yes,no,page Color non animable par API : Fusion ou clip au-dessus
+Looks non possédés grisés dans les menus,looks,could,yes,no,utile seulement en phase vente
+Import de produits (.drx/.cube/.zip) avec vérification par contenu,vente,could,yes,no,phase vente
+Installateur + activation par email et clé,vente,could,yes,no,phase vente ; en perso un script d'installation suffit
+Composeur de bundle et paiement,vente,could,yes,no,phase vente ; /replica-backend
+Les 10 looks Sotoi et leurs packs de LUT,looks,skip,yes,skip,leur contenu ; on utilise les looks de STV
+Noms de pellicules Kodak comme noms de produit,film,skip,yes,skip,marques déposées ; garder l'émulation avec nos noms
+Images de démo du site,marketing,skip,yes,skip,leur contenu et plans de films sous droits
+Nom ; logo et marque « Pocket »,marque,skip,yes,skip,à remplacer en /replica-brand
+Vérification de licence des produits Sotoi,vente,skip,yes,skip,leur système
+Autres plugins Pocket (SFX ; Text ; Overlay) et abonnement Pocket CC,écosystème,skip,yes,skip,autres produits
+Version Mac App Store de Resolve,plateforme,skip,no,skip,sandbox Apple : impossible pour tout le monde
