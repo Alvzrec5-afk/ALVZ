@@ -84,6 +84,8 @@ export type FinanceSettings = {
   /** Lien de paiement en ligne (Revolut, PayPal, Lydia, Stripe…), bouton « Payer » sur la page du devis. */
   payment_link?: string;
   validity_days?: number;
+  /** Objectif d'encaissement par mois, en euros (jauge de l'Accueil). */
+  monthly_goal?: number;
   deposit_pct?: number;
   terms?: string;
 };
@@ -235,6 +237,7 @@ export function cleanSettings(src: Record<string, unknown>): FinanceSettings {
     bic: text(src.bic, 15).toUpperCase(),
     payment_link: cleanLink(src.payment_link),
     validity_days: int(src.validity_days, 1, 365) ?? 30,
+    monthly_goal: int(src.monthly_goal, 0, 1_000_000) || undefined,
     deposit_pct: int(src.deposit_pct, 0, 100) ?? 30,
     terms: text(src.terms, 2000),
   };

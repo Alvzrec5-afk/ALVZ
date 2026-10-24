@@ -20,6 +20,7 @@ export function FinanceSettingsForm({ settings }: { settings: FinanceSettings })
     payment_link: settings.payment_link ?? "",
     validity_days: String(settings.validity_days ?? 30),
     deposit_pct: String(settings.deposit_pct ?? 30),
+    monthly_goal: settings.monthly_goal ? String(settings.monthly_goal) : "",
     terms: settings.terms ?? "",
   });
   const [notice, setNotice] = useState<{ ok?: string; error?: string } | null>(null);
@@ -67,6 +68,7 @@ export function FinanceSettingsForm({ settings }: { settings: FinanceSettings })
             <p className="text-xs text-muted mt-2">Ajoute un bouton « Payer » sur vos devis et le lien dans les e-mails. Un devis peut avoir son propre lien.</p>
           </div>
           <F label="Acompte habituel (%)"><input className="field" inputMode="numeric" value={s.deposit_pct} onChange={set("deposit_pct")} /></F>
+          <F label="Objectif par mois (€, Accueil)"><input className="field" inputMode="numeric" placeholder="Ex. 3000" value={s.monthly_goal} onChange={set("monthly_goal")} /></F>
           <F label="Devis valable (jours)"><input className="field" inputMode="numeric" value={s.validity_days} onChange={set("validity_days")} /></F>
         </div>
         <F label="Conditions habituelles (en bas de chaque devis)">

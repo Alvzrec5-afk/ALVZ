@@ -339,3 +339,8 @@ Remises et montants des e-mails (24 oct.) : colonnes `quotes.discount_type` (non
 `discount_label` (migration « quotes_discount ») ; `quoteTotals(lines, vat, discount)` → `{ gross, discount, ht, vat, ttc }`
 (remise sur le HT, avant TVA) ; devis client : Sous-total, remise, Total. E-mails : repères `{montant}` `{acompte}` (acompte encore dû)
 `{reste}` `{echeance}` remplacés à l'envoi par `fillAmounts` avec les chiffres lus en base (`emailQuote`), valeurs affichées sous le message.
+Accueil « cockpit » (24 oct., remplace l'ancien Accueil) : `app/admin/(protected)/page.tsx` calcule `CockpitData` (encaissé du mois
++ 6 mois, à encaisser / en retard, options à venir, prochaine prestation, 14 prochains jours via `loadCalendar` de
+`lib/calendar-entries.ts` — partagé avec la page Calendrier —, objectif `finance.monthly_goal` (€, Finances → Réglages), derniers
+paiements) ; affichage `components/admin/home-cockpit.tsx` ; stockage en bas : `StorageOverview` (`studio-dashboard.tsx` : jauge
+demi-cercle, plus gros projets, carte Oracle). Plus de « projets récents » ni de compteurs photos/vidéos sur l'Accueil.
