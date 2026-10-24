@@ -3,7 +3,7 @@
 Périmètre : tout le panneau Pocket Grade 2.0 : curseurs d'étalonnage, caméra + profil LOG,
 looks (PowerGrades / LUTs), CopyCat (étalonnage depuis une image de référence), Film Module,
 LAB (halation + bloom), palette de couleurs, avant/après animé, export de still.
-La vente (licence, installateur public, boutique) est notée mais reportée : « perso d'abord, vente plus tard ».
+Le plugin seulement : pas de site, pas de boutique, pas de licence.
 Pour : STV / ALVZ.REC, d'abord en outil interne, puis peut-être en produit.
 Cible technique : DaVinci Resolve **Studio** (18+), macOS.
 Date : 2026-10-24
@@ -164,7 +164,7 @@ Conséquence : la technique la plus probable (déduite de l'API, **pas** de leur
 
 ## Matrice des fonctions
 
-Voir `features.csv`. Must : 22, should : 14, could : 7, skip : 7.
+Voir `features.csv`. Must : 22, should : 14, could : 3, skip : 11.
 
 ## Hors périmètre (ne peut pas ou ne doit pas être cloné)
 

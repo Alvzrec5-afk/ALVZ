@@ -38,10 +38,10 @@ Exporter l'image courante en JPEG (Still),export,should,yes,no,ExportCurrentFram
 Film Module : format Regular 8 -> IMAX (gate weave ; flicker ; perforations ; poussière),film,could,yes,no,
 Palette de couleurs en surimpression (1–8 couleurs ; taille ; position ; Update),palette,could,yes,no,rendu à l'export
 Avant/après animé rendu à l'export (0.5 à 10 s),export,could,yes,no,page Color non animable par API : Fusion ou clip au-dessus
-Looks non possédés grisés dans les menus,looks,could,yes,no,utile seulement en phase vente
-Import de produits (.drx/.cube/.zip) avec vérification par contenu,vente,could,yes,no,phase vente
-Installateur + activation par email et clé,vente,could,yes,no,phase vente ; en perso un script d'installation suffit
-Composeur de bundle et paiement,vente,could,yes,no,phase vente ; /replica-backend
+Looks non possédés grisés dans les menus,looks,skip,yes,skip,pas de vente : tous les looks sont à STV
+Import de produits (.drx/.cube/.zip) avec vérification par contenu,vente,skip,yes,skip,pas de site ni de vente : plugin seul
+Installateur + activation par email et clé,vente,skip,yes,skip,pas de licence : un script d'installation suffit
+Composeur de bundle et paiement,vente,skip,yes,skip,pas de site
 Les 10 looks Sotoi et leurs packs de LUT,looks,skip,yes,skip,leur contenu ; on utilise les looks de STV
 Noms de pellicules Kodak comme noms de produit,film,skip,yes,skip,marques déposées ; garder l'émulation avec nos noms
 Images de démo du site,marketing,skip,yes,skip,leur contenu et plans de films sous droits

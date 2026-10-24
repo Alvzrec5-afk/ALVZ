@@ -1,2 +1,5 @@
 # Captures de référence du produit original : jamais livrées (voir replica-recon)
 replica/screens/
+__pycache__/
+*.egg-info/
+.venv/

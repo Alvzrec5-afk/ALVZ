@@ -2,9 +2,8 @@
 
 « ALVZ Grade » est un nom de travail. Le vrai nom viendra avec `/replica-brand`.
 
-Ce n'est pas une app web : c'est un **outil de bureau qui pilote DaVinci Resolve Studio** sur macOS.
-Le gabarit web de la skill ne sert donc qu'à la **phase vente** (licences, paiement, téléchargement).
-La phase perso n'a ni serveur ni base de données.
+Ce n'est pas une app web : c'est un **plugin qui pilote DaVinci Resolve Studio** sur macOS.
+Pas de site, pas de serveur, pas de base de données : tout tourne sur le Mac de STV.
 
 ## Le flux couleur de STV (point de départ)
 
@@ -17,8 +16,6 @@ Le plugin ne change pas sa façon de travailler : il remplace les nodes du milie
 
 ## Stack
 
-### Phase perso (maintenant)
-
 | couche | choix | pourquoi |
 | --- | --- | --- |
 | langage | Python 3.12 (python.org) | c'est le langage de l'API de Resolve, et numpy / OpenCV couvrent CopyCat |
@@ -29,21 +26,9 @@ Le plugin ne change pas sa façon de travailler : il remplace les nodes du milie
 | gabarit de nodes | un PowerGrade `.drx` par caméra, construit **une fois à la main** par STV à partir de ses propres CST | l'API ne crée pas de nodes ; un gabarit les apporte, avec les vrais CST de Resolve (tone mapping compris) |
 | maths couleur | numpy ; formules publiques (S-Log3 et S-Gamut3.Cine de Sony, DWG et DI de Blackmagic, Rec.709) | pour CopyCat et les tests |
 | CopyCat | numpy + OpenCV (détecteur de visage YuNet, modèle libre) | transfert de couleur et masque de peau |
-| état des clips | un fichier JSON par clip dans `~/Library/Application Support/ALVZ Grade/` | une seule « base » ; pas besoin de Postgres pour un outil local |
+| état des clips | un fichier JSON par clip dans `~/Library/Application Support/ALVZ Grade/` | pas besoin de base de données pour un outil local |
 | tests | pytest (maths, générateur de DCTL, CopyCat) + un script de test à lancer dans Resolve | la partie pure Python tourne en CI ; la partie Resolve se teste sur le Mac de STV |
 | CI | GitHub Actions (macOS) | lint + tests unitaires à chaque push |
-
-### Phase vente (plus tard)
-
-| couche | choix | pourquoi |
-| --- | --- | --- |
-| site + page de vente + compte | Next.js (App Router) + TypeScript sur Vercel | le choix par défaut, géré, gratuit au départ |
-| base de données | Postgres sur Supabase | licences, commandes, activations |
-| auth | Supabase Auth (lien magique par email) | le client retrouve sa clé sans mot de passe |
-| paiement | Stripe Checkout | un paiement unique ; remises de bundle via des coupons |
-| email | Resend | envoi de la clé + du lien de téléchargement |
-| fichiers | Supabase Storage (bucket privé, liens signés) | l'installateur et les looks |
-| app livrée | PyInstaller → `.app` signée et **notarisée** Apple, dans un `.pkg` | sans notarisation, macOS bloque l'app |
 
 ## Le gabarit de nodes (cœur du système)
 
@@ -71,7 +56,7 @@ Changer de caméra = réappliquer le gabarit de cette caméra (`ApplyGradeFromDR
 
 ## Schéma
 
-### Phase perso : l'état d'un clip (JSON, version 1)
+### L'état d'un clip (JSON, version 1)
 
 ```json
 {
@@ -101,14 +86,9 @@ Changer de caméra = réappliquer le gabarit de cette caméra (`ApplyGradeFromDR
 
 Les looks sont stockés dans `Looks/<id>/` : `look.cube` (65 points, DI → DI), `look.json` (nom, vignette, notes). Ce sont **les looks de STV**. Ils s'exportent depuis Resolve avec `TimelineItem.ExportLUT` sur un clip qui ne contient que les nodes du look.
 
-### Phase vente : Postgres (Supabase)
-
-Tables : 7. Règles d'accès : **RLS Postgres**. Un client ne lit que ses propres lignes ; les écritures passent uniquement par le serveur (clé de service : webhook Stripe et routes de licence).
-Le SQL complet est dans `replica/schema.sql`.
-
 ## API
 
-### Phase perso : le pont vers Resolve (module `bridge`)
+### Le pont vers Resolve (module `bridge`)
 
 Ce sont des fonctions Python, pas des routes HTTP. Un seul processus les appelle (l'UI), avec un fil dédié à Resolve.
 
@@ -137,23 +117,6 @@ Services internes (sans Resolve) : `color.transforms` (S-Log3, S-Gamut3.Cine, DW
 5. Peau : détecter les visages (YuNet) et construire un masque de peau. Avec « Séparer », les statistiques sont calculées sans la peau ; avec « Protéger », la peau est ramenée vers la ligne des tons chair.
 6. Appliquer la force (70 % par défaut), écrire les DCTL, mettre à jour les curseurs. Tout reste réglable.
 
-### Phase vente : routes HTTP
-
-| méthode chemin | fait | qui | entrée | sortie | parcours |
-| --- | --- | --- | --- | --- | --- |
-| `POST /api/checkout` | crée la session Stripe pour un bundle | public | ids des produits | URL Stripe | S12 |
-| `POST /api/stripe/webhook` | commande payée → licence + droits + email | Stripe (signature vérifiée) | événement | 200 | S12 |
-| `POST /api/license/activate` | lie une machine à une clé | l'app | email, clé, empreinte machine | jeton signé + produits | F01 |
-| `POST /api/license/validate` | revalide (au plus 1×/semaine, hors ligne toléré 30 j) | l'app | jeton | produits à jour | F01 |
-| `POST /api/license/deactivate` | libère une machine | l'app ou le compte | jeton | 200 | S11 |
-| `GET /api/downloads/:product` | lien signé vers l'installateur ou le look | client connecté | — | URL 10 min | S11 |
-| `GET /api/releases/latest` | numéro de la dernière version | l'app | version actuelle | version, notes, URL | — |
-| `GET /account` | page compte : clé, produits, téléchargements | client connecté | — | page | S11 |
-
-Webhooks entrants : Stripe (`checkout.session.completed`, `charge.refunded` → droits retirés).
-Webhooks sortants : aucun.
-Tâches planifiées : nettoyage des activations inactives depuis 180 jours (cron Vercel, hebdomadaire).
-
 ## Les parties qui piquent
 
 - **Latence des curseurs** : le cycle écrire un DCTL → `RefreshLUTList` → `SetLUT` n'est pas mesuré. Les curseurs fréquents passent par le CDL (instantané) ; le reste est limité à ~10 rendus par seconde. C'est le premier test du spike.
@@ -164,7 +127,6 @@ Tâches planifiées : nettoyage des activations inactives depuis 180 jours (cron
 - **Avant/après et palette rendus à l'export** : la page Color n'est pas animable par l'API. On passe par une piste au-dessus et Fusion. Il faut nettoyer derrière (bouton Retirer).
 - **Fidélité des couleurs** : la conversion de CopyCat (Python) doit coller au CST de Resolve. Test : comparer pixel par pixel avec un still exporté de Resolve, écart cible < 0,5 %.
 - **Versions de Resolve** : l'API bouge (la 21.1 a retiré le scripting de la version gratuite). Le plugin vérifie la version au démarrage et teste les fonctions dont il a besoin.
-- **Phase vente** : webhooks Stripe reçus deux fois (clé d'idempotence = id de l'événement), remboursements, partage de clés (limite de 2 machines), notarisation Apple, RGPD (supprimer le compte efface commandes et activations ; on garde les factures, obligation légale).
 
 ## Ordre de construction
 
@@ -180,4 +142,3 @@ Tâches planifiées : nettoyage des activations inactives depuis 180 jours (cron
    - Importants : peau séparée/protégée, Shifter, Film Look, NR, Glow, compresseur, bleach, noirs, vignette, ratio, halation, bloom, empilement, Still (S03–S06, S10).
    - Bonus : module Format, palette (S08), avant/après animé (S09).
 4. **Corrections issues de `/replica-entrepreneur`** : ce que les utilisateurs reprochent à ce type d'outil, à intégrer quand on l'aura lancé.
-5. **Phase vente.** `schema.sql`, site + Stripe + licences (S11, S12), import de produits (S02), installateur signé et notarisé (S01).
