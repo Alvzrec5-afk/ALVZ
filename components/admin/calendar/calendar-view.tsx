@@ -6,6 +6,7 @@ import { formatTime, monthGrid, type CalendarEntry, type CalendarEvent } from "@
 import { ChevronLeft, ChevronRight, PlusIcon } from "@/components/icons";
 import { EventEditor } from "./event-editor";
 import { SyncButton } from "./sync-button";
+import { CalendarSources, type CalendarSourceInfo } from "./calendar-sources";
 
 const MONTHS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
 const SHORT = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
@@ -19,12 +20,14 @@ const TONE: Record<CalendarEntry["tone"], string> = {
   due: "bg-warn/15 text-warn",
   overdue: "bg-danger/15 text-danger",
   cancelled: "text-muted line-through",
+  external: "bg-[color-mix(in_srgb,var(--series-1)_14%,transparent)] text-ink border-l-2 border-[var(--series-1)]",
 };
 const LEGEND: [CalendarEntry["tone"], string][] = [
   ["event", "Confirmé"],
   ["option", "Option (pas sûr)"],
   ["project", "Galerie, vidéo, rendez-vous"],
   ["due", "Solde à recevoir"],
+  ["external", "Importé (iPhone, Google)"],
 ];
 
 const longDay = (d: string) =>
@@ -36,17 +39,19 @@ export function CalendarView({
   events,
   openId,
   initialMonth,
+  sources,
 }: {
   today: string;
   entries: CalendarEntry[];
   events: CalendarEvent[];
   openId: string | null;
   initialMonth: string;
+  sources: CalendarSourceInfo[];
 }) {
   const router = useRouter();
   const [month, setMonth] = useState(initialMonth); // « 2026-10 »
   const [selected, setSelected] = useState(today);
-  const [editing, setEditing] = useState<{ event?: CalendarEvent; date?: string } | null>(() => {
+  const [editing, setEditing] = useState<{ event?: CalendarEvent; date?: string; external?: CalendarEntry["external"] } | null>(() => {
     const ev = openId ? events.find((e) => e.id === openId) : undefined;
     return ev ? { event: ev } : null;
   });
@@ -91,7 +96,8 @@ export function CalendarView({
     if (e.eventId) {
       const ev = events.find((x) => x.id === e.eventId);
       if (ev) setEditing({ event: ev });
-    } else if (e.href) router.push(e.href);
+    } else if (e.external) setEditing({ external: e.external, date: e.date });
+    else if (e.href) router.push(e.href);
   }
 
   return (
@@ -156,7 +162,7 @@ export function CalendarView({
               {list.length > 0 && (
                 <div className="sm:hidden flex flex-wrap gap-0.5 mt-1 justify-center">
                   {list.slice(0, 4).map((e) => (
-                    <i key={e.key} className={`block w-1.5 h-1.5 rounded-full ${e.tone === "option" ? "border border-muted" : e.tone === "due" ? "bg-warn" : e.tone === "overdue" ? "bg-danger" : e.tone === "event" ? "bg-ink" : "bg-muted"}`} />
+                    <i key={e.key} className={`block w-1.5 h-1.5 rounded-full ${e.tone === "option" ? "border border-muted" : e.tone === "due" ? "bg-warn" : e.tone === "overdue" ? "bg-danger" : e.tone === "event" ? "bg-ink" : e.tone === "external" ? "bg-[var(--series-1)]" : "bg-muted"}`} />
                   ))}
                 </div>
               )}
@@ -181,10 +187,13 @@ export function CalendarView({
         </section>
       </div>
 
+      <CalendarSources sources={sources} />
+
       {editing && (
         <EventEditor
-          key={editing.event?.id ?? `new-${editing.date}`}
+          key={editing.event?.id ?? `new-${editing.date}-${editing.external?.uid ?? ""}`}
           event={editing.event}
+          external={editing.external}
           date={editing.date ?? today}
           onClose={() => {
             setFollow(null);
@@ -214,7 +223,7 @@ function EntryList({ list, onOpen, withDate, empty }: { list: CalendarEntry[]; o
                 <span className="block text-[10px] text-muted">{SHORT[Number(e.date.slice(5, 7)) - 1]}</span>
               </span>
             )}
-            <span className={`shrink-0 w-2 self-stretch rounded-full ${e.tone === "event" ? "bg-ink" : e.tone === "option" ? "border border-dashed border-muted" : e.tone === "due" ? "bg-warn" : e.tone === "overdue" ? "bg-danger" : "bg-line"}`} />
+            <span className={`shrink-0 w-2 self-stretch rounded-full ${e.tone === "event" ? "bg-ink" : e.tone === "option" ? "border border-dashed border-muted" : e.tone === "due" ? "bg-warn" : e.tone === "overdue" ? "bg-danger" : e.tone === "external" ? "bg-[var(--series-1)]" : "bg-line"}`} />
             <span className="flex-1 min-w-0">
               <span className={`block text-[15px] truncate ${e.tone === "cancelled" ? "line-through text-muted" : ""}`}>{e.title}</span>
               <span className="block text-xs text-muted truncate">

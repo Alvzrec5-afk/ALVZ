@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { requireAdminApi } from "@/lib/auth";
 import type { EventKind } from "@/lib/calendar";
 import { confirmEvent, createAgreedQuote } from "@/lib/calendar-server";
+import { checkCalendar, normalizeCalendarUrl } from "@/lib/calendar-import";
 
 type Result = { error?: string; ok?: string; id?: string };
 
@@ -32,6 +33,8 @@ export type EventInput = {
   want_video: boolean;
   want_board: boolean;
   price_cents: number | null;
+  /** Événement importé (iPhone, Google) repris dans le studio. */
+  external_uid?: string | null;
 };
 
 /** Ajoute (id null) ou modifie un événement. Un nouvel événement « prestation » commence en option. */
@@ -75,7 +78,7 @@ export async function saveEvent(id: string | null, input: EventInput, confirm = 
   } else {
     const { data, error } = await supabase
       .from("calendar_events")
-      .insert({ ...row, status: kind === "prestation" ? "option" : "confirmed" })
+      .insert({ ...row, status: kind === "prestation" ? "option" : "confirmed", external_uid: text(input.external_uid, 500) || null })
       .select("id")
       .single();
     if (error) return { error: error.message };
@@ -160,4 +163,29 @@ export async function calendarFeedUrl(renew = false): Promise<Result & { url?: s
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host");
   return { url: `https://${host}/api/calendar/${token}` };
+}
+
+/** Ajoute un calendrier externe (lien iCal de l'iPhone / iCloud ou de Google), vérifié avant d'être gardé. */
+export async function addCalendarSource(name: string, rawUrl: string): Promise<Result> {
+  const { supabase } = await requireAdminApi();
+  const url = normalizeCalendarUrl(rawUrl);
+  if (!url) return { error: "Lien invalide : collez le lien de partage du calendrier (il commence par webcal:// ou https://)." };
+  let count: number;
+  try {
+    count = await checkCalendar(url);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Calendrier illisible." };
+  }
+  const { error } = await supabase.from("calendar_sources").insert({ name: text(name, 80) || "Mon calendrier", url });
+  if (error) return { error: error.message };
+  refresh();
+  return { ok: `Calendrier ajouté : ${count} événement${count > 1 ? "s" : ""} trouvé${count > 1 ? "s" : ""}.` };
+}
+
+export async function deleteCalendarSource(id: string): Promise<Result> {
+  const { supabase } = await requireAdminApi();
+  const { error } = await supabase.from("calendar_sources").delete().eq("id", id);
+  if (error) return { error: error.message };
+  refresh();
+  return {};
 }

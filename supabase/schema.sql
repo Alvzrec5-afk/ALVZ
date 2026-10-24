@@ -482,3 +482,4 @@ alter table public.quotes add column if not exists payment_link text not null de
 alter table public.quotes add column if not exists pay_clicked_at timestamptz; -- migration « quotes_pay_clicked »
 -- Catalogue d'articles : table public.catalog_items (migration « catalog_items », RLS admin + grant authenticated/service_role).
 -- Calendrier : table public.calendar_events + studio_settings.calendar_token (migration « calendar_events », RLS admin + grants).
+-- Calendriers importés : table public.calendar_sources + calendar_events.external_uid (migration « calendar_sources »).

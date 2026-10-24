@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { KIND_LABEL, type CalendarEvent, type EventKind } from "@/lib/calendar";
+import { KIND_LABEL, type CalendarEntry, type CalendarEvent, type EventKind } from "@/lib/calendar";
 import { formatCents, parseEuros } from "@/lib/finance";
 import { confirmEventAction, createEventQuote, deleteEvent, saveEvent, setEventStatus, type EventInput } from "@/app/admin/calendar-actions";
 import { Segmented } from "@/components/admin/ui";
@@ -13,10 +13,13 @@ import { BoardIcon, CloseIcon, FilmIcon, ImageIcon, MoneyIcon } from "@/componen
 export function EventEditor({
   event,
   date,
+  external,
   onClose,
   onSaved,
 }: {
   event?: CalendarEvent;
+  /** Événement importé (iPhone, Google) repris dans le studio : champs pré-remplis. */
+  external?: NonNullable<CalendarEntry["external"]>;
   date: string;
   onClose: () => void;
   /** Appelé après chaque enregistrement ; `id` = garder la fenêtre ouverte sur cet événement. */
@@ -25,15 +28,15 @@ export function EventEditor({
   const router = useRouter();
   const [f, setF] = useState({
     kind: (event?.kind ?? "prestation") as EventKind,
-    title: event?.title ?? "",
+    title: event?.title ?? external?.title ?? "",
     client_name: event?.client_name ?? "",
     client_email: event?.client_email ?? "",
-    starts_on: event?.starts_on ?? date,
-    ends_on: event?.ends_on ?? "",
-    start_time: event?.start_time?.slice(0, 5) ?? "",
-    end_time: event?.end_time?.slice(0, 5) ?? "",
-    location: event?.location ?? "",
-    notes: event?.notes ?? "",
+    starts_on: event?.starts_on ?? external?.date ?? date,
+    ends_on: event?.ends_on ?? external?.endDate ?? "",
+    start_time: event?.start_time?.slice(0, 5) ?? external?.time ?? "",
+    end_time: event?.end_time?.slice(0, 5) ?? external?.endTime ?? "",
+    location: event?.location ?? external?.location ?? "",
+    notes: event?.notes ?? external?.notes ?? "",
     want_photo: event?.want_photo ?? false,
     want_video: event?.want_video ?? false,
     want_board: event?.want_board ?? false,
@@ -53,7 +56,7 @@ export function EventEditor({
       setNotice({ error: "Prix invalide." });
       return null;
     }
-    return { ...f, price_cents: price };
+    return { ...f, price_cents: price, external_uid: external?.uid ?? null };
   }
 
   function save(confirm = false) {
@@ -107,6 +110,12 @@ export function EventEditor({
         </div>
 
         <div className="px-6 py-8 space-y-7">
+          {external && !id && (
+            <p className="text-xs leading-relaxed border border-line bg-bg-soft px-4 py-3">
+              Ajouté dans « {external.source} ». Complétez si besoin (client, prix, galerie / vidéo / tableau), puis enregistrez : il devient un
+              événement du studio et n&apos;apparaîtra plus en double.
+            </p>
+          )}
           <Segmented value={f.kind} options={KIND_LABEL} onChange={(v) => set("kind", v)} />
 
           <L label={prestation ? "Titre (ex. Mariage Léa & Tom)" : "Titre"}>

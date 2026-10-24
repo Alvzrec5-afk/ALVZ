@@ -41,9 +41,11 @@ export type CalendarEntry = {
   time?: string | null;
   title: string;
   sub?: string;
-  tone: "event" | "option" | "project" | "due" | "overdue" | "cancelled";
+  tone: "event" | "option" | "project" | "due" | "overdue" | "cancelled" | "external";
   href?: string;
   eventId?: string;
+  /** Événement d'un calendrier importé : ouvert comme un nouvel événement pré-rempli. */
+  external?: { uid: string; source: string; title: string; date: string; endDate: string | null; time: string | null; endTime: string | null; location: string; notes: string };
 };
 
 /** « 14:30:00 » → « 14 h 30 » ; « 09:00:00 » → « 9 h ». */

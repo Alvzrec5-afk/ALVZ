@@ -328,3 +328,10 @@ client l'accepte (en ligne, ou passage à « accepté » / paiement noté au stu
 projet vidéo : champ « Prix convenu » → `createAgreedQuote` relié. Abonnement iPhone / Mac / Google : `/api/calendar/<jeton>`
 (`studio_settings.calendar_token`, `calendarFeedUrl`, format `lib/ical.ts`, options en STATUS:TENTATIVE).
 Numérotation des devis partagée : `nextQuoteNumber` (`lib/finance-data.ts`).
+Calendriers importés (24 oct.) : table `calendar_sources` (nom, url iCal ; migration « calendar_sources ») ; `lib/calendar-import.ts`
+(`ical.js` 2.2.1, licence MPL : fuseaux VTIMEZONE, répétitions RRULE + exceptions, annulés ignorés, journée entière ; fenêtre
+−60 j / +400 j ; `importedEvents` en cache 5 min ; `normalizeCalendarUrl` : webcal → https, adresses locales refusées ; téléchargement
+8 s / 5 Mo). Page Calendrier : entrées « external » (bleu `--series-1`), section `components/admin/calendar/calendar-sources.tsx`
+(ajout vérifié par `addCalendarSource`, aide iPhone iCloud « Calendrier public » / Google « Adresse secrète iCal »). Toucher un
+événement importé ouvre `EventEditor` pré-rempli (`external`) ; enregistré → `calendar_events.external_uid` (l'original n'est plus
+affiché). Sens unique : le studio ne modifie pas l'iPhone ; l'abonnement /api/calendar n'exporte pas les événements importés.

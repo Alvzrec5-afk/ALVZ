@@ -3,6 +3,7 @@ import { requireAdminPage } from "@/lib/auth";
 import { EVENT_FIELDS, type CalendarEntry, type CalendarEvent } from "@/lib/calendar";
 import { addDays, formatCents, quoteState, todayParis } from "@/lib/finance";
 import { loadQuotes } from "@/lib/finance-data";
+import { importedEvents } from "@/lib/calendar-import";
 import { CalendarView } from "@/components/admin/calendar/calendar-view";
 
 export const metadata = { title: "Calendrier" };
@@ -12,13 +13,25 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const { supabase } = await requireAdminPage();
   const today = todayParis();
   const since = addDays(today, -400);
-  const [{ data: events }, { data: galleries }, { quotes, paid }] = await Promise.all([
+  const [{ data: events }, { data: galleries }, { quotes, paid }, { data: sourceRows }] = await Promise.all([
     supabase.from("calendar_events").select(EVENT_FIELDS).is("deleted_at", null).gte("starts_on", since).order("starts_on"),
     supabase.from("galleries").select("id, title, kind, event_date").is("deleted_at", null).not("event_date", "is", null).gte("event_date", since),
     loadQuotes(supabase),
+    supabase.from("calendar_sources").select("id, name, url").order("created_at"),
   ]);
+  // Calendriers importés (iPhone, Google) : lus en parallèle ; un lien en panne n'empêche pas le reste de s'afficher.
+  const sources = await Promise.all(
+    (sourceRows ?? []).map(async (s) => {
+      try {
+        return { id: s.id as string, name: s.name as string, events: await importedEvents(s.url as string, today), error: null };
+      } catch (e) {
+        return { id: s.id as string, name: s.name as string, events: [], error: e instanceof Error ? e.message : "Calendrier illisible" };
+      }
+    }),
+  );
   const evs = ((events ?? []) as CalendarEvent[]).map((e) => ({ ...e, price_cents: e.price_cents === null ? null : Number(e.price_cents) }));
   const linked = new Set(evs.flatMap((e) => [e.gallery_id, e.video_id]).filter(Boolean));
+  const taken = new Set((await supabase.from("calendar_events").select("external_uid").not("external_uid", "is", null).is("deleted_at", null)).data?.map((r) => r.external_uid as string));
 
   const entries: CalendarEntry[] = [
     ...evs.map((e) => ({
@@ -42,6 +55,21 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         tone: "project" as const,
         href: `/admin/galleries/${g.id}`,
       })),
+    // Événements importés, sauf ceux déjà repris dans le studio.
+    ...sources.flatMap((s) =>
+      s.events
+        .filter((e) => !taken.has(e.uid))
+        .map((e) => ({
+          key: `x-${s.id}-${e.uid}`,
+          date: e.date,
+          endDate: e.endDate,
+          time: e.time ? `${e.time}:00` : null,
+          title: e.title,
+          sub: s.name,
+          tone: "external" as const,
+          external: { ...e, source: s.name },
+        })),
+    ),
     // Soldes à recevoir (devis acceptés avec une date limite).
     ...quotes
       .filter((q) => q.status === "accepted" && q.due_on)
@@ -71,6 +99,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         entries={entries}
         events={evs}
         openId={sp.e && evs.some((e) => e.id === sp.e) ? sp.e : null}
+        sources={sources.map((s) => ({ id: s.id, name: s.name, count: s.events.length, error: s.error }))}
         initialMonth={/^\d{4}-\d{2}$/.test(sp.m ?? "") ? sp.m! : today.slice(0, 7)}
       />
     </div>
