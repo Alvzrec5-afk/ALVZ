@@ -69,6 +69,22 @@ export function ClientGallery(props: Props) {
     return () => window.removeEventListener("resize", measure);
   }, [tab, favorites.size, props.collections.length]);
 
+  // Pas de zoom sur la page de la galerie (pincement, double-tap) : le zoom se fait dans la photo ouverte (visionneuse).
+  useEffect(() => {
+    const stop = (e: Event) => e.preventDefault(); // Safari (iPhone, iPad) : gestes de zoom
+    const twoFingers = (e: TouchEvent) => {
+      if (e.touches.length > 1) e.preventDefault();
+    };
+    document.addEventListener("gesturestart", stop, { passive: false });
+    document.addEventListener("gesturechange", stop, { passive: false });
+    document.addEventListener("touchmove", twoFingers, { passive: false });
+    return () => {
+      document.removeEventListener("gesturestart", stop);
+      document.removeEventListener("gesturechange", stop);
+      document.removeEventListener("touchmove", twoFingers);
+    };
+  }, []);
+
   // Couleur de fond de la page (zones de rebond iPhone comprises)
   useEffect(() => {
     document.documentElement.dataset.theme = themeAttr(design);
@@ -147,6 +163,7 @@ export function ClientGallery(props: Props) {
     <div
       data-theme={themeAttr(design)}
       className={`fs-${design.font_style} min-h-svh bg-bg text-ink`}
+      style={{ touchAction: "pan-x pan-y" }}
       onContextMenu={props.watermark ? (e) => (e.target as HTMLElement).tagName === "IMG" && e.preventDefault() : undefined}
     >
       <Cover design={design} cover={props.cover} coverAlt={props.coverAlt} title={props.title} date={props.date} onEnter={scrollToGrid} />

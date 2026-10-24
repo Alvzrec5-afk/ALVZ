@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { notFound, redirect } from "next/navigation";
 import { formatLongDate } from "@/lib/dates";
 import type { Contact } from "@/lib/contact";
@@ -12,6 +12,9 @@ import { ClientGallery } from "@/components/gallery/client-gallery";
 import { ExpiredScreen, LockScreen } from "@/components/gallery/screens";
 
 export const dynamic = "force-dynamic";
+
+/** Galerie : pas de zoom de la page (Android le respecte ; iPhone : bloqué par la galerie elle-même). Le zoom se fait dans la photo ouverte. */
+export const viewport: Viewport = { width: "device-width", initialScale: 1, maximumScale: 1, userScalable: false, viewportFit: "cover" };
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const g = await findGalleryBySlug((await params).slug);

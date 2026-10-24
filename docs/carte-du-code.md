@@ -344,3 +344,9 @@ Accueil « cockpit » (24 oct., remplace l'ancien Accueil) : `app/admin/(protect
 `lib/calendar-entries.ts` — partagé avec la page Calendrier —, objectif `finance.monthly_goal` (€, Finances → Réglages), derniers
 paiements) ; affichage `components/admin/home-cockpit.tsx` ; stockage en bas : `StorageOverview` (`studio-dashboard.tsx` : jauge
 demi-cercle, plus gros projets, carte Oracle). Projets récents en lignes (`components/admin/recent-projects.tsx`, données `lib/recent-projects.ts`) entre les 14 jours et le stockage ; plus de compteurs photos/vidéos sur l'Accueil.
+Zoom des galeries client (24 oct.) : la page `/g/<lien>` ne zoome plus (`client-gallery.tsx` : `touch-action: pan-x pan-y`, gestes
+Safari `gesturestart/gesturechange` et `touchmove` à deux doigts bloqués ; `viewport` de `app/g/[slug]/page.tsx` : maximumScale 1).
+Zoom intégré à la visionneuse `components/gallery/lightbox.tsx` : pincement (jusqu'à ×4, le point pincé suit les doigts), double-tap
+(×2,5 à l'endroit touché, le double-clic que le navigateur génère ensuite est ignoré), glisser pour se déplacer quand c'est zoomé
+(plus de balayage photo suivante / fermeture tant que c'est zoomé), ordinateur : double-clic, molette / trackpad, glisser à la souris ;
+remis à zéro au changement de photo et à la fermeture.
