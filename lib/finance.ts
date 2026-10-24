@@ -25,6 +25,9 @@ export function qtyWithUnit(qty: number, unit?: string) {
   const short: Record<string, string> = { Heure: "h", Jour: "j", Km: "km" };
   return `${n} ${short[unit] ?? unit.toLowerCase()}`;
 }
+export type DiscountType = "none" | "percent" | "amount";
+/** Remise sur le total HT : `value` = pourcentage, ou euros (pas des centimes). */
+export type Discount = { type: DiscountType; value: number; label?: string };
 export type QuoteStatus = "draft" | "sent" | "accepted" | "refused" | "cancelled";
 export type PaymentMethod = "virement" | "especes" | "carte" | "cheque" | "autre";
 
@@ -49,6 +52,9 @@ export type Quote = {
   notes: string;
   /** Lien de paiement de ce devis (vide = celui des réglages). */
   payment_link: string;
+  discount_type: DiscountType;
+  discount_value: number;
+  discount_label: string;
   share_slug: string;
   sent_at: string | null;
   accepted_at: string | null;
@@ -83,7 +89,7 @@ export type FinanceSettings = {
 };
 
 export const QUOTE_FIELDS =
-  "id, number, title, client_name, client_email, client_address, gallery_id, lines, vat_rate, total_cents, deposit_pct, status, issued_on, valid_until, due_on, lock_gallery, invoice_ref, notes, payment_link, share_slug, sent_at, accepted_at, accepted_name, last_reminder_at, pay_clicked_at, created_at";
+  "id, number, title, client_name, client_email, client_address, gallery_id, lines, vat_rate, total_cents, deposit_pct, status, issued_on, valid_until, due_on, lock_gallery, invoice_ref, notes, payment_link, discount_type, discount_value, discount_label, share_slug, sent_at, accepted_at, accepted_name, last_reminder_at, pay_clicked_at, created_at";
 
 export const STATUS_LABEL: Record<QuoteStatus, string> = {
   draft: "Brouillon",
@@ -132,10 +138,40 @@ export function lineTotal(l: QuoteLine) {
 }
 
 /** Totaux d'un devis : HT (somme des lignes), TVA, TTC. */
-export function quoteTotals(lines: QuoteLine[], vatRate: number) {
-  const ht = lines.reduce((s, l) => s + lineTotal(l), 0);
+export function quoteTotals(lines: QuoteLine[], vatRate: number, discount?: Discount | null) {
+  const gross = lines.reduce((s, l) => s + lineTotal(l), 0);
+  const value = Math.max(0, Number(discount?.value) || 0);
+  const off =
+    discount?.type === "percent" ? Math.round((gross * Math.min(100, value)) / 100) : discount?.type === "amount" ? Math.min(gross, Math.round(value * 100)) : 0;
+  const ht = gross - off;
   const vat = Math.round((ht * vatRate) / 100);
-  return { ht, vat, ttc: ht + vat };
+  return { gross, discount: off, ht, vat, ttc: ht + vat };
+}
+
+/** Remise lue d'un devis (colonnes discount_*). */
+export const quoteDiscount = (q: Pick<Quote, "discount_type" | "discount_value" | "discount_label">): Discount => ({
+  type: q.discount_type ?? "none",
+  value: Number(q.discount_value) || 0,
+  label: q.discount_label ?? "",
+});
+
+/** « Remise 10 % » / « Remise » + libellé éventuel. */
+export function discountText(d: Discount) {
+  const base = d.label?.trim() || "Remise";
+  return d.type === "percent" ? `${base} (${String(d.value).replace(".", ",")} %)` : base;
+}
+
+/**
+ * Repères des e-mails, remplacés à l'envoi par les vrais chiffres du devis :
+ * {montant} total, {acompte} acompte encore dû, {reste} reste à payer, {echeance} date du solde.
+ */
+export function fillAmounts(text: string, v: { total: number; deposit: number; paid: number; due_on: string | null }) {
+  const remaining = Math.max(0, v.total - v.paid);
+  return text
+    .replaceAll("{montant}", formatCents(v.total))
+    .replaceAll("{acompte}", formatCents(Math.max(0, v.deposit - v.paid)))
+    .replaceAll("{reste}", formatCents(remaining))
+    .replaceAll("{echeance}", v.due_on ? formatDay(v.due_on) : "dès que possible");
 }
 
 export function depositCents(q: Pick<Quote, "total_cents" | "deposit_pct">) {

@@ -10,6 +10,8 @@ import {
   METHOD_LABEL,
   addDays,
   cleanLines,
+  depositCents,
+  fillAmounts,
   cleanLink,
   cleanSettings,
   quoteTotals,
@@ -95,12 +97,18 @@ export type QuoteInput = {
   invoice_ref: string;
   notes: string;
   payment_link: string;
+  discount_type: string;
+  discount_value: number;
+  discount_label: string;
 };
 
 export async function saveQuote(id: string, input: QuoteInput): Promise<Result> {
   const { supabase } = await requireAdminApi();
   const lines = cleanLines(input.lines);
   const vatRate = Math.min(100, Math.max(0, Number(input.vat_rate) || 0));
+  const dType = input.discount_type === "percent" || input.discount_type === "amount" ? input.discount_type : "none";
+  const dValue = Math.round(Math.max(0, Number(input.discount_value) || 0) * 100) / 100;
+  const discount = { type: dValue > 0 ? dType : "none", value: dType === "percent" ? Math.min(100, dValue) : Math.min(1_000_000, dValue) } as const;
   const email = text(input.client_email, 160).toLowerCase();
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "L'adresse e-mail du client n'est pas valide." };
   const { error } = await supabase
@@ -113,7 +121,10 @@ export async function saveQuote(id: string, input: QuoteInput): Promise<Result> 
       gallery_id: typeof input.gallery_id === "string" && input.gallery_id ? input.gallery_id : null,
       lines,
       vat_rate: vatRate,
-      total_cents: quoteTotals(lines, vatRate).ttc,
+      total_cents: quoteTotals(lines, vatRate, discount).ttc,
+      discount_type: discount.type,
+      discount_value: discount.value,
+      discount_label: text(input.discount_label, 120),
       deposit_pct: Math.min(100, Math.max(0, Math.round(Number(input.deposit_pct) || 0))),
       issued_on: day(input.issued_on) ?? todayParis(),
       valid_until: day(input.valid_until),
@@ -156,7 +167,7 @@ export async function duplicateQuote(id: string) {
   const { supabase } = await requireAdminApi();
   const { data: q } = await supabase
     .from("quotes")
-    .select("title, client_name, client_email, client_address, lines, vat_rate, total_cents, deposit_pct")
+    .select("title, client_name, client_email, client_address, lines, vat_rate, total_cents, deposit_pct, discount_type, discount_value, discount_label")
     .eq("id", id)
     .single();
   if (!q) throw new Error("Devis introuvable");
@@ -238,11 +249,21 @@ export async function saveFinanceSettings(input: Record<string, unknown>): Promi
 /** Envoie le devis (ou une relance) au client par Gmail, avec le lien de sa page. */
 export async function emailQuote(id: string, input: { subject: string; body: string; kind: "send" | "reminder" }): Promise<Result> {
   const { supabase } = await requireAdminApi();
-  const { data: q } = await supabase.from("quotes").select("id, status, client_email, share_slug").eq("id", id).single();
+  const [{ data: q }, { data: pays }] = await Promise.all([
+    supabase.from("quotes").select("id, status, client_email, share_slug, total_cents, deposit_pct, due_on").eq("id", id).single(),
+    supabase.from("quote_payments").select("amount_cents").eq("quote_id", id),
+  ]);
   if (!q) return { error: "Devis introuvable" };
   if (!q.client_email) return { error: "Ajoutez l'adresse e-mail du client dans le devis." };
-  const subject = text(input.subject, 200);
-  const body = text(input.body, 10000);
+  // Montants lus au moment de l'envoi (lignes, remise, paiements déjà notés) : l'e-mail est toujours juste.
+  const amounts = {
+    total: Number(q.total_cents),
+    deposit: depositCents({ total_cents: Number(q.total_cents), deposit_pct: q.deposit_pct as number }),
+    paid: (pays ?? []).reduce((s, p) => s + Number(p.amount_cents), 0),
+    due_on: (q.due_on as string | null) ?? null,
+  };
+  const subject = fillAmounts(text(input.subject, 200), amounts);
+  const body = fillAmounts(text(input.body, 10000), amounts);
   if (!subject || !body) return { error: "Objet et message obligatoires." };
 
   const h = await headers();

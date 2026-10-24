@@ -335,3 +335,7 @@ Calendriers importés (24 oct.) : table `calendar_sources` (nom, url iCal ; migr
 (ajout vérifié par `addCalendarSource`, aide iPhone iCloud « Calendrier public » / Google « Adresse secrète iCal »). Toucher un
 événement importé ouvre `EventEditor` pré-rempli (`external`) ; enregistré → `calendar_events.external_uid` (l'original n'est plus
 affiché). Sens unique : le studio ne modifie pas l'iPhone ; l'abonnement /api/calendar n'exporte pas les événements importés.
+Remises et montants des e-mails (24 oct.) : colonnes `quotes.discount_type` (none|percent|amount), `discount_value` (% ou €),
+`discount_label` (migration « quotes_discount ») ; `quoteTotals(lines, vat, discount)` → `{ gross, discount, ht, vat, ttc }`
+(remise sur le HT, avant TVA) ; devis client : Sous-total, remise, Total. E-mails : repères `{montant}` `{acompte}` (acompte encore dû)
+`{reste}` `{echeance}` remplacés à l'envoi par `fillAmounts` avec les chiffres lus en base (`emailQuote`), valeurs affichées sous le message.

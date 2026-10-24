@@ -2,6 +2,8 @@ import {
   FRANCHISE_MENTION,
   amountDueNow,
   depositCents,
+  discountText,
+  quoteDiscount,
   formatCents,
   formatDay,
   lineTotal,
@@ -17,7 +19,8 @@ import { PrintButton } from "./print-button";
 
 /** Devis tel que le client le voit : lecture, PDF (impression du navigateur), bon pour accord. */
 export function QuoteDocument({ q, paid, f, slug }: { q: Quote; paid: number; f: FinanceSettings; slug: string }) {
-  const totals = quoteTotals(q.lines, q.vat_rate);
+  const discount = quoteDiscount(q);
+  const totals = quoteTotals(q.lines, q.vat_rate, discount);
   const state = quoteState(q, paid);
   const deposit = depositCents(q);
   const franchise = q.vat_rate === 0;
@@ -94,6 +97,12 @@ export function QuoteDocument({ q, paid, f, slug }: { q: Quote; paid: number; f:
           </table>
 
           <dl className="mt-6 ml-auto max-w-xs text-sm space-y-2">
+            {totals.discount > 0 && (
+              <>
+                <div className="flex justify-between"><dt className="text-muted">Sous-total{franchise ? "" : " HT"}</dt><dd className="tabular-nums">{formatCents(totals.gross)}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-muted">{discountText(discount)}</dt><dd className="tabular-nums whitespace-nowrap">− {formatCents(totals.discount)}</dd></div>
+              </>
+            )}
             {!franchise && (
               <>
                 <div className="flex justify-between"><dt className="text-muted">Total HT</dt><dd className="tabular-nums">{formatCents(totals.ht)}</dd></div>

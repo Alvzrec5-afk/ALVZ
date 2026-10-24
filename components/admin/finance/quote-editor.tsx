@@ -16,6 +16,10 @@ import {
   quoteTotals,
   todayParis,
   UNITS,
+  discountText,
+  fillAmounts,
+  type Discount,
+  type DiscountType,
   type CatalogItem,
   type FinanceSettings,
   type Payment,
@@ -32,7 +36,7 @@ import {
   saveQuote,
   setQuoteStatus,
 } from "@/app/admin/finance-actions";
-import { Toggle } from "@/components/admin/ui";
+import { Segmented, Toggle } from "@/components/admin/ui";
 import { HoverLink } from "@/components/admin/hover-link";
 import { PlusIcon, TrashIcon } from "@/components/icons";
 import { QuoteBadge } from "./finance-parts";
@@ -94,6 +98,9 @@ export function QuoteEditor({
     invoice_ref: quote.invoice_ref,
     notes: quote.notes,
     payment_link: quote.payment_link,
+    discount_type: (quote.discount_type ?? "none") as DiscountType,
+    discount_value: quote.discount_value ? String(quote.discount_value).replace(".", ",") : "",
+    discount_label: quote.discount_label ?? "",
   });
   const [lines, setLines] = useState<Line[]>(() => (quote.lines.length ? quote.lines.map(toLine) : [EMPTY]));
   const [picker, setPicker] = useState(false);
@@ -117,7 +124,12 @@ export function QuoteEditor({
   };
 
   const vatRate = Number(form.vat_rate.replace(",", ".")) || 0;
-  const totals = useMemo(() => quoteTotals(lines.map(fromLine), vatRate), [lines, vatRate]);
+  const discountValue = Number(form.discount_value.replace(",", ".")) || 0;
+  const discount: Discount = { type: form.discount_type, value: discountValue, label: form.discount_label };
+  const totals = useMemo(
+    () => quoteTotals(lines.map(fromLine), vatRate, { type: form.discount_type, value: discountValue }),
+    [lines, vatRate, form.discount_type, discountValue],
+  );
   const paid = payments.reduce((s, p) => s + p.amount_cents, 0);
   const live = { ...quote, total_cents: totals.ttc, deposit_pct: Number(form.deposit_pct) || 0, due_on: form.due_on || null, valid_until: form.valid_until || null };
   const state = quoteState(live, paid);
@@ -134,6 +146,7 @@ export function QuoteEditor({
       deposit_pct: Number(form.deposit_pct) || 0,
       valid_until: form.valid_until || null,
       due_on: form.due_on || null,
+      discount_value: discountValue,
     });
     if (!r.error) setDirty(false);
     return r;
@@ -310,8 +323,41 @@ export function QuoteEditor({
             <Field label="Acompte demandé (%)">
               <input className="field" inputMode="numeric" value={form.deposit_pct} onChange={(e) => set("deposit_pct", e.target.value.replace(/\D/g, "").slice(0, 3))} />
             </Field>
+            <div className="col-span-2 space-y-3">
+              <span className="label">Remise</span>
+              <Segmented
+                value={form.discount_type}
+                options={{ none: "Aucune", percent: "En %", amount: "En €" }}
+                onChange={(v) => set("discount_type", v)}
+              />
+              {form.discount_type !== "none" && (
+                <div className="grid grid-cols-[6rem_1fr] gap-4">
+                  <input
+                    className="field"
+                    inputMode="decimal"
+                    aria-label={form.discount_type === "percent" ? "Remise en pourcentage" : "Remise en euros"}
+                    placeholder={form.discount_type === "percent" ? "10" : "50"}
+                    value={form.discount_value}
+                    onChange={(e) => set("discount_value", e.target.value)}
+                  />
+                  <input
+                    className="field"
+                    placeholder="Libellé (ex. Remise fidélité)"
+                    value={form.discount_label}
+                    onChange={(e) => set("discount_label", e.target.value)}
+                    maxLength={120}
+                  />
+                </div>
+              )}
+            </div>
           </div>
           <dl className="text-sm space-y-2">
+            {totals.discount > 0 && (
+              <>
+                <Row label="Sous-total" value={formatCents(totals.gross)} />
+                <Row label={discountText(discount)} value={`− ${formatCents(totals.discount)}`} />
+              </>
+            )}
             {!franchise && (
               <>
                 <Row label="Total HT" value={formatCents(totals.ht)} />
@@ -536,9 +582,9 @@ function Mail({
       subject: `Devis ${quote.number}${form.title ? ` — ${form.title}` : ""}`,
       body: `${hello}
 
-Voici mon devis pour ${what}, d'un montant de ${formatCents(total)}.
+Voici mon devis pour ${what}, d'un montant de {montant}.
 
-${deposit > 0 ? `Un acompte de ${formatCents(deposit)} est demandé pour réserver la date${online ? ", à régler directement depuis la page du devis" : ""}.\n\n` : ""}Vous pouvez le consulter, l'enregistrer en PDF et l'accepter en ligne :
+${deposit > 0 ? `Un acompte de {acompte} est demandé pour réserver la date${online ? ", à régler directement depuis la page du devis" : ""}.\n\n` : ""}Vous pouvez le consulter, l'enregistrer en PDF et l'accepter en ligne :
 {lien}
 
 Je reste disponible pour toute question.
@@ -549,7 +595,7 @@ Je reste disponible pour toute question.
       subject: `Rappel — ${form.title || `devis ${quote.number}`}`,
       body: `${hello}
 
-Petit rappel concernant ${what} : il reste ${formatCents(state.remaining)} à régler${form.due_on ? ` (échéance du ${formatDay(form.due_on)})` : ""}.
+Petit rappel concernant ${what} : il reste {reste} à régler${form.due_on ? " (échéance du {echeance})" : ""}.
 
 ${online ? "Vous pouvez régler en ligne depuis la page du devis :" : "Le détail est ici :"}
 {lien}
@@ -604,7 +650,18 @@ Belle journée,`,
         <Field label="Message">
           <textarea className="field leading-relaxed" rows={11} style={{ minHeight: "16rem", resize: "vertical" }} value={body} onChange={(e) => setBody(e.target.value)} maxLength={10000} />
         </Field>
-        <p className="text-xs text-muted -mt-3">« {"{lien}"} » seul sur sa ligne devient le bouton « Voir le devis ». Votre signature (logo et réseaux) est ajoutée en bas.</p>
+        <div className="text-xs text-muted -mt-3 space-y-1 leading-relaxed">
+          <p>
+            Montants mis à jour tout seuls à l&apos;envoi : <Tag>{"{montant}"}</Tag> {formatCents(total)} · <Tag>{"{acompte}"}</Tag>{" "}
+            {formatCents(Math.max(0, deposit - state.paid))} · <Tag>{"{reste}"}</Tag> {formatCents(state.remaining)}
+            {form.due_on ? (
+              <>
+                {" "}· <Tag>{"{echeance}"}</Tag> {formatDay(form.due_on)}
+              </>
+            ) : null}
+          </p>
+          <p>« {"{lien}"} » seul sur sa ligne devient le bouton « Voir le devis ». Votre signature (logo et réseaux) est ajoutée en bas.</p>
+        </div>
         <div className="flex flex-wrap items-center gap-4">
           <button className="btn" onClick={send} disabled={!mailer || busy}>{busy ? "Envoi…" : kind === "send" ? "Envoyer le devis" : "Envoyer la relance"}</button>
           {quote.sent_at && <span className="text-xs text-muted">Devis envoyé le {formatDay(quote.sent_at.slice(0, 10))}</span>}
@@ -615,6 +672,10 @@ Belle journée,`,
       </div>
     </Section>
   );
+}
+
+function Tag({ children }: { children: React.ReactNode }) {
+  return <code className="px-1 py-px bg-bg-soft border border-line text-ink text-[11px]">{children}</code>;
 }
 
 /** Clic sur « Payer » plus récent que le dernier paiement noté, et il reste à payer. */
