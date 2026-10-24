@@ -7,6 +7,7 @@ import { HoverLink } from "@/components/admin/hover-link";
 import { CountUp, DashboardActions } from "@/components/admin/dashboard-parts";
 import { StorageOverview, type StorageInfo } from "@/components/admin/studio-dashboard";
 import { ChevronRight } from "@/components/icons";
+import { RecentProjects, type RecentItem } from "@/components/admin/recent-projects";
 
 export type CockpitData = {
   today: string;
@@ -96,7 +97,11 @@ export function HomeCockpit({
   usage,
   galleries,
   boards,
+  recent = [],
+  recentVariant = "rows",
 }: {
+  recent?: RecentItem[];
+  recentVariant?: "rows" | "strip";
   data: CockpitData;
   o: StudioOverview;
   usage: StorageInfo;
@@ -254,6 +259,8 @@ export function HomeCockpit({
           </div>
         </section>
       </div>
+
+      <RecentProjects items={recent} variant={recentVariant} />
 
       <StorageOverview o={o} usage={usage} galleries={galleries} />
     </div>
