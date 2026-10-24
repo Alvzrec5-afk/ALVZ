@@ -15,7 +15,11 @@ import time
 from pathlib import Path
 
 LUT_DIR = Path("/Library/Application Support/Blackmagic Design/DaVinci Resolve/LUT")
-WORK = LUT_DIR / "ALVZ" / "_spike"
+# Deux emplacements testés : le dossier LUT de Resolve (protégé, sudo pour le créer)
+# et un dossier utilisateur (pas de sudo, si Resolve accepte un chemin absolu hors du dossier LUT)
+LUT_WORK = LUT_DIR / "ALVZ" / "_spike"
+USER_WORK = Path.home() / "Library" / "Application Support" / "ALVZ Grade" / "spike"
+WORK = USER_WORK
 REPORT = Path.home() / "Desktop" / "alvz_spike_report.json"
 
 DCTL = """// ALVZ spike {n}
@@ -87,12 +91,15 @@ def main():
         print("Impossible de joindre Resolve.")
         return
     report["resolve"] = {"product": resolve.GetProductName(), "version": resolve.GetVersionString()}
+    global WORK
+    USER_WORK.mkdir(parents=True, exist_ok=True)
     try:
-        WORK.mkdir(parents=True, exist_ok=True)
+        LUT_WORK.mkdir(parents=True, exist_ok=True)
+        lut_writable = True
     except PermissionError:
-        print("Pas le droit d'écrire dans le dossier LUT de Resolve. Dans le Terminal :\n"
-              f'  sudo mkdir -p "{WORK.parent}" && sudo chown "$USER" "{WORK.parent}"')
-        return
+        lut_writable = False
+    steps["lut_dir_writable"] = lut_writable
+    WORK = LUT_WORK if lut_writable else USER_WORK
     resolve.OpenPage("color")
     project = resolve.GetProjectManager().GetCurrentProject()
     timeline = project.GetCurrentTimeline()
@@ -128,11 +135,12 @@ def main():
     step("refresh_lut_list", lambda: stats([timed(project.RefreshLUTList)[1] for _ in range(5)]))
 
     # 3. Le cycle complet d'un curseur DCTL : écrire un nouveau fichier, rafraîchir, appliquer
-    def dctl_cycle(use_relative):
-        WORK.mkdir(parents=True, exist_ok=True)
+    def dctl_cycle(use_relative, work=None):
+        work = work or WORK
+        work.mkdir(parents=True, exist_ok=True)
         write_ms, refresh_ms, set_ms, total, oks = [], [], [], [], []
         for n in range(20):
-            p = WORK / f"spike_{'rel' if use_relative else 'abs'}_{n}.dctl"
+            p = work / f"spike_{'rel' if use_relative else 'abs'}_{n}.dctl"
             t0 = time.perf_counter()
             _, t = timed(p.write_text, DCTL.format(n=n, offset=0.002 * n))
             write_ms.append(t)
@@ -145,8 +153,10 @@ def main():
             total.append((time.perf_counter() - t0) * 1000.0)
         return {"all_ok": all(oks), "write": stats(write_ms), "refresh": stats(refresh_ms),
                 "set_lut": stats(set_ms), "total": stats(total), "get_lut_after": g.GetLUT(1)}
-    step("dctl_cycle_absolute_path", lambda: dctl_cycle(False))
-    step("dctl_cycle_relative_path", lambda: dctl_cycle(True))
+    step("dctl_cycle_outside_lut_dir", lambda: dctl_cycle(False, USER_WORK))
+    if lut_writable:
+        step("dctl_cycle_absolute_path", lambda: dctl_cycle(False))
+        step("dctl_cycle_relative_path", lambda: dctl_cycle(True))
 
     # 4. Export d'image : formats acceptés, et l'image est-elle étalonnée ?
     def export_formats():
@@ -165,7 +175,7 @@ def main():
         cube.write_text(INVERT_CUBE)
         results = {}
         still = Path.home() / "Desktop" / "alvz_spike_lut_test.png"
-        g.SetLUT(1, str(WORK / "spike_abs_0.dctl"))
+        g.SetLUT(1, str(USER_WORK / "spike_abs_0.dctl"))
         project.ExportCurrentFrameAsStill(str(still))
         base = file_hash(still)
         for label, lut_ref in (("relative_name", "invert.cube"), ("absolute", str(cube))):
@@ -191,6 +201,7 @@ def main():
     report["ok"] = True
     REPORT.write_text(json.dumps(report, indent=2, ensure_ascii=False))
     print(f"[ALVZ spike] Rapport écrit : {REPORT}")
+    print("[ALVZ spike] RAPPORT JSON :\n" + json.dumps(report, indent=2, ensure_ascii=False))
     print("[ALVZ spike] Le node 1 du clip a été modifié : Reset du node (clic droit > Reset Node Grade).")
 
 

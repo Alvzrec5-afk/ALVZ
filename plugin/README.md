@@ -10,15 +10,17 @@ Teinte, Saturation, Tons chair et Reset. Le panneau suit le clip sous la tête d
 
 Ce test mesure si les curseurs peuvent être assez rapides et vérifie ce que l'API de Resolve permet.
 
-1. Dans le Terminal :
+1. Dans Resolve : ouvre un **projet de test**, page Color, place la tête de lecture sur un clip avec **un seul node vide**.
+   Préférences > Système > Général > **External scripting using : Local**.
+2. Dans le Terminal, depuis le dossier `plugin/` :
    ```bash
-   sudo mkdir -p "/Library/Application Support/Blackmagic Design/DaVinci Resolve/LUT/ALVZ"
-   sudo chown "$USER" "/Library/Application Support/Blackmagic Design/DaVinci Resolve/LUT/ALVZ"
-   cp "resolve_scripts/ALVZ Spike.py" ~/Library/Application\ Support/Blackmagic\ Design/DaVinci\ Resolve/Fusion/Scripts/Color/
+   python3 "resolve_scripts/ALVZ Spike.py"
    ```
-2. Dans Resolve : ouvre un **projet de test**, page Color, place la tête de lecture sur un clip avec **un seul node vide**.
-3. Workspace > Scripts > **ALVZ Spike**.
-4. Envoie-moi le fichier `alvz_spike_report.json` qui apparaît sur ton Bureau.
+   (ou copie le script dans `~/Library/Application Support/Blackmagic Design/DaVinci Resolve/Fusion/Scripts/Color/`
+   et lance-le par Workspace > Scripts > **ALVZ Spike**).
+3. Le rapport s'affiche et s'écrit sur le Bureau : `alvz_spike_report.json`.
+
+Pas besoin de `sudo` : si le dossier LUT de Resolve est protégé, le test essaie un dossier utilisateur.
 
 ## 2. Installer
 
