@@ -343,4 +343,4 @@ Accueil « cockpit » (24 oct., remplace l'ancien Accueil) : `app/admin/(protect
 + 6 mois, à encaisser / en retard, options à venir, prochaine prestation, 14 prochains jours via `loadCalendar` de
 `lib/calendar-entries.ts` — partagé avec la page Calendrier —, objectif `finance.monthly_goal` (€, Finances → Réglages), derniers
 paiements) ; affichage `components/admin/home-cockpit.tsx` ; stockage en bas : `StorageOverview` (`studio-dashboard.tsx` : jauge
-demi-cercle, plus gros projets, carte Oracle). Plus de « projets récents » ni de compteurs photos/vidéos sur l'Accueil.
+demi-cercle, plus gros projets, carte Oracle). Projets récents en lignes (`components/admin/recent-projects.tsx`, données `lib/recent-projects.ts`) entre les 14 jours et le stockage ; plus de compteurs photos/vidéos sur l'Accueil.

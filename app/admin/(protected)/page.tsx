@@ -4,6 +4,7 @@ import { loadCalendar } from "@/lib/calendar-entries";
 import { addDays, quoteState, todayParis, type FinanceSettings } from "@/lib/finance";
 import { loadQuotes } from "@/lib/finance-data";
 import { storageUsage, studioOverview } from "@/lib/usage";
+import { loadRecentProjects } from "@/lib/recent-projects";
 import { HomeCockpit, type CockpitData } from "@/components/admin/home-cockpit";
 
 export const metadata = { title: "Accueil" };
@@ -22,12 +23,15 @@ export default async function StudioHome() {
   const [o, usage, { data: galleries }, { data: boards }, { data: settings }, money] = await Promise.all([
     studioOverview(supabase),
     storageUsage(supabase),
-    supabase.from("galleries").select("id, title, kind").is("deleted_at", null).order("updated_at", { ascending: false }),
-    supabase.from("boards").select("id, title").is("parent_id", null).is("deleted_at", null).eq("is_template", false).eq("is_library", false).order("updated_at", { ascending: false }),
+    supabase.from("galleries").select("id, title, kind, created_at, updated_at, cover_photo_id").is("deleted_at", null).order("updated_at", { ascending: false }),
+    supabase.from("boards").select("id, title, updated_at, cover_key").is("parent_id", null).is("deleted_at", null).eq("is_template", false).eq("is_library", false).order("updated_at", { ascending: false }),
     supabase.from("studio_settings").select("finance, contact").eq("id", 1).maybeSingle(),
     finance,
   ]);
-  const cal = await loadCalendar(supabase, today, money);
+  const [cal, recent] = await Promise.all([
+    loadCalendar(supabase, today, money),
+    loadRecentProjects(supabase, (galleries ?? []) as Parameters<typeof loadRecentProjects>[1], (boards ?? []) as Parameters<typeof loadRecentProjects>[2], usage.perGallery),
+  ]);
   const { quotes, paid, payments } = money;
   const f = (settings?.finance ?? {}) as FinanceSettings;
   const contact = (settings?.contact ?? {}) as Contact;
@@ -88,6 +92,7 @@ export default async function StudioHome() {
       data={data}
       o={o}
       usage={usage}
+      recent={recent}
       galleries={(galleries ?? []).map((g) => ({ id: g.id as string, title: g.title as string, kind: g.kind as string }))}
       boards={(boards ?? []).map((b) => ({ id: b.id as string, title: b.title as string }))}
     />
