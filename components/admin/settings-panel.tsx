@@ -19,6 +19,7 @@ export function SettingsPanel({ gallery, onDelete }: { gallery: ManagedGallery; 
     downloads_enabled: gallery.downloadsEnabled,
     download_web_enabled: gallery.downloadWebEnabled,
     download_email_required: gallery.downloadEmailRequired,
+    zip_enabled: gallery.zipEnabled,
     favorites_enabled: gallery.favoritesEnabled,
     show_contact: gallery.design.show_contact,
   });
@@ -29,10 +30,11 @@ export function SettingsPanel({ gallery, onDelete }: { gallery: ManagedGallery; 
         downloads_enabled: gallery.downloadsEnabled,
         download_web_enabled: gallery.downloadWebEnabled,
         download_email_required: gallery.downloadEmailRequired,
+        zip_enabled: gallery.zipEnabled,
         favorites_enabled: gallery.favoritesEnabled,
         show_contact: gallery.design.show_contact,
       }),
-    [gallery.watermark, gallery.downloadsEnabled, gallery.downloadWebEnabled, gallery.downloadEmailRequired, gallery.favoritesEnabled, gallery.design.show_contact],
+    [gallery.watermark, gallery.downloadsEnabled, gallery.downloadWebEnabled, gallery.downloadEmailRequired, gallery.zipEnabled, gallery.favoritesEnabled, gallery.design.show_contact],
   );
   const toggle = (key: keyof typeof opts) => (v: boolean) => {
     setOpts((o) => ({ ...o, [key]: v }));
@@ -78,8 +80,14 @@ export function SettingsPanel({ gallery, onDelete }: { gallery: ManagedGallery; 
     return (
       <div>
         <SubHeader title="Téléchargement" onBack={back} />
-        <Toggle checked={opts.downloads_enabled} onChange={toggle("downloads_enabled")} label="Autoriser le téléchargement" hint="Photo par photo dans la visionneuse, ou toute la galerie / une collection en ZIP." />
+        <Toggle checked={opts.downloads_enabled} onChange={toggle("downloads_enabled")} label="Autoriser le téléchargement" hint="Photo par photo dans la visionneuse (et toute la galerie en ZIP, si l'option ci-dessous est activée)." />
         <div className={opts.downloads_enabled ? "" : "opacity-40 pointer-events-none"}>
+          <Toggle
+            checked={opts.zip_enabled}
+            onChange={toggle("zip_enabled")}
+            label="Autoriser le téléchargement de toute la galerie"
+            hint="Désactivé : le client ne peut plus tout télécharger d'un coup (ZIP de la galerie ou d'une collection), seulement photo par photo depuis la visionneuse."
+          />
           <Toggle
             checked={opts.download_web_enabled}
             onChange={toggle("download_web_enabled")}

@@ -31,6 +31,8 @@ export type ManagedGallery = {
   downloadsEnabled: boolean;
   downloadWebEnabled: boolean;
   downloadEmailRequired: boolean;
+  /** Téléchargement de toute la galerie / d'une collection en ZIP. */
+  zipEnabled: boolean;
   favoritesEnabled: boolean;
   design: GalleryDesign;
   kind: "photo" | "video";

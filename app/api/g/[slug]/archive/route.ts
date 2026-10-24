@@ -13,6 +13,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
   if ("error" in access) return access.error;
   const { gallery } = access;
   if (!gallery.downloads_enabled) return Response.json({ error: "Téléchargement désactivé" }, { status: 403 });
+  if (gallery.zip_enabled === false) return Response.json({ error: "Téléchargement de la galerie complète désactivé" }, { status: 403 });
   const noEmail = await needsDownloadEmail(gallery);
   if (noEmail) return noEmail;
 

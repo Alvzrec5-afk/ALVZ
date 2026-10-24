@@ -1,4 +1,4 @@
-import type { Metadata, Viewport } from "next";
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { formatLongDate } from "@/lib/dates";
 import type { Contact } from "@/lib/contact";
@@ -13,8 +13,6 @@ import { ExpiredScreen, LockScreen } from "@/components/gallery/screens";
 
 export const dynamic = "force-dynamic";
 
-/** Galerie : pas de zoom de la page (Android le respecte ; iPhone : bloqué par la galerie elle-même). Le zoom se fait dans la photo ouverte. */
-export const viewport: Viewport = { width: "device-width", initialScale: 1, maximumScale: 1, userScalable: false, viewportFit: "cover" };
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const g = await findGalleryBySlug((await params).slug);
@@ -68,6 +66,7 @@ export default async function GalleryPage({ params }: { params: Promise<{ slug: 
       downloadWebEnabled={gallery.download_web_enabled}
       downloadEmailRequired={gallery.download_email_required}
       paymentPending={gallery.payment_locked}
+      zipEnabled={gallery.zip_enabled !== false}
       favoritesEnabled={gallery.favorites_enabled}
       cover={cover ? { src: cover.web, width: cover.width, height: cover.height } : videos[0] ? { src: videos[0].poster, width: 16, height: 9 } : null}
       coverAlt={views.find((p) => p.id !== cover?.id)?.web ?? null}

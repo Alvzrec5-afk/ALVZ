@@ -344,9 +344,10 @@ Accueil « cockpit » (24 oct., remplace l'ancien Accueil) : `app/admin/(protect
 `lib/calendar-entries.ts` — partagé avec la page Calendrier —, objectif `finance.monthly_goal` (€, Finances → Réglages), derniers
 paiements) ; affichage `components/admin/home-cockpit.tsx` ; stockage en bas : `StorageOverview` (`studio-dashboard.tsx` : jauge
 demi-cercle, plus gros projets, carte Oracle). Projets récents en lignes (`components/admin/recent-projects.tsx`, données `lib/recent-projects.ts`) entre les 14 jours et le stockage ; plus de compteurs photos/vidéos sur l'Accueil.
-Zoom des galeries client (24 oct.) : la page `/g/<lien>` ne zoome plus (`client-gallery.tsx` : `touch-action: pan-x pan-y`, gestes
-Safari `gesturestart/gesturechange` et `touchmove` à deux doigts bloqués ; `viewport` de `app/g/[slug]/page.tsx` : maximumScale 1).
-Zoom intégré à la visionneuse `components/gallery/lightbox.tsx` : pincement (jusqu'à ×4, le point pincé suit les doigts), double-tap
-(×2,5 à l'endroit touché, le double-clic que le navigateur génère ensuite est ignoré), glisser pour se déplacer quand c'est zoomé
-(plus de balayage photo suivante / fermeture tant que c'est zoomé), ordinateur : double-clic, molette / trackpad, glisser à la souris ;
-remis à zéro au changement de photo et à la fermeture.
+Zoom des galeries client (24 oct.) : la grille `/g/<lien>` ne zoome pas (`client-gallery.tsx` : `touch-action: pan-x pan-y` sur la
+page, gestes Safari `gesturestart/gesturechange` et `touchmove` à deux doigts bloqués) ; photo ouverte (visionneuse) : zoom **normal du
+navigateur** (blocage levé tant que `open !== null`, `touch-action: auto`), et si la page est restée zoomée on peut dézoomer
+(`visualViewport.scale > 1`). Pas de zoom maison dans `lightbox.tsx` (essayé puis retiré à la demande du propriétaire).
+Téléchargement de toute la galerie : colonne `galleries.zip_enabled` (migration « galleries_zip_enabled », par défaut oui) ;
+Paramètres → Téléchargement → « Autoriser le téléchargement de toute la galerie » ; coupé → plus de ZIP (menu client, route
+`/api/g/<lien>/archive` refusée en 403), photo par photo toujours possible si le téléchargement est autorisé.

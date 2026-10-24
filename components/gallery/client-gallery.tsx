@@ -25,6 +25,8 @@ type Props = {
   downloadEmailRequired?: boolean;
   /** Devis lié pas encore réglé : téléchargement disponible après le paiement. */
   paymentPending?: boolean;
+  /** Téléchargement de toute la galerie / d'une collection en ZIP (sinon photo par photo seulement). */
+  zipEnabled?: boolean;
   favoritesEnabled: boolean;
   cover: { src: string; width: number; height: number } | null;
   /** Deuxième photo (mise en page Diptyque). */
@@ -49,6 +51,7 @@ export function ClientGallery(props: Props) {
   const [askDownload, setAskDownload] = useState<(() => void) | null>(null);
   const needEmail = Boolean(props.downloadEmailRequired) && !email;
   const [open, setOpen] = useState<number | null>(null);
+  const zipAllowed = props.downloadsEnabled && props.zipEnabled !== false;
   const [menu, setMenu] = useState(false);
   const [zip, setZip] = useState<{ done: number; total: number } | null>(null);
   const [contactOpen, setContactOpen] = useState(false);
@@ -69,11 +72,17 @@ export function ClientGallery(props: Props) {
     return () => window.removeEventListener("resize", measure);
   }, [tab, favorites.size, props.collections.length]);
 
-  // Pas de zoom sur la page de la galerie (pincement, double-tap) : le zoom se fait dans la photo ouverte (visionneuse).
+  // Pas de zoom sur la grille de la galerie (pincement, double-tap). Photo ouverte : zoom normal du navigateur.
+  // Si la page est restée zoomée (photo fermée en zoom), on laisse dézoomer.
+  const lightboxOpen = useRef(false);
+  lightboxOpen.current = open !== null;
   useEffect(() => {
-    const stop = (e: Event) => e.preventDefault(); // Safari (iPhone, iPad) : gestes de zoom
+    const blocked = () => !lightboxOpen.current && (window.visualViewport?.scale ?? 1) <= 1.01;
+    const stop = (e: Event) => {
+      if (blocked()) e.preventDefault(); // Safari (iPhone, iPad) : gestes de zoom
+    };
     const twoFingers = (e: TouchEvent) => {
-      if (e.touches.length > 1) e.preventDefault();
+      if (e.touches.length > 1 && blocked()) e.preventDefault();
     };
     document.addEventListener("gesturestart", stop, { passive: false });
     document.addEventListener("gesturechange", stop, { passive: false });
@@ -163,7 +172,7 @@ export function ClientGallery(props: Props) {
     <div
       data-theme={themeAttr(design)}
       className={`fs-${design.font_style} min-h-svh bg-bg text-ink`}
-      style={{ touchAction: "pan-x pan-y" }}
+      style={{ touchAction: open === null ? "pan-x pan-y" : "auto" }}
       onContextMenu={props.watermark ? (e) => (e.target as HTMLElement).tagName === "IMG" && e.preventDefault() : undefined}
     >
       <Cover design={design} cover={props.cover} coverAlt={props.coverAlt} title={props.title} date={props.date} onEnter={scrollToGrid} />
@@ -240,7 +249,7 @@ export function ClientGallery(props: Props) {
                 <span className={`eyebrow text-[10px] ml-1 ${design.nav_style === "labels" ? "" : "hidden lg:inline"}`}>Sélection</span>
               </button>
             )}
-            {(props.downloadsEnabled || props.favoritesEnabled) && (
+            {(zipAllowed || props.favoritesEnabled) && (
               <div className="relative">
                 <button
                   className="flex items-center gap-1.5 h-10 px-2 text-ink/80 hover:text-ink transition-colors"
@@ -248,7 +257,7 @@ export function ClientGallery(props: Props) {
                   aria-label="Menu"
                   disabled={zip !== null}
                 >
-                  {props.downloadsEnabled ? (
+                  {zipAllowed ? (
                     <>
                       <span className={design.nav_style === "labels" ? "" : "lg:hidden"}>{design.nav_style === "labels" ? <DownloadIcon className="w-5 h-5" /> : <DotsVertical />}</span>
                       {design.nav_style !== "labels" && <DownloadIcon className="w-5 h-5 hidden lg:block" />}
@@ -256,7 +265,7 @@ export function ClientGallery(props: Props) {
                   ) : (
                     <DotsVertical />
                   )}
-                  <span className={`eyebrow text-[10px] ${design.nav_style === "labels" ? "" : "hidden lg:inline"}`}>{props.downloadsEnabled ? "Télécharger" : "Menu"}</span>
+                  <span className={`eyebrow text-[10px] ${design.nav_style === "labels" ? "" : "hidden lg:inline"}`}>{zipAllowed ? "Télécharger" : "Menu"}</span>
                 </button>
                 {menu && (
                   <>
@@ -273,7 +282,7 @@ export function ClientGallery(props: Props) {
                           <HeartIcon className="w-4 h-4" /> Ma sélection{favorites.size > 0 ? ` (${favorites.size})` : ""}
                         </button>
                       )}
-                      {props.downloadsEnabled && (
+                      {zipAllowed && (
                         <>
                           {activeCollection && props.collections.length > 1 && (
                             <button className="w-full text-left px-5 py-3 text-sm hover:bg-bg-soft flex items-center gap-3" onClick={() => startZip(activeCollection.id)}>

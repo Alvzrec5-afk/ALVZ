@@ -21,10 +21,12 @@ export type PublicGallery = {
   download_email_required: boolean;
   /** Devis lié pas encore réglé (Finances) : téléchargements coupés, voir findGalleryBySlug. */
   payment_locked: boolean;
+  /** Téléchargement de toute la galerie / d'une collection en ZIP (sinon photo par photo seulement). */
+  zip_enabled: boolean;
   design: Record<string, unknown> | null;
 } & Omit<GalleryDesign, "nav_style" | "show_contact">;
 
-export const GALLERY_FIELDS = `id, kind, slug, title, event_date, cover_photo_id, password_hash, expires_at, watermark, downloads_enabled, favorites_enabled, download_web_enabled, download_email_required, payment_locked, ${DESIGN_FIELDS}`;
+export const GALLERY_FIELDS = `id, kind, slug, title, event_date, cover_photo_id, password_hash, expires_at, watermark, downloads_enabled, favorites_enabled, download_web_enabled, download_email_required, payment_locked, zip_enabled, ${DESIGN_FIELDS}`;
 
 /** Une seule lecture par requête (titre de l'onglet et page la partagent). */
 export const findGalleryBySlug = cache(async (slug: string) => {
