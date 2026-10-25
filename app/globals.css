@@ -350,6 +350,14 @@ body {
 /* Page d'un devis : « Enregistrer en PDF » = impression du navigateur, sans les boutons. */
 @media print {
   .no-print { display: none !important; }
-  @page { margin: 14mm; }
-  body { background: #fff; }
+  /* Marge nulle : le navigateur n'ajoute plus date / adresse en haut et en bas ; la marge est dans la page. */
+  @page { size: A4; margin: 0; }
+  html, body { background: #fff !important; min-height: 0 !important; }
+  .quote-print { padding: 14mm 14mm 12mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .quote-print .qp-head th { background: #000; color: #fff; font-weight: 700; font-size: 9.5pt; padding: 5pt 6pt; border-right: 1px solid #fff; white-space: nowrap; }
+  .quote-print .qp-head th:last-child { border-right: 0; }
+  .quote-print .qp-row td { padding: 6pt; vertical-align: top; border-bottom: 1px solid #e5e7eb; }
+  .quote-print .qp-row { break-inside: avoid; }
+  .quote-print .qp-keep { break-inside: avoid; }
+  .quote-print .qp-total { background: #000; color: #fff; font-weight: 700; font-size: 11pt; padding: 6pt 8pt; }
 }

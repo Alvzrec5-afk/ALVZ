@@ -16,6 +16,7 @@ import {
 import { Wordmark } from "@/components/wordmark";
 import { AcceptForm } from "./accept-form";
 import { PrintButton } from "./print-button";
+import { QuotePrint } from "./quote-print";
 
 /** Devis tel que le client le voit : lecture, PDF (impression du navigateur), bon pour accord. */
 export function QuoteDocument({ q, paid, f, slug }: { q: Quote; paid: number; f: FinanceSettings; slug: string }) {
@@ -31,8 +32,9 @@ export function QuoteDocument({ q, paid, f, slug }: { q: Quote; paid: number; f:
   const canPay = Boolean(payLink) && (q.status === "sent" || q.status === "accepted") && due.cents > 0;
 
   return (
-    <div data-theme="blanc" className="min-h-svh bg-bg-soft text-ink print:bg-white">
-      <div className="max-w-3xl mx-auto px-4 sm:px-8 py-8 sm:py-14 print:p-0 print:max-w-none">
+    <div data-theme="blanc" className="min-h-svh bg-bg-soft text-ink print:min-h-0 print:bg-white">
+      <QuotePrint q={q} paid={paid} f={f} />
+      <div className="max-w-3xl mx-auto px-4 sm:px-8 py-8 sm:py-14 print:hidden">
         <div className="no-print flex flex-wrap items-center justify-end gap-3 mb-6">
           {q.status === "accepted" && <span className="text-sm text-accent mr-auto">✓ Devis accepté{q.accepted_at ? ` le ${formatDay(q.accepted_at.slice(0, 10))}` : ""}</span>}
           {state.settled && <span className="text-sm text-accent mr-auto">✓ Réglé, merci !</span>}

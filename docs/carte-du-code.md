@@ -290,7 +290,7 @@ Réglages (`finance-settings-form.tsx` → `studio_settings.finance` : nom, SIRE
 Calculs partagés : `lib/finance.ts` (centimes, `quoteTotals`, `quoteState`, `quoteBadge`) ; lectures : `lib/finance-data.ts` ;
 actions : `app/admin/finance-actions.ts` (numéro suivant `D-AAAA-NNN`, paiement sur devis « envoyé » ⇒ « accepté »).
 Page client `/d/<share_slug>` (`components/quote/quote-document.tsx`, client de service, brouillons cachés) : devis avec
-mentions (SIRET, « TVA non applicable, art. 293 B du CGI »), « Enregistrer en PDF » = impression (`.no-print`), bon pour accord
+mentions (SIRET, « TVA non applicable, art. 293 B du CGI »), « Enregistrer en PDF » = impression : à l'impression, la page est remplacée par `components/quote/quote-print.tsx` (A4 sur une page façon Abby, tailles en pt, tableau à en-tête noir, `@page margin: 0` pour retirer date/adresse du navigateur, styles `.quote-print` dans `globals.css`), bon pour accord
 en ligne (`app/d/[slug]/actions.ts`, seulement si envoyé et non expiré). Pas de vraie facture : elles restent dans un logiciel
 agréé (facture électronique obligatoire pour les micro en 2027) ; seul leur numéro est noté.
 Blocage : `galleries.payment_locked` (déclencheurs SQL) ; `findGalleryBySlug` renvoie alors `downloads_enabled = false`
