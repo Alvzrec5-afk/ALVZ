@@ -485,3 +485,4 @@ alter table public.quotes add column if not exists pay_clicked_at timestamptz; -
 -- Calendriers importés : table public.calendar_sources + calendar_events.external_uid (migration « calendar_sources »).
 -- Remise des devis : quotes.discount_type / discount_value / discount_label (migration « quotes_discount »).
 alter table public.galleries add column if not exists zip_enabled boolean not null default true; -- migration « galleries_zip_enabled »
+alter table public.quotes add column if not exists client_phone text not null default ''; -- migration « quotes_client_phone »

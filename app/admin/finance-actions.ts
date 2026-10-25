@@ -85,6 +85,7 @@ export type QuoteInput = {
   title: string;
   client_name: string;
   client_email: string;
+  client_phone: string;
   client_address: string;
   gallery_id: string | null;
   lines: unknown;
@@ -117,6 +118,7 @@ export async function saveQuote(id: string, input: QuoteInput): Promise<Result> 
       title: text(input.title, 200),
       client_name: text(input.client_name, 160),
       client_email: email || null,
+      client_phone: text(input.client_phone, 30),
       client_address: text(input.client_address, 400),
       gallery_id: typeof input.gallery_id === "string" && input.gallery_id ? input.gallery_id : null,
       lines,
@@ -167,7 +169,7 @@ export async function duplicateQuote(id: string) {
   const { supabase } = await requireAdminApi();
   const { data: q } = await supabase
     .from("quotes")
-    .select("title, client_name, client_email, client_address, lines, vat_rate, total_cents, deposit_pct, discount_type, discount_value, discount_label")
+    .select("title, client_name, client_email, client_phone, client_address, lines, vat_rate, total_cents, deposit_pct, discount_type, discount_value, discount_label")
     .eq("id", id)
     .single();
   if (!q) throw new Error("Devis introuvable");
@@ -341,5 +343,24 @@ export async function deleteCatalogItem(id: string): Promise<Result> {
   const { error } = await supabase.from("catalog_items").delete().eq("id", id);
   if (error) return { error: error.message };
   refresh();
+  return {};
+}
+
+/**
+ * Devis envoyé par message (WhatsApp, SMS…) depuis le téléphone du studio : le brouillon passe « envoyé »
+ * (sa page devient visible du client), ou la relance est datée.
+ */
+export async function markQuoteSent(id: string, kind: "send" | "reminder"): Promise<Result> {
+  const { supabase } = await requireAdminApi();
+  const now = new Date().toISOString();
+  if (kind === "reminder") {
+    const { error } = await supabase.from("quotes").update({ last_reminder_at: now }).eq("id", id);
+    if (error) return { error: error.message };
+  } else {
+    const { error } = await supabase.from("quotes").update({ sent_at: now }).eq("id", id);
+    if (error) return { error: error.message };
+    await supabase.from("quotes").update({ status: "sent" }).eq("id", id).eq("status", "draft");
+  }
+  refresh(id);
   return {};
 }

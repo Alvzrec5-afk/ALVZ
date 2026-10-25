@@ -37,6 +37,8 @@ export type Quote = {
   title: string;
   client_name: string;
   client_email: string | null;
+  /** Téléphone (envoi du devis par WhatsApp / SMS). */
+  client_phone: string;
   client_address: string;
   gallery_id: string | null;
   lines: QuoteLine[];
@@ -91,7 +93,7 @@ export type FinanceSettings = {
 };
 
 export const QUOTE_FIELDS =
-  "id, number, title, client_name, client_email, client_address, gallery_id, lines, vat_rate, total_cents, deposit_pct, status, issued_on, valid_until, due_on, lock_gallery, invoice_ref, notes, payment_link, discount_type, discount_value, discount_label, share_slug, sent_at, accepted_at, accepted_name, last_reminder_at, pay_clicked_at, created_at";
+  "id, number, title, client_name, client_email, client_phone, client_address, gallery_id, lines, vat_rate, total_cents, deposit_pct, status, issued_on, valid_until, due_on, lock_gallery, invoice_ref, notes, payment_link, discount_type, discount_value, discount_label, share_slug, sent_at, accepted_at, accepted_name, last_reminder_at, pay_clicked_at, created_at";
 
 export const STATUS_LABEL: Record<QuoteStatus, string> = {
   draft: "Brouillon",
@@ -280,6 +282,13 @@ export function amountDueNow(q: Pick<Quote, "total_cents" | "deposit_pct">, paid
   const deposit = depositCents(q);
   if (deposit > 0 && paid < deposit) return { cents: deposit - paid, label: "Payer l'acompte" };
   return { cents: Math.max(0, q.total_cents - paid), label: "Payer la facture" };
+}
+
+/** « 06 11 32 94 06 » → « 33611329406 » (format des liens WhatsApp) ; vide si ce n'est pas un numéro. */
+export function phoneDigits(phone: string) {
+  const d = phone.replace(/[^\d+]/g, "").replace(/^\+/, "").replace(/^00/, "");
+  const fr = d.replace(/^0(\d{9})$/, "33$1");
+  return /^\d{8,15}$/.test(fr) ? fr : "";
 }
 
 /** Mention obligatoire en micro-entreprise sans TVA. */

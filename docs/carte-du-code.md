@@ -351,3 +351,8 @@ navigateur** (blocage levé tant que `open !== null`, `touch-action: auto`), et 
 Téléchargement de toute la galerie : colonne `galleries.zip_enabled` (migration « galleries_zip_enabled », par défaut oui) ;
 Paramètres → Téléchargement → « Autoriser le téléchargement de toute la galerie » ; coupé → plus de ZIP (menu client, route
 `/api/g/<lien>/archive` refusée en 403), photo par photo toujours possible si le téléchargement est autorisé.
+Envoi du devis par message (25 oct.) : `quotes.client_phone` (migration « quotes_client_phone ») ; section « Envoyer par message »
+de `quote-editor.tsx` (`SendByMessage`) : texte court (devis ou relance, montants à jour, lien `/d/<lien>`, modifiable), boutons
+WhatsApp (`wa.me/<numéro>?text=`, `phoneDigits` : 06… → 336…), SMS / iMessage (`sms:+33…?&body=`), Partager (`navigator.share`,
+iPhone) et Copier. Rien ne part du serveur ; `markQuoteSent` passe le brouillon en « envoyé » (sa page devient visible) ou date la relance.
+Refusé si le devis n'est pas enregistré.

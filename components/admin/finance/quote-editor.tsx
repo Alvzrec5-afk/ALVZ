@@ -1,11 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   FRANCHISE_MENTION,
   METHOD_LABEL,
   cleanLink,
+  phoneDigits,
   STATUS_LABEL,
   depositCents,
   formatCents,
@@ -33,6 +34,7 @@ import {
   deleteQuote,
   duplicateQuote,
   emailQuote,
+  markQuoteSent,
   saveQuote,
   setQuoteStatus,
 } from "@/app/admin/finance-actions";
@@ -87,6 +89,7 @@ export function QuoteEditor({
     title: quote.title,
     client_name: quote.client_name,
     client_email: quote.client_email ?? "",
+    client_phone: quote.client_phone ?? "",
     client_address: quote.client_address,
     gallery_id: quote.gallery_id ?? "",
     vat_rate: String(quote.vat_rate).replace(".", ","),
@@ -220,6 +223,9 @@ export function QuoteEditor({
           </Field>
           <Field label="E-mail">
             <input className="field" type="email" value={form.client_email} onChange={(e) => set("client_email", e.target.value)} maxLength={160} />
+          </Field>
+          <Field label="Téléphone (WhatsApp / SMS)">
+            <input className="field" type="tel" inputMode="tel" placeholder="06 12 34 56 78" value={form.client_phone} onChange={(e) => set("client_phone", e.target.value)} maxLength={30} />
           </Field>
         </div>
         <Field label="Adresse (facultatif)">
@@ -429,6 +435,8 @@ export function QuoteEditor({
           pouvez coller ici un lien créé pour le montant exact.
         </p>
       </Payments>
+
+      <SendByMessage quote={quote} settings={settings} state={state} deposit={deposit} total={totals.ttc} form={form} dirty={dirty} />
 
       <Mail quote={quote} mailer={mailer} settings={settings} state={state} deposit={deposit} total={totals.ttc} form={form} save={save} dirty={dirty} />
 
@@ -670,6 +678,120 @@ Belle journée,`,
         {notice?.ok && <p className="text-sm text-accent">{notice.ok}</p>}
         {notice?.error && <p className="text-sm text-danger">{notice.error}</p>}
       </div>
+    </Section>
+  );
+}
+
+/**
+ * Envoi par message depuis le téléphone (WhatsApp, SMS / iMessage, Partager) : texte court, montants à jour, lien du devis.
+ * Rien ne part du site : c'est l'app du téléphone qui s'ouvre avec le message prêt.
+ */
+function SendByMessage({
+  quote,
+  settings,
+  state,
+  deposit,
+  total,
+  form,
+  dirty,
+}: {
+  quote: Quote;
+  settings: FinanceSettings;
+  state: ReturnType<typeof quoteState>;
+  deposit: number;
+  total: number;
+  form: { title: string; client_name: string; client_phone: string; due_on: string };
+  dirty: boolean;
+}) {
+  const router = useRouter();
+  const reminder = quote.status !== "draft" && state.remaining > 0 && (quote.status === "accepted" || state.paid > 0 || Boolean(quote.sent_at));
+  const [kind, setKind] = useState<"send" | "reminder">(reminder ? "reminder" : "send");
+  const [link, setLink] = useState(`/d/${quote.share_slug}`);
+  useEffect(() => setLink(`${window.location.origin}/d/${quote.share_slug}`), [quote.share_slug]);
+  const hello = form.client_name ? `Bonjour ${form.client_name.split(/\s+/)[0]},` : "Bonjour,";
+  const what = form.title || "votre projet";
+  const depositLeft = Math.max(0, deposit - state.paid);
+  const sign = settings.owner_name?.split(/\s+/)[0] || settings.business_name || "";
+  const auto =
+    kind === "send"
+      ? `${hello}\n\nVoici mon devis pour ${what} : ${formatCents(total)}${depositLeft > 0 ? `, avec un acompte de ${formatCents(depositLeft)} pour réserver la date` : ""}.\nVous pouvez le consulter, l'accepter et payer en ligne ici :\n${link}\n\nÀ très vite${sign ? `,\n${sign}` : " !"}`
+      : `${hello}\n\nPetit rappel pour ${what} : il reste ${formatCents(state.remaining)} à régler${form.due_on ? ` (échéance du ${formatDay(form.due_on)})` : ""}.\nLe détail et le paiement sont ici :\n${link}\n\nMerci${sign ? `,\n${sign}` : " !"}`;
+  const [custom, setCustom] = useState<string | null>(null);
+  const text = custom ?? auto;
+  const [copied, setCopied] = useState(false);
+  const [canShare, setCanShare] = useState(false);
+  useEffect(() => setCanShare(typeof navigator !== "undefined" && "share" in navigator), []);
+  const digits = phoneDigits(form.client_phone);
+  const enc = encodeURIComponent(text);
+  const whatsapp = digits ? `https://wa.me/${digits}?text=${enc}` : `https://wa.me/?text=${enc}`;
+  const sms = `sms:${digits ? `+${digits}` : ""}?&body=${enc}`;
+
+  /** Le message part : le devis devient visible du client (brouillon → envoyé) ou la relance est datée. */
+  function sent(e?: React.MouseEvent) {
+    if (dirty) {
+      e?.preventDefault();
+      alert("Enregistrez d'abord le devis (bouton en bas), pour que le client voie la dernière version.");
+      return false;
+    }
+    void markQuoteSent(quote.id, kind).then(() => router.refresh());
+    return true;
+  }
+
+  return (
+    <Section title="Envoyer par message (WhatsApp, SMS)">
+      <div className="flex gap-2 mb-6">
+        {(["send", "reminder"] as const).map((k) => (
+          <button
+            key={k}
+            onClick={() => {
+              setKind(k);
+              setCustom(null);
+            }}
+            className={`px-4 py-2 text-xs border ${kind === k ? "border-ink" : "border-line text-muted hover:text-ink"}`}
+          >
+            {k === "send" ? "Envoyer le devis" : "Relance de paiement"}
+          </button>
+        ))}
+      </div>
+      <Field label="Message">
+        <textarea className="field leading-relaxed" rows={7} style={{ resize: "vertical" }} value={text} onChange={(e) => setCustom(e.target.value)} maxLength={2000} />
+      </Field>
+      {custom !== null && (
+        <button className="text-xs text-muted hover:text-ink mt-2" onClick={() => setCustom(null)}>
+          Revenir au message automatique (montants à jour)
+        </button>
+      )}
+      <div className="mt-5 flex flex-wrap gap-2">
+        <a className="btn" href={whatsapp} target="_blank" rel="noopener noreferrer" onClick={sent}>WhatsApp</a>
+        <a className="btn btn-ghost" href={sms} onClick={sent}>SMS / iMessage</a>
+        {canShare && (
+          <button
+            className="btn btn-ghost"
+            onClick={async () => {
+              if (!sent()) return;
+              try {
+                await navigator.share({ text });
+              } catch {}
+            }}
+          >
+            Partager…
+          </button>
+        )}
+        <button
+          className="btn btn-ghost"
+          onClick={async () => {
+            await navigator.clipboard.writeText(text);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          }}
+        >
+          {copied ? "Copié ✓" : "Copier"}
+        </button>
+      </div>
+      <p className="text-xs text-muted mt-3 leading-relaxed">
+        {digits ? "Le message s'ouvre dans l'app, prêt à envoyer à ce numéro." : "Sans numéro, choisissez le contact dans l'app."} Le devis passe en « Envoyé » et sa page
+        devient visible du client.
+      </p>
     </Section>
   );
 }
