@@ -10,6 +10,7 @@ import { ArrowLeft, FilmIcon, PlusCircleIcon } from "@/components/icons";
 import { VideoPlayer, formatTime, qualityLabel, type PlayerHandle } from "@/components/video/video-player";
 import { VideoComments } from "@/components/video/video-comments";
 import { Toggle } from "./ui";
+import { DropOverlay, useWindowFileDrop } from "./file-drop";
 
 export type AdminVideo = VideoView & {
   sizeBytes: number;
@@ -36,6 +37,14 @@ export function VideosPanel({ galleryId, slug, watermark, videos }: { galleryId:
   const [openId, setOpenId] = useState<string | null>(null);
   const open = videos.find((v) => v.id === openId);
   const busy = items.some((i) => i.status === "queued" || i.status === "working");
+  // Vidéos glissées depuis l'ordinateur n'importe où sur la page (pas pendant qu'une vidéo est ouverte).
+  const [ignored, setIgnored] = useState(0);
+  const over = useWindowFileDrop((dt) => {
+    const files = Array.from(dt.files);
+    const clips = files.filter((f) => f.type.startsWith("video/") || /\.(mp4|mov|m4v|webm|mkv|avi)$/i.test(f.name));
+    setIgnored(files.length - clips.length);
+    if (clips.length) uploader.add(clips);
+  }, !openId);
 
   useEffect(() => {
     if (!busy) return;
@@ -48,6 +57,7 @@ export function VideosPanel({ galleryId, slug, watermark, videos }: { galleryId:
 
   return (
     <div>
+      <DropOverlay show={over} title="Déposez vos vidéos" hint="Elles sont préparées puis envoyées comme avec « Ajouter des vidéos »." />
       <div className="flex items-center justify-between gap-4 mb-6 lg:mb-8">
         <h2 className="display text-2xl sm:text-3xl">Vidéos</h2>
         <button onClick={() => input.current?.click()} className="flex items-center gap-1.5 text-[13px] sm:text-sm text-accent hover:opacity-80">
@@ -66,6 +76,11 @@ export function VideosPanel({ galleryId, slug, watermark, videos }: { galleryId:
         />
       </div>
 
+      {ignored > 0 && (
+        <p className="text-sm text-warn mb-4">
+          {ignored} fichier{ignored > 1 ? "s" : ""} ignoré{ignored > 1 ? "s" : ""} : seules les vidéos vont ici (les photos se déposent dans l&apos;onglet « Photos »).
+        </p>
+      )}
       {items.length > 0 && (
         <div className="mb-10 border border-line">
           {items.map((i) => (
@@ -104,6 +119,7 @@ export function VideosPanel({ galleryId, slug, watermark, videos }: { galleryId:
           Aucune vidéo dans cette galerie.
           <br />
           <span className="text-accent">Ajouter un clip</span>
+          <span className="hidden lg:inline"> ou glissez-le ici</span>
           <span className="block text-xs mt-3 max-w-sm mx-auto leading-relaxed">
             Votre ordinateur prépare automatiquement plusieurs qualités : chaque client reçoit celle qui convient à sa connexion.
             {watermark && " Le filigrane de la galerie est incrusté dans la vidéo."}

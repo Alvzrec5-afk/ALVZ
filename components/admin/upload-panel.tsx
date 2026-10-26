@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { filesFromDrop, filesFromInput } from "@/lib/client/files";
 import { Uploader } from "@/lib/client/uploader";
+import { DropOverlay, useWindowFileDrop } from "./file-drop";
 
 function formatBytes(n: number) {
   if (n < 1024 * 1024) return `${Math.round(n / 1024)} Ko`;
@@ -11,7 +12,7 @@ function formatBytes(n: number) {
   return `${(n / 1024 / 1024 / 1024).toFixed(2)} Go`;
 }
 
-export function UploadPanel({ galleryId, defaultCollection }: { galleryId: string; defaultCollection: string }) {
+export function UploadPanel({ galleryId, defaultCollection, onPageDrop }: { galleryId: string; defaultCollection: string; onPageDrop?: () => void }) {
   const router = useRouter();
   const [uploader] = useState(() => new Uploader(galleryId, () => router.refresh()));
   const items = useSyncExternalStore(uploader.subscribe, uploader.getSnapshot, uploader.getSnapshot);
@@ -20,6 +21,16 @@ export function UploadPanel({ galleryId, defaultCollection }: { galleryId: strin
   const folderInput = useRef<HTMLInputElement>(null);
 
   const busy = items.some((i) => i.status === "queued" || i.status === "working");
+  const [skipped, setSkipped] = useState(0);
+
+  // Photos glissées depuis l'ordinateur n'importe où sur la page de la galerie (pas seulement dans la zone).
+  const pageOver = useWindowFileDrop(async (dt) => {
+    const videos = Array.from(dt.files).filter((f) => f.type.startsWith("video/")).length;
+    const picked = await filesFromDrop(dt);
+    setSkipped(videos);
+    if (picked.length) uploader.add(picked, defaultCollection);
+    if (picked.length || videos) onPageDrop?.();
+  }, Boolean(onPageDrop));
 
   useEffect(() => {
     if (!busy) return;
@@ -42,6 +53,12 @@ export function UploadPanel({ galleryId, defaultCollection }: { galleryId: strin
 
   return (
     <div className="mb-12">
+      <DropOverlay show={pageOver} title="Déposez vos photos" hint={`Dans « ${defaultCollection} » — un dossier devient une collection.`} />
+      {skipped > 0 && (
+        <p className="text-sm text-warn mb-4">
+          {skipped} vidéo{skipped > 1 ? "s" : ""} ignorée{skipped > 1 ? "s" : ""} : déposez les vidéos dans l&apos;onglet « Vidéos ».
+        </p>
+      )}
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -51,6 +68,7 @@ export function UploadPanel({ galleryId, defaultCollection }: { galleryId: strin
         onDrop={async (e) => {
           e.preventDefault();
           setOver(false);
+          setSkipped(0);
           uploader.add(await filesFromDrop(e.dataTransfer), defaultCollection);
         }}
         className={`border border-dashed px-6 py-12 text-center transition-colors ${over ? "border-ink bg-bg-soft" : "border-line"}`}

@@ -116,7 +116,7 @@ export function PhotosPanel(props: Props) {
               <CloseIcon />
             </button>
           </div>
-          <UploadPanel galleryId={props.galleryId} defaultCollection={active?.name ?? "Galerie"} />
+          <UploadPanel galleryId={props.galleryId} defaultCollection={active?.name ?? "Galerie"} onPageDrop={() => setUploadOpen(true)} />
           <p className="text-xs text-muted -mt-6">Vous pouvez fermer cette fenêtre : l&apos;envoi continue en arrière-plan.</p>
         </div>
       </div>
