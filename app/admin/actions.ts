@@ -207,6 +207,17 @@ export async function deleteVideo(galleryId: string, videoId: string) {
   return {};
 }
 
+/** Plusieurs vidéos d'un coup (sélection dans la liste). */
+export async function deleteVideos(galleryId: string, videoIds: string[]) {
+  const { supabase } = await requireAdminApi();
+  const ids = videoIds.filter((id) => typeof id === "string").slice(0, 500);
+  if (!ids.length) return {};
+  const { data } = await supabase.from("videos").select(VIDEO_PURGE_FIELDS).in("id", ids).eq("gallery_id", galleryId);
+  await purgeVideos(supabase, data ?? []);
+  revalidatePath(`/admin/galleries/${galleryId}`);
+  return {};
+}
+
 export async function reorderVideos(galleryId: string, orderedIds: string[]) {
   const { supabase } = await requireAdminApi();
   await Promise.all(orderedIds.map((id, i) => supabase.from("videos").update({ position: (i + 1) * 1000 }).eq("id", id).eq("gallery_id", galleryId)));

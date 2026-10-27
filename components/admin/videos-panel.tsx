@@ -3,10 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { deleteInBackground } from "./background";
-import { deleteVideo, deleteVideoComment, setVideoCommentResolved, updateVideo } from "@/app/admin/actions";
+import { deleteVideo, deleteVideoComment, deleteVideos, setVideoCommentResolved, updateVideo } from "@/app/admin/actions";
 import type { VideoComment, VideoView } from "@/lib/types";
 import { VideoUploader } from "@/lib/client/video-uploader";
-import { ArrowLeft, FilmIcon, PlusCircleIcon } from "@/components/icons";
+import { ArrowLeft, FilmIcon, PlusCircleIcon, TrashIcon } from "@/components/icons";
 import { VideoPlayer, formatTime, qualityLabel, type PlayerHandle } from "@/components/video/video-player";
 import { VideoComments } from "@/components/video/video-comments";
 import { Toggle } from "./ui";
@@ -37,6 +37,27 @@ export function VideosPanel({ galleryId, slug, watermark, videos }: { galleryId:
   const [openId, setOpenId] = useState<string | null>(null);
   const open = videos.find((v) => v.id === openId);
   const busy = items.some((i) => i.status === "queued" || i.status === "working");
+  // Sélection pour supprimer plusieurs vidéos d'un coup.
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const toggle = (id: string) =>
+    setPicked((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  const stopSelecting = () => {
+    setSelecting(false);
+    setPicked(new Set());
+  };
+  function remove(ids: string[]) {
+    const names = videos.filter((v) => ids.includes(v.id)).map((v) => v.title);
+    const what = ids.length === 1 ? `« ${names[0]} »` : `ces ${ids.length} vidéos`;
+    if (!confirm(`Supprimer définitivement ${what} ? Le client ne pourra plus la${ids.length > 1 ? "s" : ""} voir.`)) return;
+    deleteInBackground(ids, () => (ids.length === 1 ? deleteVideo(galleryId, ids[0]) : deleteVideos(galleryId, ids)), () => router.refresh());
+    stopSelecting();
+  }
   // Vidéos glissées depuis l'ordinateur n'importe où sur la page (pas pendant qu'une vidéo est ouverte).
   const [ignored, setIgnored] = useState(0);
   const over = useWindowFileDrop((dt) => {
@@ -60,9 +81,28 @@ export function VideosPanel({ galleryId, slug, watermark, videos }: { galleryId:
       <DropOverlay show={over} title="Déposez vos vidéos" hint="Elles sont préparées puis envoyées comme avec « Ajouter des vidéos »." />
       <div className="flex items-center justify-between gap-4 mb-6 lg:mb-8">
         <h2 className="display text-2xl sm:text-3xl">Vidéos</h2>
-        <button onClick={() => input.current?.click()} className="flex items-center gap-1.5 text-[13px] sm:text-sm text-accent hover:opacity-80">
-          <PlusCircleIcon /> Ajouter des vidéos
-        </button>
+        <div className="flex items-center gap-5">
+          {videos.length > 0 &&
+            (selecting ? (
+              <>
+                <button className="text-[13px] sm:text-sm text-muted hover:text-ink" onClick={stopSelecting}>Annuler</button>
+                <button
+                  className="flex items-center gap-1.5 text-[13px] sm:text-sm text-danger hover:opacity-80 disabled:opacity-40"
+                  disabled={picked.size === 0}
+                  onClick={() => remove([...picked])}
+                >
+                  <TrashIcon className="w-4 h-4" /> Supprimer{picked.size ? ` (${picked.size})` : ""}
+                </button>
+              </>
+            ) : (
+              <button className="text-[13px] sm:text-sm text-muted hover:text-ink" onClick={() => setSelecting(true)}>Sélectionner</button>
+            ))}
+          {!selecting && (
+            <button onClick={() => input.current?.click()} className="flex items-center gap-1.5 text-[13px] sm:text-sm text-accent hover:opacity-80">
+              <PlusCircleIcon /> Ajouter des vidéos
+            </button>
+          )}
+        </div>
         <input
           ref={input}
           type="file"
@@ -128,19 +168,36 @@ export function VideosPanel({ galleryId, slug, watermark, videos }: { galleryId:
       ) : (
         <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-5 gap-y-8">
           {videos.map((v) => (
-            <li key={v.id}>
-              <button onClick={() => setOpenId(v.id)} className="group block w-full text-left">
-                <div className="relative aspect-video bg-bg-soft overflow-hidden">
+            <li key={v.id} className="relative group">
+              <button onClick={() => (selecting ? toggle(v.id) : setOpenId(v.id))} className="block w-full text-left">
+                <div className={`relative aspect-video bg-bg-soft overflow-hidden ${selecting && picked.has(v.id) ? "ring-2 ring-accent ring-offset-2 ring-offset-bg" : ""}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={v.poster} alt="" loading="lazy" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.03]" />
                   <span className="absolute bottom-2 right-2 bg-black/70 text-white text-[11px] tabular-nums px-1.5 py-0.5">{formatTime(v.duration)}</span>
                   {!v.downloadsEnabled && <span className="absolute top-2 left-2 bg-black/70 text-white text-[10px] uppercase tracking-wider px-1.5 py-0.5">Téléchargement bloqué</span>}
+                  {selecting && (
+                    <span
+                      className={`absolute top-2 right-2 w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs ${picked.has(v.id) ? "bg-accent border-accent text-white" : "border-white bg-black/30"}`}
+                    >
+                      {picked.has(v.id) ? "✓" : ""}
+                    </span>
+                  )}
                 </div>
                 <p className="text-[15px] mt-3 truncate">{v.title}</p>
                 <p className="text-xs text-muted mt-1">
                   {v.views} lecture{v.views > 1 ? "s" : ""} · {v.comments.length} commentaire{v.comments.length > 1 ? "s" : ""} · ↓ {v.downloadCount}
                 </p>
               </button>
+              {!selecting && (
+                <button
+                  onClick={() => remove([v.id])}
+                  className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center bg-black/60 text-white hover:bg-danger transition-opacity lg:opacity-0 lg:group-hover:opacity-100 focus:opacity-100"
+                  title="Supprimer la vidéo"
+                  aria-label={`Supprimer ${v.title}`}
+                >
+                  <TrashIcon className="w-4 h-4" />
+                </button>
+              )}
             </li>
           ))}
         </ul>

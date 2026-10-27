@@ -15,7 +15,7 @@ Vidéos, Coordonnées, Outils → Clients & e-mails, Déconnexion) ; sur mobile 
   Photo unique / Vidéo unique, tableau E-mail · Fichier · Résolution · Date, toujours une ligne par personne avec détail
   au clic, tri récent/ancien, export CSV).
 - Vidéos : `app/admin/(protected)/videos/` — projets vidéo = galeries avec `kind = 'video'`
-  (onglets Vidéos / Design / Paramètres). `videos-panel.tsx` : envoi (aussi par glisser-déposer n'importe où sur la page, comme les photos : `file-drop.tsx`, `useWindowFileDrop` + voile `DropOverlay`), fiche vidéo (lien direct,
+  (onglets Vidéos / Design / Paramètres). `videos-panel.tsx` : envoi (aussi par glisser-déposer n'importe où sur la page, comme les photos : `file-drop.tsx`, `useWindowFileDrop` + voile `DropOverlay`), suppression depuis la liste (corbeille par vidéo, mode « Sélectionner » → `deleteVideos`), fiche vidéo (lien direct,
   téléchargement autorisé ou non, commentaires, activité ; liste « Téléchargements » = `video_events` kind download
   avec `email` si connu ; l'option « Demander l'e-mail » s'applique aussi aux vidéos, `video-page.tsx` réutilise `EmailDialog`).
 - Clients & e-mails : `app/admin/(protected)/clients/` — adresses issues des favoris et
