@@ -5,9 +5,8 @@ import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from "@d
 import { CSS } from "@dnd-kit/utilities";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { setCover } from "@/app/admin/actions";
 import type { Collection, PhotoView } from "@/lib/types";
-import { CloseIcon, DotsIcon, GridIcon, HeartIcon, PlusCircleIcon, SortIcon } from "@/components/icons";
+import { CloseIcon, DotsIcon, GridIcon, HeartIcon, PlusCircleIcon, SortIcon, TrashIcon } from "@/components/icons";
 import { UploadPanel } from "./upload-panel";
 import { deleteInBackground } from "./background";
 import { AdminViewer } from "./admin-viewer";
@@ -37,8 +36,7 @@ export function PhotosPanel(props: Props) {
   const [actions, setActions] = useState(false);
   const [viewer, setViewer] = useState<number | null>(null);
   const dragging = useRef(false); // évite d'ouvrir la visionneuse à la fin d'un glisser-déposer
-  const [coverId, setCoverId] = useState(props.coverPhotoId);
-  useEffect(() => setCoverId(props.coverPhotoId), [props.coverPhotoId]);
+  const coverId = props.coverPhotoId;
 
   useEffect(() => setPositions(props.positions), [props.positions]);
   useEffect(() => {
@@ -174,7 +172,6 @@ export function PhotosPanel(props: Props) {
                   onOpen={() => !dragging.current && setViewer(order.findIndex((o) => o.id === p.id))}
                   favorites={props.favoriteCounts[p.id] ?? 0}
                   downloads={props.downloadCounts[p.id] ?? 0}
-                  onCover={() => run(() => setCover(props.galleryId, p.id))}
                   onDelete={() => {
                     if (confirm(`Supprimer ${p.filename} ?`)) {
                       deleteInBackground([p.id], () => post("/api/admin/photos/delete", { photoIds: [p.id] }), () => router.refresh());
@@ -196,11 +193,6 @@ export function PhotosPanel(props: Props) {
           coverId={coverId}
           favoriteCounts={props.favoriteCounts}
           downloadCounts={props.downloadCounts}
-          onCover={async (p) => {
-            await setCover(props.galleryId, p.id);
-            setCoverId(p.id);
-            router.refresh();
-          }}
           onDelete={async (p) => {
             // La photo disparaît tout de suite ; suppression des fichiers en arrière-plan.
             deleteInBackground([p.id], () => post("/api/admin/photos/delete", { photoIds: [p.id] }), () => router.refresh());
@@ -221,7 +213,6 @@ function SortablePhoto({
   onOpen,
   favorites,
   downloads,
-  onCover,
   onDelete,
 }: {
   photo: PhotoView;
@@ -229,7 +220,6 @@ function SortablePhoto({
   onOpen: () => void;
   favorites: number;
   downloads: number;
-  onCover: () => void;
   onDelete: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: photo.id });
@@ -244,7 +234,12 @@ function SortablePhoto({
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={photo.thumb} alt={photo.filename} loading="lazy" draggable={false} className="w-full h-full object-cover lg:object-contain lg:p-[7%]" />
-      {isCover && <span className="absolute top-1.5 left-1.5 bg-black/60 text-white text-[10px] tracking-widest uppercase px-1.5 py-0.5">Couverture</span>}
+      {isCover && (
+        <span className="absolute top-1.5 left-1.5 bg-black/60 text-white text-[10px] tracking-widest uppercase px-1.5 py-0.5" title="Photo de couverture">
+          <span className="sm:hidden">★</span>
+          <span className="hidden sm:inline">Couverture</span>
+        </span>
+      )}
       {(favorites > 0 || downloads > 0) && (
         <span className="absolute bottom-1.5 left-1.5 flex items-center gap-2 text-white text-[11px] drop-shadow">
           {favorites > 0 && (
@@ -255,16 +250,18 @@ function SortablePhoto({
           {downloads > 0 && <span>↓ {downloads}</span>}
         </span>
       )}
-      <div className="absolute inset-x-0 top-0 flex justify-end gap-1 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-        {!isCover && (
-          <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onCover(); }} className="bg-black/60 text-white text-[10px] px-1.5 py-1 uppercase tracking-wider" title="Utiliser comme couverture">
-            Couv.
-          </button>
-        )}
-        <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onDelete(); }} className="bg-black/60 text-white text-[10px] px-1.5 py-1" title="Supprimer">
-          ✕
-        </button>
-      </div>
+      <button
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete();
+        }}
+        className="absolute top-1 right-1 w-7 h-7 flex items-center justify-center bg-black/55 text-white hover:bg-danger transition-opacity lg:opacity-0 lg:group-hover:opacity-100 focus:opacity-100"
+        title="Supprimer la photo"
+        aria-label={`Supprimer ${photo.filename}`}
+      >
+        <TrashIcon className="w-3.5 h-3.5" />
+      </button>
       <p className="absolute inset-x-0 bottom-0 px-1.5 py-1 text-[10px] text-white bg-gradient-to-t from-black/60 to-transparent truncate opacity-0 group-hover:opacity-100 transition-opacity text-right">
         {photo.filename}
       </p>

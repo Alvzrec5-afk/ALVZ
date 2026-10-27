@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PhotoView } from "@/lib/types";
-import { ChevronLeft, ChevronRight, CloseIcon, HeartIcon } from "@/components/icons";
+import { ChevronLeft, ChevronRight, CloseIcon, HeartIcon, TrashIcon } from "@/components/icons";
 
-/** Visionneuse du studio : voir une photo en grand, la supprimer ou en faire la couverture. */
+/** Visionneuse du studio : voir une photo en grand, la supprimer (petite poubelle en haut). La couverture se choisit dans Design → Couverture. */
 export function AdminViewer({
   photos,
   index,
@@ -14,7 +14,6 @@ export function AdminViewer({
   favoriteCounts,
   downloadCounts,
   onDelete,
-  onCover,
 }: {
   photos: PhotoView[];
   index: number;
@@ -24,7 +23,6 @@ export function AdminViewer({
   favoriteCounts: Record<string, number>;
   downloadCounts: Record<string, number>;
   onDelete: (photo: PhotoView) => Promise<void>;
-  onCover: (photo: PhotoView) => Promise<void>;
 }) {
   const photo = photos[index];
   const [loaded, setLoaded] = useState(false);
@@ -102,6 +100,17 @@ export function AdminViewer({
             {dls > 0 && <span>· ↓ {dls} téléchargement{dls > 1 ? "s" : ""}</span>}
           </p>
         </div>
+        <button
+          className="icon-btn hover:text-danger"
+          disabled={busy}
+          title="Supprimer la photo"
+          aria-label="Supprimer la photo"
+          onClick={() => {
+            if (confirm(`Supprimer définitivement ${photo.filename} ?`)) act(() => onDelete(photo));
+          }}
+        >
+          <TrashIcon />
+        </button>
         <button className="icon-btn" onClick={onClose} aria-label="Fermer">
           <CloseIcon />
         </button>
@@ -129,20 +138,7 @@ export function AdminViewer({
         )}
       </div>
 
-      <div className="flex gap-3 px-4 pt-3 pb-[max(env(safe-area-inset-bottom),1rem)] border-t border-line">
-        <button className="btn btn-ghost flex-1 min-w-0 px-2" disabled={busy || isCover} onClick={() => act(() => onCover(photo))}>
-          {isCover ? "Couverture ✓" : "Couverture"}
-        </button>
-        <button
-          className="btn btn-danger flex-1 min-w-0 px-2"
-          disabled={busy}
-          onClick={() => {
-            if (confirm(`Supprimer définitivement ${photo.filename} ?`)) act(() => onDelete(photo));
-          }}
-        >
-          {busy ? "…" : "Supprimer"}
-        </button>
-      </div>
+      <div className="pb-[env(safe-area-inset-bottom)]" />
     </div>
   );
 }
