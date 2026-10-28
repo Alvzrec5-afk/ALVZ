@@ -3,6 +3,7 @@ import { formatCents, formatDay, quoteBadge, quoteState, todayParis } from "@/li
 import { loadExpenses, loadQuotes } from "@/lib/finance-data";
 import { HoverLink } from "@/components/admin/hover-link";
 import { MonthChart } from "@/components/admin/finance/month-chart";
+import { InvestmentOverview } from "@/components/admin/finance/investment-overview";
 import { NewQuoteButton, QuoteBadge } from "@/components/admin/finance/finance-parts";
 
 export const dynamic = "force-dynamic";
@@ -93,6 +94,8 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
           tone={overdue.length > 0 ? "danger" : undefined}
         />
       </div>
+
+      <InvestmentOverview expenses={expenses} payments={payments} toCollect={toCollect} />
 
       <section>
         <h2 className="eyebrow text-muted mb-6">Mois par mois</h2>
