@@ -214,7 +214,7 @@ export async function deletePayment(quoteId: string, paymentId: string): Promise
   return {};
 }
 
-export async function addExpense(input: { label: string; category: string; amount_cents: number; spent_on: string; note: string }): Promise<Result> {
+export async function addExpense(input: { label: string; category: string; amount_cents: number; spent_on: string; note: string; is_resale?: boolean }): Promise<Result> {
   const { supabase } = await requireAdminApi();
   const amount = Math.round(Number(input.amount_cents));
   const label = text(input.label, 200);
@@ -226,6 +226,7 @@ export async function addExpense(input: { label: string; category: string; amoun
     amount_cents: amount,
     spent_on: day(input.spent_on) ?? todayParis(),
     note: text(input.note, 300),
+    is_resale: Boolean(input.is_resale),
   });
   if (error) return { error: error.message };
   refresh();

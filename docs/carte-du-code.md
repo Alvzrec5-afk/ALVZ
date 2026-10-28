@@ -285,7 +285,7 @@ encaissé de l'année / du mois, résultat, reste à encaisser, graphique `month
 tableau des chiffres, liste « À relancer » : retard, acompte non reçu, envoyé sans réponse depuis 7 jours), Devis
 (`devis/page.tsx` + `quotes-list.tsx`, fiche `devis/[id]` = `quote-editor.tsx` : état, client, lignes, TVA (si réglages
 « Je facture la TVA »), acompte %, dates, galerie liée + blocage, conditions, n° de facture externe, paiements reçus,
-e-mail Gmail « Envoyer le devis » / « Relance de paiement » avec `{lien}`), Dépenses (`expenses-manager.tsx`),
+e-mail Gmail « Envoyer le devis » / « Relance de paiement » avec `{lien}`), Dépenses (`expenses-manager.tsx`, Achat / Revente : `expenses.is_resale`, montant positif en base rendu négatif par `loadExpenses` pour être déduit de tous les totaux),
 Réglages (`finance-settings-form.tsx` → `studio_settings.finance` : nom, SIRET, adresse, TVA, IBAN, acompte, validité, conditions).
 Calculs partagés : `lib/finance.ts` (centimes, `quoteTotals`, `quoteState`, `quoteBadge`) ; lectures : `lib/finance-data.ts` ;
 actions : `app/admin/finance-actions.ts` (numéro suivant `D-AAAA-NNN`, paiement sur devis « envoyé » ⇒ « accepté »).

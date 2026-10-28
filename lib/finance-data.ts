@@ -23,9 +23,10 @@ export async function loadQuotes(supabase: SupabaseClient) {
 }
 
 export async function loadExpenses(supabase: SupabaseClient) {
-  const { data, error } = await supabase.from("expenses").select("id, label, category, amount_cents, spent_on, note").order("spent_on", { ascending: false }).limit(2000);
+  const { data, error } = await supabase.from("expenses").select("id, label, category, amount_cents, spent_on, note, is_resale").order("spent_on", { ascending: false }).limit(2000);
   if (error) throw new Error(error.message);
-  return ((data ?? []) as Expense[]).map((e) => ({ ...e, amount_cents: Number(e.amount_cents) }));
+  // Une revente est enregistrée en positif ; ici elle devient négative pour être déduite de tous les totaux.
+  return ((data ?? []) as Expense[]).map((e) => ({ ...e, is_resale: Boolean(e.is_resale), amount_cents: Number(e.amount_cents) * (e.is_resale ? -1 : 1) }));
 }
 
 /** Galeries et projets vidéo qu'on peut relier à un devis. */

@@ -68,7 +68,8 @@ export type Quote = {
 };
 
 export type Payment = { id: string; quote_id: string; amount_cents: number; paid_on: string; method: PaymentMethod; note: string; created_at?: string };
-export type Expense = { id: string; label: string; category: string; amount_cents: number; spent_on: string; note: string };
+/** `amount_cents` est négatif pour une revente de matériel (argent récupéré, déduit des dépenses). */
+export type Expense = { id: string; label: string; category: string; amount_cents: number; spent_on: string; note: string; is_resale: boolean };
 
 /** Infos légales et habitudes de facturation (Finances → Réglages), gardées dans studio_settings.finance. */
 export type FinanceSettings = {

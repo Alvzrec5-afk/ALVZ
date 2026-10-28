@@ -477,7 +477,7 @@ alter table public.galleries add column if not exists payment_locked boolean not
 -- deposit_pct, status draft|sent|accepted|refused|cancelled, issued_on, valid_until, due_on, lock_gallery, invoice_ref,
 -- notes, share_slug (page publique /d/<lien>), sent_at, accepted_at, accepted_name, last_reminder_at, deleted_at),
 -- public.quote_payments (quote_id, amount_cents, paid_on, method virement|especes|carte|cheque|autre, note),
--- public.expenses (label, category, amount_cents, spent_on, note). RLS admin + grant à authenticated, service_role.
+-- public.expenses (label, category, amount_cents, spent_on, note, is_resale : revente de matériel, montant positif déduit des dépenses — migration expenses_resale). RLS admin + grant à authenticated, service_role.
 alter table public.quotes add column if not exists payment_link text not null default ''; -- migration « quotes_payment_link »
 alter table public.quotes add column if not exists pay_clicked_at timestamptz; -- migration « quotes_pay_clicked »
 -- Catalogue d'articles : table public.catalog_items (migration « catalog_items », RLS admin + grant authenticated/service_role).
