@@ -179,7 +179,9 @@ export function ClientGallery(props: Props) {
   return (
     <div
       data-theme={themeAttr(design)}
-      className={`fs-${design.font_style} min-h-svh bg-bg text-ink`}
+      // overflow-x: clip : rien ne doit élargir la page au-delà de l'écran (sinon Safari dézoome toute la galerie) ;
+      // « clip » et non « hidden », qui casserait l'en-tête collant.
+      className={`fs-${design.font_style} min-h-svh bg-bg text-ink overflow-x-clip`}
       style={{ touchAction: open === null ? "pan-x pan-y" : "auto" }}
       onContextMenu={props.watermark ? (e) => (e.target as HTMLElement).tagName === "IMG" && e.preventDefault() : undefined}
     >
@@ -252,7 +254,8 @@ export function ClientGallery(props: Props) {
                 aria-label="Trouver mes photos"
               >
                 <FaceScanIcon className="w-[22px] h-[22px]" />
-                <span className={`eyebrow text-[10px] ml-1 ${design.nav_style === "labels" ? "" : "hidden lg:inline"}`}>Trouver mes photos</span>
+                {/* Au téléphone : icônes seules (sauf « Contacter ») ; avec le texte, la rangée dépasserait l'écran. */}
+                <span className={`eyebrow text-[10px] ml-1 ${design.nav_style === "labels" ? "hidden sm:inline" : "hidden lg:inline"}`}>Trouver mes photos</span>
               </button>
             )}
             {props.favoritesEnabled && (
@@ -269,7 +272,7 @@ export function ClientGallery(props: Props) {
                     </span>
                   )}
                 </span>
-                <span className={`eyebrow text-[10px] ml-1 ${design.nav_style === "labels" ? "" : "hidden lg:inline"}`}>Sélection</span>
+                <span className={`eyebrow text-[10px] ml-1 ${design.nav_style === "labels" ? "hidden sm:inline" : "hidden lg:inline"}`}>Sélection</span>
               </button>
             )}
             {(zipAllowed || props.favoritesEnabled) && (
@@ -288,7 +291,7 @@ export function ClientGallery(props: Props) {
                   ) : (
                     <DotsVertical />
                   )}
-                  <span className={`eyebrow text-[10px] ${design.nav_style === "labels" ? "" : "hidden lg:inline"}`}>{zipAllowed ? "Télécharger" : "Menu"}</span>
+                  <span className={`eyebrow text-[10px] ${design.nav_style === "labels" ? "hidden sm:inline" : "hidden lg:inline"}`}>{zipAllowed ? "Télécharger" : "Menu"}</span>
                 </button>
                 {menu && (
                   <>
