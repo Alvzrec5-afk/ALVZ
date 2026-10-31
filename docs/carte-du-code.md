@@ -369,6 +369,9 @@ pré-signée, sinon la version web). Progression : rubrique des paramètres (`Fa
 POST remplace les visages d'une photo et met `photos.faces_indexed_at`), table `photo_faces` (vecteur pgvector 128,
 cascade avec photo et galerie). Client : bouton « Trouver mes photos » (`FaceSearchDialog` dans `client-gallery.tsx`,
 accord obligatoire, selfie ou photo, `selfieDescriptor` ajoute une marge pour les selfies serrés), onglet « Mes photos » ;
-`/api/g/<lien>/faces` → `match_faces` (distance < 0,6, la plus proche d'abord). Le selfie n'est jamais envoyé.
+`/api/g/<lien>/faces` → `match_faces` (distance < 0,50 = `MAX_DISTANCE`, la plus proche d'abord ; 0,6 laissait passer
+des inconnus sur la galerie ZOEE le 31 oct.). Le selfie n'est jamais envoyé ; son empreinte = moyenne du selfie et de son miroir.
+Mode réglage : si `isStudioSession()`, la route cherche jusqu'à 0,75 et renvoie `distances` (15 plus proches) + `threshold`,
+affichés sous les résultats (« Studio · seuil … »), jamais aux clients.
 Tests (photos d'exemple face-api.js) : vraie personne 0,37–0,55, inconnus ≥ 0,69 ; têtes de 45–60 px trouvées
 dans une image 6000 × 4000.

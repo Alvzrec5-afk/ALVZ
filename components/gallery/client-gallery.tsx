@@ -107,6 +107,8 @@ export function ClientGallery(props: Props) {
 
   // Photos trouvées par le selfie, de la plus ressemblante à la moins ressemblante.
   const [faceMatches, setFaceMatches] = useState<string[] | null>(null);
+  // Mode réglage (studio connecté seulement) : distance de chaque photo trouvée.
+  const [faceDebug, setFaceDebug] = useState<{ distances: number[]; threshold: number } | null>(null);
   const [faceOpen, setFaceOpen] = useState(false);
   const visible = useMemo(() => {
     if (tab === FACES_TAB) {
@@ -347,6 +349,12 @@ export function ClientGallery(props: Props) {
             <button className="text-xs underline underline-offset-4 mt-3 hover:opacity-70" onClick={() => setFaceOpen(true)}>
               Nouvelle recherche
             </button>
+            {faceDebug && (
+              <p className="text-[11px] text-muted mt-3 font-mono">
+                Studio · seuil {faceDebug.threshold} · photos les plus proches :{" "}
+                {faceDebug.distances.length ? faceDebug.distances.map((d) => d.toFixed(2)).join(" ") : "aucune sous 0,75"}
+              </p>
+            )}
           </div>
         )}
         {tab === VIDEOS_TAB ? (
@@ -430,8 +438,9 @@ export function ClientGallery(props: Props) {
         <FaceSearchDialog
           slug={props.slug}
           onCancel={() => setFaceOpen(false)}
-          onDone={(ids) => {
+          onDone={(ids, debug) => {
             setFaceMatches(ids);
+            setFaceDebug(debug ?? null);
             setFaceOpen(false);
             selectTab(FACES_TAB);
           }}
@@ -764,7 +773,15 @@ function FaceScanIcon({ className = "w-5 h-5" }: { className?: string }) {
  * « Trouver mes photos » : le client accepte, prend un selfie (ou choisit une photo) ; l'empreinte du visage
  * est calculée sur son téléphone et seule elle part au site. Le selfie n'est ni envoyé ni enregistré.
  */
-function FaceSearchDialog({ slug, onCancel, onDone }: { slug: string; onCancel: () => void; onDone: (photoIds: string[]) => void }) {
+function FaceSearchDialog({
+  slug,
+  onCancel,
+  onDone,
+}: {
+  slug: string;
+  onCancel: () => void;
+  onDone: (photoIds: string[], debug?: { distances: number[]; threshold: number }) => void;
+}) {
   const [consent, setConsent] = useState(false);
   const [step, setStep] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -789,7 +806,7 @@ function FaceSearchDialog({ slug, onCancel, onDone }: { slug: string; onCancel: 
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || "Recherche impossible");
-      onDone(json.photoIds ?? []);
+      onDone(json.photoIds ?? [], json.distances ? { distances: json.distances, threshold: json.threshold } : undefined);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setStep(null);

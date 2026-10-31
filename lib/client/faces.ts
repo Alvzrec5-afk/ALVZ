@@ -156,8 +156,18 @@ export async function selfieDescriptor(file: File): Promise<number[] | null> {
   g.fillRect(0, 0, c.width, c.height);
   g.drawImage(bitmap, pad, pad, w, h);
   bitmap.close();
-  const all = await faceapi.detectAllFaces(c, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 })).withFaceLandmarks().withFaceDescriptors();
-  if (!all.length) return null;
-  const main = all.reduce((a, b) => (b.detection.box.area > a.detection.box.area ? b : a));
-  return Array.from(main.descriptor, (n) => Math.round(n * 1e5) / 1e5);
+  const largest = async (input: HTMLCanvasElement) => {
+    const all = await faceapi.detectAllFaces(input, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 })).withFaceLandmarks().withFaceDescriptors();
+    return all.length ? all.reduce((a, b) => (b.detection.box.area > a.detection.box.area ? b : a)).descriptor : null;
+  };
+  const main = await largest(c);
+  if (!main) return null;
+  // Même selfie en miroir : la moyenne des deux empreintes est plus stable (moins de fausses ressemblances).
+  const mirror = canvasOf(c.width, c.height);
+  const mg = mirror.getContext("2d")!;
+  mg.translate(c.width, 0);
+  mg.scale(-1, 1);
+  mg.drawImage(c, 0, 0);
+  const flipped = await largest(mirror);
+  return Array.from(main, (n, i) => Math.round(((flipped ? (n + flipped[i]) / 2 : n)) * 1e5) / 1e5);
 }
