@@ -83,8 +83,10 @@ Détail complet (fichiers, tables, choix techniques) : **`docs/carte-du-code.md`
   face-api, visage redressé 112 px, empreinte 512, original 4000 px + morceaux de 900 px pour les petites têtes) et
   `lib/client/face-indexer.ts` → `/api/admin/faces` → table `face_embeddings` (`photos.faces_model = 'arcface-b0'` ; une
   photo d'un autre moteur est à ré-analyser). Client : « Trouver mes photos » → `/api/g/<lien>/faces` → `match_faces_arcface`
-  (distance cosinus < **0,60** ; banc d'essai : même personne ≤ 0,54, inconnus ≥ 0,72). Studio connecté : distances des
-  15 photos les plus proches sous les résultats (mode réglage). Ancienne table `photo_faces` inutilisée.
+  (distance cosinus < **0,60** ; banc d'essai : même personne ≤ 0,54, inconnus ≥ 0,72 ; essai réel ZOEE avec un visage
+  absent : plus proches 0,78–0,83 → aucune photo fausse). Mode réglage (distances affichées) retiré à la demande du
+  propriétaire : rien de technique dans la vue client. Pas de bouton de langue : seule la langue du téléphone compte.
+  Ancienne table `photo_faces` inutilisée.
 - **Langue des pages clients** (31 oct.) : galerie, vidéo, mot de passe, galerie expirée suivent la langue de l'appareil
   (`lib/i18n.ts` : `pickLang(Accept-Language)` → fr / en / pt comme alvzrec.com, créole cap-verdien → pt, autre → en ;
   dictionnaire `fr`/`en`/`pt`, `translator`, `longDate`). Contexte `components/gallery/lang.tsx` (`LangProvider`, `useT`) ;
@@ -175,10 +177,8 @@ Publié le 24 oct. : **calendriers importés** (iPhone iCloud / Google, lien iCa
   Ctrl + clic sur Mac ; envoi d'un clip (H.264/4K) ; e-mail de test Gmail ; images « disparues » des tableaux
   revenues (réparation automatique `objectSize`).
 - **À vérifier en vrai par le propriétaire** : recherche par selfie (31 oct.) sur une vraie galerie : vitesse de l'analyse sur
-  son Mac, justesse du moteur ArcFace (ZOEE à ré-analyser une fois : Paramètres → Recherche par visage → Analyser ; puis
-  ligne « Studio · seuil … » sous les résultats : son propre visage absent → aucune photo ; une personne présente → ses
-  photos). Table `face_embeddings` + `match_faces_arcface` déjà en base US. Lien jsDelivr `gh/vladmandic/insightface@c972aaf…`
-  non vérifiable depuis le conteneur (bloqué) : à confirmer au premier essai.
+  son Mac ; ArcFace confirmé le 31 oct. pour un visage absent (aucune photo) et lien jsDelivr OK (analyse faite) ; reste à
+  essayer avec une personne présente dans la galerie (ses photos doivent sortir).
 - E-mails qui partent en spam : conseils donnés. Proposé, non fait : test vers n'importe quelle adresse
   (mail-tester.com), envois étalés dans le temps ; plus tard, adresse à son domaine (Brevo / Google Workspace +
   SPF/DKIM/DMARC).

@@ -120,8 +120,6 @@ function GalleryView(props: Props) {
 
   // Photos trouvées par le selfie, de la plus ressemblante à la moins ressemblante.
   const [faceMatches, setFaceMatches] = useState<string[] | null>(null);
-  // Mode réglage (studio connecté seulement) : distance de chaque photo trouvée.
-  const [faceDebug, setFaceDebug] = useState<{ distances: number[]; threshold: number } | null>(null);
   const [faceOpen, setFaceOpen] = useState(false);
   const visible = useMemo(() => {
     if (tab === FACES_TAB) {
@@ -359,12 +357,6 @@ function GalleryView(props: Props) {
             <button className="text-xs underline underline-offset-4 mt-3 hover:opacity-70" onClick={() => setFaceOpen(true)}>
               {t("newSearch")}
             </button>
-            {faceDebug && (
-              <p className="text-[11px] text-muted mt-3 font-mono">
-                Studio · seuil {faceDebug.threshold} · photos les plus proches :{" "}
-                {faceDebug.distances.length ? faceDebug.distances.map((d) => d.toFixed(2)).join(" ") : "aucune sous 0,85"}
-              </p>
-            )}
           </div>
         )}
         {tab === VIDEOS_TAB ? (
@@ -448,9 +440,8 @@ function GalleryView(props: Props) {
         <FaceSearchDialog
           slug={props.slug}
           onCancel={() => setFaceOpen(false)}
-          onDone={(ids, debug) => {
+          onDone={(ids) => {
             setFaceMatches(ids);
-            setFaceDebug(debug ?? null);
             setFaceOpen(false);
             selectTab(FACES_TAB);
           }}
@@ -790,7 +781,7 @@ function FaceSearchDialog({
 }: {
   slug: string;
   onCancel: () => void;
-  onDone: (photoIds: string[], debug?: { distances: number[]; threshold: number }) => void;
+  onDone: (photoIds: string[]) => void;
 }) {
   const [consent, setConsent] = useState(false);
   const t = useT();
@@ -817,7 +808,7 @@ function FaceSearchDialog({
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || t("faceFailed"));
-      onDone(json.photoIds ?? [], json.distances ? { distances: json.distances, threshold: json.threshold } : undefined);
+      onDone(json.photoIds ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setStep(null);

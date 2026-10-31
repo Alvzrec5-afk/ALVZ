@@ -399,3 +399,6 @@ l'événement par `longDate(iso, lang)`. `ClientGallery` / `VideoPage` enveloppe
 `<html lang>`) ; `useT()` dans `Cover`, `EmailDialog`, `FaceSearchDialog`, `Lightbox`, `PhotoGrid`, `ContactCard`,
 `VideoPlayer`, `VideoComments` (français par défaut hors fournisseur, ex. lecteur du studio). `downloadArchive(…, t)`.
 Message serveur « Mot de passe incorrect. » traduit à l'affichage dans `LockScreen`. Portugais d'Europe (Cap-Vert).
+
+**31 oct. (suite)** — mode réglage retiré : la route `/api/g/<lien>/faces` ne renvoie plus que `photoIds` (plus de
+`distances` / `isStudioSession`), et la ligne « Studio · seuil … » n'existe plus dans `client-gallery.tsx`.
