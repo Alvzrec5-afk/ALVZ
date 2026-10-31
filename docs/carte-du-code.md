@@ -387,3 +387,8 @@ InsightFace EfficientNet-B0 0,23 (choisi), GhostNet 0,20, MobileNet-swish 0,20. 
 photos à analyser = `faces_model` absent ou différent ; le POST efface aussi les vieilles lignes `photo_faces`.
 Route client : seuil 0,60 (mode réglage studio jusqu'à 0,85). Test bout en bout (vrai code) : même personne 0,21–0,54,
 inconnus ≥ 0,87 ; têtes de 70–90 px dans une image 6000 × 4000 reconnues (0,32).
+
+**En-tête de la galerie client (31 oct.)** — icônes seules (contacter, sélection, télécharger / menu), sur téléphone comme sur
+ordinateur, quel que soit le style d'en-tête du Design ; recherche par selfie = grand bouton « Trouver mes photos » sous
+l'en-tête (« Mes photos (n) » après une recherche). Page en `overflow-x: clip` : la rangée de boutons débordait au téléphone
+et Safari dézoomait toute la galerie.

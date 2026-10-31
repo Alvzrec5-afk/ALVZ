@@ -236,26 +236,15 @@ export function ClientGallery(props: Props) {
               )}
             </nav>
           )}
-          <div className="flex items-center -mr-2 pb-3 md:pb-0 md:order-3">
+          <div className="flex items-center -mr-2 pb-3 md:pb-0 md:order-3 ml-auto">
             {canContact && (
               <button
                 onClick={() => setContactOpen(true)}
-                className="flex items-center gap-1 h-8 px-2 mr-0.5 border border-line hover:border-ink text-ink/90 transition-colors"
+                className="flex items-center h-10 px-2 text-ink/80 hover:text-ink transition-colors"
                 aria-label="Contacter"
+                title="Contacter"
               >
-                <ChatIcon />
-                <span className="text-[10px] uppercase tracking-[0.1em]">Contacter</span>
-              </button>
-            )}
-            {props.faceSearch && (
-              <button
-                onClick={() => (faceMatches && tab !== FACES_TAB ? selectTab(FACES_TAB) : setFaceOpen(true))}
-                className={`flex items-center gap-1.5 h-10 px-2 transition-colors ${tab === FACES_TAB ? "text-ink" : "text-ink/80 hover:text-ink"}`}
-                aria-label="Trouver mes photos"
-              >
-                <FaceScanIcon className="w-[22px] h-[22px]" />
-                {/* Au téléphone : icônes seules (sauf « Contacter ») ; avec le texte, la rangée dépasserait l'écran. */}
-                <span className={`eyebrow text-[10px] ml-1 ${design.nav_style === "labels" ? "hidden sm:inline" : "hidden lg:inline"}`}>Trouver mes photos</span>
+                <ChatIcon className="w-[21px] h-[21px]" />
               </button>
             )}
             {props.favoritesEnabled && (
@@ -263,6 +252,7 @@ export function ClientGallery(props: Props) {
                 onClick={() => selectTab(tab === FAVORITES_TAB ? props.collections[0]?.id ?? "" : FAVORITES_TAB)}
                 className={`relative flex items-center gap-1.5 h-10 px-2 transition-colors ${tab === FAVORITES_TAB ? "text-heart" : "text-ink/80 hover:text-ink"}`}
                 aria-label="Ma sélection"
+                title="Ma sélection"
               >
                 <span className="relative">
                   <HeartIcon className="w-[22px] h-[22px]" filled={tab === FAVORITES_TAB} />
@@ -272,7 +262,6 @@ export function ClientGallery(props: Props) {
                     </span>
                   )}
                 </span>
-                <span className={`eyebrow text-[10px] ml-1 ${design.nav_style === "labels" ? "hidden sm:inline" : "hidden lg:inline"}`}>Sélection</span>
               </button>
             )}
             {(zipAllowed || props.favoritesEnabled) && (
@@ -280,18 +269,12 @@ export function ClientGallery(props: Props) {
                 <button
                   className="flex items-center gap-1.5 h-10 px-2 text-ink/80 hover:text-ink transition-colors"
                   onClick={() => setMenu((m) => !m)}
-                  aria-label="Menu"
+                  aria-label={zipAllowed ? "Télécharger" : "Menu"}
+                  title={zipAllowed ? "Télécharger" : "Menu"}
                   disabled={zip !== null}
                 >
-                  {zipAllowed ? (
-                    <>
-                      <span className={design.nav_style === "labels" ? "" : "lg:hidden"}>{design.nav_style === "labels" ? <DownloadIcon className="w-5 h-5" /> : <DotsVertical />}</span>
-                      {design.nav_style !== "labels" && <DownloadIcon className="w-5 h-5 hidden lg:block" />}
-                    </>
-                  ) : (
-                    <DotsVertical />
-                  )}
-                  <span className={`eyebrow text-[10px] ${design.nav_style === "labels" ? "hidden sm:inline" : "hidden lg:inline"}`}>{zipAllowed ? "Télécharger" : "Menu"}</span>
+                  {/* En-tête : icônes seules, sur téléphone comme sur ordinateur (demandé le 31 oct.). */}
+                  {zipAllowed ? <DownloadIcon className="w-5 h-5" /> : <DotsVertical />}
                 </button>
                 {menu && (
                   <>
@@ -333,6 +316,19 @@ export function ClientGallery(props: Props) {
       <main className="mx-auto max-w-[1700px] px-2 sm:px-8 lg:px-12 pt-2 sm:pt-8 lg:pt-10 pb-24 protect">
         {props.paymentPending && (
           <p className="text-center text-xs text-muted pt-4 pb-6">Le téléchargement sera disponible dès le règlement de la prestation.</p>
+        )}
+        {/* Recherche par selfie : grand bouton avec son texte, sous l'en-tête. */}
+        {props.faceSearch && tab !== FACES_TAB && tab !== VIDEOS_TAB && (
+          <div className="px-3 sm:px-0 pt-4 pb-6 sm:pt-0 sm:pb-8">
+            <button
+              onClick={() => (faceMatches ? selectTab(FACES_TAB) : setFaceOpen(true))}
+              className="w-full max-w-xl mx-auto flex items-center justify-center gap-3 h-14 border border-line hover:border-ink text-ink transition-colors"
+            >
+              <FaceScanIcon className="w-5 h-5" />
+              <span className="eyebrow text-[11px]">{faceMatches ? `Mes photos (${faceMatches.length})` : "Trouver mes photos"}</span>
+              <span className="text-[11px] text-muted hidden sm:inline">{faceMatches ? "" : "avec un selfie"}</span>
+            </button>
+          </div>
         )}
         {tab === FAVORITES_TAB && favorites.size > 0 && (
           <p className="text-center text-xs text-muted py-6">
@@ -754,9 +750,9 @@ function DotsVertical() {
   );
 }
 
-function ChatIcon() {
+function ChatIcon({ className = "w-4 h-4" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M4.5 18.5 5.7 15A7.5 7.5 0 1 1 9 18.3l-4.5.2Z" />
     </svg>
   );
