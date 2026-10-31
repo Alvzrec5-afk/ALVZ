@@ -9,13 +9,15 @@ import { Wordmark } from "@/components/wordmark";
 import { VideoPlayer, formatTime, type PlayerHandle } from "@/components/video/video-player";
 import { VideoComments } from "@/components/video/video-comments";
 import { VideoCards, type VideoCard } from "./video-cards";
+import { LangProvider, useT } from "./lang";
+import type { Lang } from "@/lib/i18n";
 import { EmailDialog } from "./client-gallery";
 
 function formatSize(n: number) {
   return n >= 1024 ** 3 ? `${(n / 1024 ** 3).toFixed(2).replace(".", ",")} Go` : `${Math.max(1, Math.round(n / 1024 ** 2))} Mo`;
 }
 
-export function VideoPage(props: {
+type VideoPageProps = {
   slug: string;
   galleryTitle: string;
   design: GalleryDesign;
@@ -28,7 +30,20 @@ export function VideoPage(props: {
   paymentPending?: boolean;
   /** Retour à la galerie (absent pour un projet vidéo d'un seul clip). */
   backHref: string | null;
-}) {
+  /** Langue de l'appareil du client (français par défaut). */
+  lang?: Lang;
+};
+
+export function VideoPage(props: VideoPageProps) {
+  return (
+    <LangProvider lang={props.lang ?? "fr"}>
+      <VideoView {...props} />
+    </LangProvider>
+  );
+}
+
+function VideoView(props: VideoPageProps) {
+  const t = useT();
   const { video, design, slug } = props;
   const player = useRef<PlayerHandle>(null);
   const [comments, setComments] = useState(props.comments);
@@ -74,7 +89,7 @@ export function VideoPage(props: {
   async function post(c: { time: number; author: string; body: string }) {
     const res = await fetch(`${api}/comments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(c) });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json.error ?? "Envoi impossible");
+    if (!res.ok) throw new Error(json.error ?? t("sendFailed"));
     setComments((list) => [...list, json as VideoComment]);
   }
 
@@ -116,7 +131,7 @@ export function VideoPage(props: {
               <div className="min-w-0">
                 <h1 className="gallery-title text-2xl sm:text-4xl break-words">{video.title}</h1>
                 <p className="eyebrow text-muted text-[10px] mt-2">ALVZ.REC · {formatTime(video.duration)}</p>
-                {props.paymentPending && <p className="text-xs text-muted mt-3">Le téléchargement sera disponible dès le règlement de la prestation.</p>}
+                {props.paymentPending && <p className="text-xs text-muted mt-3">{t("paymentPending")}</p>}
               </div>
               {video.downloads.length > 0 && (
                 <div className="relative shrink-0">
@@ -126,11 +141,11 @@ export function VideoPage(props: {
                       onClick={(e) => guard(e, `${api}/download?q=${video.downloads[0].quality}`)}
                       className="btn btn-ghost flex items-center gap-2"
                     >
-                      <DownloadIcon className="w-4 h-4" /> Télécharger
+                      <DownloadIcon className="w-4 h-4" /> {t("download")}
                     </a>
                   ) : (
                     <button className="btn btn-ghost flex items-center gap-2" onClick={() => setDownloadOpen((o) => !o)}>
-                      <DownloadIcon className="w-4 h-4" /> Télécharger
+                      <DownloadIcon className="w-4 h-4" /> {t("download")}
                     </button>
                   )}
                   {downloadOpen && (
@@ -154,7 +169,7 @@ export function VideoPage(props: {
 
             {props.others.length > 0 && (
               <section className="mt-12 hidden lg:block">
-                <h2 className="eyebrow text-muted mb-5">Autres vidéos</h2>
+                <h2 className="eyebrow text-muted mb-5">{t("otherVideos")}</h2>
                 <VideoCards slug={slug} videos={props.others} />
               </section>
             )}
@@ -180,7 +195,7 @@ export function VideoPage(props: {
 
           {props.others.length > 0 && (
             <section className="lg:hidden">
-              <h2 className="eyebrow text-muted mb-5">Autres vidéos</h2>
+              <h2 className="eyebrow text-muted mb-5">{t("otherVideos")}</h2>
               <VideoCards slug={slug} videos={props.others} />
             </section>
           )}

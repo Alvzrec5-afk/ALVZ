@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { formatLongDate } from "@/lib/dates";
 import type { Contact } from "@/lib/contact";
 import { readDesign, themeAttr } from "@/lib/design";
 import { findGalleryBySlug, getFavoriteListId, hasAccess, isExpired } from "@/lib/gallery-access";
@@ -10,6 +10,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import type { Collection, PhotoRow } from "@/lib/types";
 import { ClientGallery } from "@/components/gallery/client-gallery";
 import { ExpiredScreen, LockScreen } from "@/components/gallery/screens";
+import { longDate, pickLang } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -24,8 +25,10 @@ export default async function GalleryPage({ params }: { params: Promise<{ slug: 
   const gallery = await findGalleryBySlug(slug);
   if (!gallery) notFound();
   const design = readDesign(gallery);
-  if (isExpired(gallery)) return <ExpiredScreen theme={themeAttr(design)} />;
-  if (!(await hasAccess(gallery))) return <LockScreen slug={slug} title={gallery.title} theme={themeAttr(design)} fontStyle={design.font_style} />;
+  // Langue réglée sur l'appareil du client (français, anglais ou portugais).
+  const lang = pickLang((await headers()).get("accept-language"));
+  if (isExpired(gallery)) return <ExpiredScreen theme={themeAttr(design)} lang={lang} />;
+  if (!(await hasAccess(gallery))) return <LockScreen slug={slug} title={gallery.title} theme={themeAttr(design)} fontStyle={design.font_style} lang={lang} />;
 
   const db = createServiceClient();
   const listId = await getFavoriteListId(gallery);
@@ -59,7 +62,7 @@ export default async function GalleryPage({ params }: { params: Promise<{ slug: 
     <ClientGallery
       slug={slug}
       title={gallery.title}
-      date={formatLongDate(gallery.event_date)}
+      date={longDate(gallery.event_date, lang)}
       design={design}
       watermark={gallery.watermark}
       downloadsEnabled={gallery.downloads_enabled}
@@ -68,6 +71,7 @@ export default async function GalleryPage({ params }: { params: Promise<{ slug: 
       paymentPending={gallery.payment_locked}
       zipEnabled={gallery.zip_enabled !== false}
       faceSearch={gallery.face_search_enabled}
+      lang={lang}
       favoritesEnabled={gallery.favorites_enabled}
       cover={cover ? { src: cover.web, width: cover.width, height: cover.height } : videos[0] ? { src: videos[0].poster, width: 16, height: 9 } : null}
       coverAlt={views.find((p) => p.id !== cover?.id)?.web ?? null}

@@ -85,6 +85,10 @@ Détail complet (fichiers, tables, choix techniques) : **`docs/carte-du-code.md`
   photo d'un autre moteur est à ré-analyser). Client : « Trouver mes photos » → `/api/g/<lien>/faces` → `match_faces_arcface`
   (distance cosinus < **0,60** ; banc d'essai : même personne ≤ 0,54, inconnus ≥ 0,72). Studio connecté : distances des
   15 photos les plus proches sous les résultats (mode réglage). Ancienne table `photo_faces` inutilisée.
+- **Langue des pages clients** (31 oct.) : galerie, vidéo, mot de passe, galerie expirée suivent la langue de l'appareil
+  (`lib/i18n.ts` : `pickLang(Accept-Language)` → fr / en / pt comme alvzrec.com, créole cap-verdien → pt, autre → en ;
+  dictionnaire `fr`/`en`/`pt`, `translator`, `longDate`). Contexte `components/gallery/lang.tsx` (`LangProvider`, `useT`) ;
+  tout nouveau texte visible par un client doit passer par ce dictionnaire. Studio, tableaux partagés et devis restent en français.
 - **Médias** : photos préparées dans le navigateur (`lib/client/image.ts`), vidéos H.264 (`lib/client/video.ts`).
 - **Base** : schéma de référence `supabase/schema.sql` (à tenir à jour après chaque migration).
 

@@ -392,3 +392,10 @@ inconnus ≥ 0,87 ; têtes de 70–90 px dans une image 6000 × 4000 reconnues (
 ordinateur, quel que soit le style d'en-tête du Design ; recherche par selfie = grand bouton « Trouver mes photos » sous
 l'en-tête (« Mes photos (n) » après une recherche). Page en `overflow-x: clip` : la rangée de boutons débordait au téléphone
 et Safari dézoomait toute la galerie.
+
+**Langue des pages clients (31 oct.)** — `app/g/[slug]/page.tsx` et `…/v/[id]/page.tsx` lisent `accept-language`
+(`headers()`) → `pickLang` → `lang` passé à `ClientGallery`, `VideoPage`, `LockScreen`, `ExpiredScreen` ; date de
+l'événement par `longDate(iso, lang)`. `ClientGallery` / `VideoPage` enveloppent tout dans `LangProvider` (met aussi
+`<html lang>`) ; `useT()` dans `Cover`, `EmailDialog`, `FaceSearchDialog`, `Lightbox`, `PhotoGrid`, `ContactCard`,
+`VideoPlayer`, `VideoComments` (français par défaut hors fournisseur, ex. lecteur du studio). `downloadArchive(…, t)`.
+Message serveur « Mot de passe incorrect. » traduit à l'affichage dans `LockScreen`. Portugais d'Europe (Cap-Vert).

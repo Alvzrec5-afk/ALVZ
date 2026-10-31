@@ -11,6 +11,8 @@ import { ContactCard, ContactSheet } from "./contact-card";
 import { contactLinks } from "@/lib/contact";
 import type { Contact } from "@/lib/contact";
 import { downloadArchive } from "./zip";
+import { LangProvider, useT } from "./lang";
+import { translator, type Lang } from "@/lib/i18n";
 import { VideoCards, type VideoCard } from "./video-cards";
 
 type Props = {
@@ -30,6 +32,8 @@ type Props = {
   favoritesEnabled: boolean;
   /** Recherche par selfie (« Trouver mes photos »). */
   faceSearch?: boolean;
+  /** Langue de l'appareil du client (français par défaut). */
+  lang?: Lang;
   cover: { src: string; width: number; height: number } | null;
   /** Deuxième photo (mise en page Diptyque). */
   coverAlt: string | null;
@@ -45,6 +49,15 @@ const FACES_TAB = "__faces";
 const VIDEOS_TAB = "__videos";
 
 export function ClientGallery(props: Props) {
+  return (
+    <LangProvider lang={props.lang ?? "fr"}>
+      <GalleryView {...props} />
+    </LangProvider>
+  );
+}
+
+function GalleryView(props: Props) {
+  const t = translator(props.lang ?? "fr");
   const { design } = props;
   const [tab, setTab] = useState(props.collections[0]?.id ?? (props.videos.length ? VIDEOS_TAB : ""));
   const [favorites, setFavorites] = useState(() => new Set(props.favorites.photoIds));
@@ -165,7 +178,7 @@ export function ClientGallery(props: Props) {
     setMenu(false);
     if (needEmail && !emailGiven) return setAskDownload(() => () => startZip(collectionId, true));
     try {
-      await downloadArchive(props.slug, collectionId, (done, total) => setZip({ done, total }));
+      await downloadArchive(props.slug, collectionId, (done, total) => setZip({ done, total }), t);
     } catch (e) {
       alert(e instanceof Error ? e.message : String(e));
     } finally {
@@ -192,7 +205,7 @@ export function ClientGallery(props: Props) {
       {/* En-tête de la galerie : nom du client, signature, actions */}
       <header className="sticky top-0 z-30 bg-bg border-b border-line">
         <div className="mx-auto max-w-[1700px] px-5 sm:px-8 lg:px-12 pt-[max(env(safe-area-inset-top),0.9rem)] md:pt-0 flex flex-wrap md:flex-nowrap items-center gap-x-3 md:gap-x-8 md:h-20">
-          <button className="flex-1 md:flex-none min-w-0 md:max-w-[32%] text-left pb-3 md:pb-0" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Revenir à la couverture">
+          <button className="flex-1 md:flex-none min-w-0 md:max-w-[32%] text-left pb-3 md:pb-0" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label={t("backToCover")}>
             <p className="gallery-title text-xl sm:text-2xl truncate">{props.title}</p>
             <p className="eyebrow text-muted text-[9px] mt-1">ALVZ.REC{props.date ? ` · ${props.date}` : ""}</p>
           </button>
@@ -221,17 +234,17 @@ export function ClientGallery(props: Props) {
                   onClick={() => selectTab(VIDEOS_TAB)}
                   className={`eyebrow whitespace-nowrap py-3 transition-colors duration-300 ${tab === VIDEOS_TAB ? "text-ink" : "text-muted hover:text-ink"}`}
                 >
-                  Vidéos
+                  {t("videos")}
                 </button>
               )}
               {tab === FACES_TAB && (
                 <button data-tab={FACES_TAB} className="eyebrow whitespace-nowrap py-3 text-ink flex items-center gap-1.5">
-                  <FaceScanIcon className="w-3.5 h-3.5" /> Mes photos
+                  <FaceScanIcon className="w-3.5 h-3.5" /> {t("myPhotos")}
                 </button>
               )}
               {tab === FAVORITES_TAB && (
                 <button data-tab={FAVORITES_TAB} className="eyebrow whitespace-nowrap py-3 text-ink flex items-center gap-1.5">
-                  <HeartIcon className="w-3.5 h-3.5" filled /> Ma sélection
+                  <HeartIcon className="w-3.5 h-3.5" filled /> {t("mySelection")}
                 </button>
               )}
             </nav>
@@ -241,8 +254,8 @@ export function ClientGallery(props: Props) {
               <button
                 onClick={() => setContactOpen(true)}
                 className="flex items-center h-10 px-2 text-ink/80 hover:text-ink transition-colors"
-                aria-label="Contacter"
-                title="Contacter"
+                aria-label={t("contact")}
+                title={t("contact")}
               >
                 <ChatIcon className="w-[21px] h-[21px]" />
               </button>
@@ -251,8 +264,8 @@ export function ClientGallery(props: Props) {
               <button
                 onClick={() => selectTab(tab === FAVORITES_TAB ? props.collections[0]?.id ?? "" : FAVORITES_TAB)}
                 className={`relative flex items-center gap-1.5 h-10 px-2 transition-colors ${tab === FAVORITES_TAB ? "text-heart" : "text-ink/80 hover:text-ink"}`}
-                aria-label="Ma sélection"
-                title="Ma sélection"
+                aria-label={t("mySelection")}
+                title={t("mySelection")}
               >
                 <span className="relative">
                   <HeartIcon className="w-[22px] h-[22px]" filled={tab === FAVORITES_TAB} />
@@ -269,8 +282,8 @@ export function ClientGallery(props: Props) {
                 <button
                   className="flex items-center gap-1.5 h-10 px-2 text-ink/80 hover:text-ink transition-colors"
                   onClick={() => setMenu((m) => !m)}
-                  aria-label={zipAllowed ? "Télécharger" : "Menu"}
-                  title={zipAllowed ? "Télécharger" : "Menu"}
+                  aria-label={zipAllowed ? t("download") : t("menu")}
+                  title={zipAllowed ? t("download") : t("menu")}
                   disabled={zip !== null}
                 >
                   {/* En-tête : icônes seules, sur téléphone comme sur ordinateur (demandé le 31 oct.). */}
@@ -288,20 +301,20 @@ export function ClientGallery(props: Props) {
                             selectTab(FAVORITES_TAB);
                           }}
                         >
-                          <HeartIcon className="w-4 h-4" /> Ma sélection{favorites.size > 0 ? ` (${favorites.size})` : ""}
+                          <HeartIcon className="w-4 h-4" /> {t("mySelection")}{favorites.size > 0 ? ` (${favorites.size})` : ""}
                         </button>
                       )}
                       {zipAllowed && (
                         <>
                           {activeCollection && props.collections.length > 1 && (
                             <button className="w-full text-left px-5 py-3 text-sm hover:bg-bg-soft flex items-center gap-3" onClick={() => startZip(activeCollection.id)}>
-                              <DownloadIcon className="w-4 h-4" /> Télécharger « {activeCollection.name} »
+                              <DownloadIcon className="w-4 h-4" /> {t("downloadCollection", { name: activeCollection.name })}
                             </button>
                           )}
                           <button className="w-full text-left px-5 py-3 text-sm hover:bg-bg-soft flex items-center gap-3" onClick={() => startZip(null)}>
-                            <DownloadIcon className="w-4 h-4" /> Télécharger toute la galerie
+                            <DownloadIcon className="w-4 h-4" /> {t("downloadAll")}
                           </button>
-                          <p className="px-5 pt-2 pb-1 text-[11px] text-muted leading-snug">Photos en haute définition, au format ZIP.</p>
+                          <p className="px-5 pt-2 pb-1 text-[11px] text-muted leading-snug">{t("zipNote")}</p>
                         </>
                       )}
                     </div>
@@ -315,7 +328,7 @@ export function ClientGallery(props: Props) {
 
       <main className="mx-auto max-w-[1700px] px-2 sm:px-8 lg:px-12 pt-2 sm:pt-8 lg:pt-10 pb-24 protect">
         {props.paymentPending && (
-          <p className="text-center text-xs text-muted pt-4 pb-6">Le téléchargement sera disponible dès le règlement de la prestation.</p>
+          <p className="text-center text-xs text-muted pt-4 pb-6">{t("paymentPending")}</p>
         )}
         {/* Recherche par selfie : grand bouton avec son texte, sous l'en-tête. */}
         {props.faceSearch && tab !== FACES_TAB && tab !== VIDEOS_TAB && (
@@ -325,28 +338,26 @@ export function ClientGallery(props: Props) {
               className="w-full max-w-xl mx-auto flex items-center justify-center gap-3 h-14 border border-line hover:border-ink text-ink transition-colors"
             >
               <FaceScanIcon className="w-5 h-5" />
-              <span className="eyebrow text-[11px]">{faceMatches ? `Mes photos (${faceMatches.length})` : "Trouver mes photos"}</span>
-              <span className="text-[11px] text-muted hidden sm:inline">{faceMatches ? "" : "avec un selfie"}</span>
+              <span className="eyebrow text-[11px]">{faceMatches ? t("myPhotosCount", { n: faceMatches.length }) : t("findMyPhotos")}</span>
+              <span className="text-[11px] text-muted hidden sm:inline">{faceMatches ? "" : t("withSelfie")}</span>
             </button>
           </div>
         )}
         {tab === FAVORITES_TAB && favorites.size > 0 && (
           <p className="text-center text-xs text-muted py-6">
-            Sélection enregistrée pour {email}. Elle est automatiquement transmise à ALVZ.REC.
+            {t("selectionSaved", { email: email ?? "" })}
           </p>
         )}
         {tab === FACES_TAB && (
           <div className="text-center py-6 px-6">
             <p className="text-sm">
-              {visible.length
-                ? `${visible.length} photo${visible.length > 1 ? "s" : ""} où vous apparaissez`
-                : "Aucune photo trouvée avec ce selfie."}
+              {visible.length ? (visible.length > 1 ? t("foundMany", { n: visible.length }) : t("foundOne")) : t("foundNone")}
             </p>
             <p className="text-xs text-muted mt-2">
-              La recherche peut manquer une photo floue, de profil ou très sombre : n&apos;hésitez pas à parcourir toute la galerie.
+              {t("faceHint")}
             </p>
             <button className="text-xs underline underline-offset-4 mt-3 hover:opacity-70" onClick={() => setFaceOpen(true)}>
-              Nouvelle recherche
+              {t("newSearch")}
             </button>
             {faceDebug && (
               <p className="text-[11px] text-muted mt-3 font-mono">
@@ -364,11 +375,11 @@ export function ClientGallery(props: Props) {
           tab === FACES_TAB ? null : tab === FAVORITES_TAB ? (
             <div className="py-28 text-center px-8">
               <HeartIcon className="w-6 h-6 mx-auto text-muted" />
-              <p className="gallery-title text-2xl mt-5">Votre sélection est vide</p>
-              <p className="text-sm text-muted mt-3">Touchez ♡ sur vos photos préférées pour les retrouver ici.</p>
+              <p className="gallery-title text-2xl mt-5">{t("selectionEmpty")}</p>
+              <p className="text-sm text-muted mt-3">{t("selectionEmptyHint")}</p>
             </div>
           ) : (
-            <p className="py-32 text-center gallery-title text-2xl text-muted">Aucune photo ici pour l&apos;instant.</p>
+            <p className="py-32 text-center gallery-title text-2xl text-muted">{t("noPhotos")}</p>
           )
         ) : (
           <div key={tab} className="animate-[gridIn_0.6s_ease-out_both]">
@@ -465,7 +476,7 @@ export function ClientGallery(props: Props) {
 
       {zip && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-ink text-bg px-5 py-3 text-xs tracking-wide shadow-xl">
-          Préparation du ZIP… {zip.done}/{zip.total}
+          {t("zipPreparing", { done: zip.done, total: zip.total })}
         </div>
       )}
     </div>
@@ -488,6 +499,7 @@ function Cover({
   date: string;
   onEnter: () => void;
 }) {
+  const t = useT();
   const focus = { objectPosition: `${design.cover_focus_x}% ${design.cover_focus_y}%` };
   const sectionRef = useRef<HTMLElement>(null);
 
@@ -515,7 +527,7 @@ function Cover({
       className={`mt-10 inline-block border px-8 sm:px-10 py-4 eyebrow tracking-[0.3em] transition-colors duration-300 animate-[fadeUp_1.6s_ease-out_both] ${light ? "border-white/85 text-white hover:bg-white hover:text-black" : "border-ink/70 text-ink hover:bg-ink hover:text-bg"}`}
       style={{ animationDelay: `${delay + words.length * 0.14}s` }}
     >
-      Afficher la galerie
+      {t("showGallery")}
     </button>
   );
   const heading = (cls: string, withDate = true) => (
@@ -687,6 +699,7 @@ export function EmailDialog({
   onCancel: () => void;
   onDone: (email: string, ids: string[]) => void;
 }) {
+  const t = useT();
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -702,7 +715,7 @@ export function EmailDialog({
     });
     const json = await res.json().catch(() => ({}));
     setPending(false);
-    if (!res.ok) return setError(json.error || "Une erreur est survenue");
+    if (!res.ok) return setError(json.error || t("errorGeneric"));
     onDone(json.email, json.photoIds);
   }
 
@@ -714,26 +727,24 @@ export function EmailDialog({
         className="w-full sm:max-w-md bg-bg text-ink px-7 pt-10 pb-[max(env(safe-area-inset-bottom),2rem)] sm:p-12 animate-[fadeUp_0.4s_ease-out_both]"
       >
         {purpose === "download" ? <DownloadIcon className="w-5 h-5 mx-auto" /> : <HeartIcon className="w-5 h-5 mx-auto text-heart" filled />}
-        <h2 className="display text-3xl text-center mt-5">{purpose === "download" ? "Téléchargement" : "Vos favoris"}</h2>
+        <h2 className="display text-3xl text-center mt-5">{purpose === "download" ? t("downloadTitle") : t("favoritesTitle")}</h2>
         <p className="text-sm text-muted text-center mt-3 leading-relaxed">
-          {purpose === "download"
-            ? "Indiquez votre e-mail pour télécharger vos photos. Il ne vous sera demandé qu'une fois."
-            : "Indiquez votre e-mail pour enregistrer votre sélection et la retrouver plus tard."}
+          {purpose === "download" ? t("emailForDownload") : t("emailForFavorites")}
         </p>
         <input
           type="email"
           required
           autoFocus
           autoComplete="email"
-          placeholder="vous@exemple.com"
+          placeholder={t("emailPlaceholder")}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           className="field mt-8 text-center"
         />
         {error && <p className="text-sm text-danger mt-3 text-center">{error}</p>}
         <div className="mt-8 flex gap-3">
-          <button type="button" className="btn btn-ghost flex-1" onClick={onCancel}>Annuler</button>
-          <button className="btn flex-1" disabled={pending}>{pending ? "…" : "Continuer"}</button>
+          <button type="button" className="btn btn-ghost flex-1" onClick={onCancel}>{t("cancel")}</button>
+          <button className="btn flex-1" disabled={pending}>{pending ? "…" : t("continue")}</button>
         </div>
       </form>
     </div>
@@ -782,6 +793,7 @@ function FaceSearchDialog({
   onDone: (photoIds: string[], debug?: { distances: number[]; threshold: number }) => void;
 }) {
   const [consent, setConsent] = useState(false);
+  const t = useT();
   const [step, setStep] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const camera = useRef<HTMLInputElement>(null);
@@ -791,20 +803,20 @@ function FaceSearchDialog({
     if (!file) return;
     setError(null);
     try {
-      setStep("Préparation de la reconnaissance…");
+      setStep(t("facePreparing"));
       const { loadFaceApi, selfieDescriptor } = await import("@/lib/client/faces");
       await loadFaceApi();
-      setStep("Analyse de votre selfie…");
+      setStep(t("faceAnalyzing"));
       const descriptor = await selfieDescriptor(file);
-      if (!descriptor) throw new Error("Aucun visage trouvé. Reprenez un selfie de face, bien éclairé, sans lunettes de soleil.");
-      setStep("Recherche dans la galerie…");
+      if (!descriptor) throw new Error(t("faceNone"));
+      setStep(t("faceSearching"));
       const res = await fetch(`/api/g/${slug}/faces`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ descriptor }),
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || "Recherche impossible");
+      if (!res.ok) throw new Error(json.error || t("faceFailed"));
       onDone(json.photoIds ?? [], json.distances ? { distances: json.distances, threshold: json.threshold } : undefined);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -819,16 +831,11 @@ function FaceSearchDialog({
         className="w-full sm:max-w-md bg-bg text-ink px-7 pt-10 pb-[max(env(safe-area-inset-bottom),2rem)] sm:p-12 animate-[fadeUp_0.4s_ease-out_both]"
       >
         <FaceScanIcon className="w-6 h-6 mx-auto" />
-        <h2 className="display text-3xl text-center mt-5">Trouver mes photos</h2>
-        <p className="text-sm text-muted text-center mt-3 leading-relaxed">
-          Prenez un selfie : nous affichons toutes les photos de la galerie où vous apparaissez.
-        </p>
+        <h2 className="display text-3xl text-center mt-5">{t("findMyPhotos")}</h2>
+        <p className="text-sm text-muted text-center mt-3 leading-relaxed">{t("faceIntro")}</p>
         <label className="flex items-start gap-3 mt-7 text-xs text-muted leading-relaxed cursor-pointer">
           <input type="checkbox" className="mt-0.5 accent-current" checked={consent} onChange={(e) => setConsent(e.target.checked)} disabled={Boolean(step)} />
-          <span>
-            J&apos;accepte que mon visage soit comparé aux photos de cette galerie. Le selfie reste sur mon appareil : il n&apos;est ni envoyé
-            ni enregistré.
-          </span>
+          <span>{t("faceConsent")}</span>
         </label>
         <input ref={camera} type="file" accept="image/*" capture="user" className="hidden" onChange={(e) => search(e.target.files?.[0])} />
         <input ref={library} type="file" accept="image/*" className="hidden" onChange={(e) => search(e.target.files?.[0])} />
@@ -839,13 +846,13 @@ function FaceSearchDialog({
         ) : (
           <div className="mt-8 space-y-3">
             <button className="btn w-full" disabled={!consent} onClick={() => camera.current?.click()}>
-              Prendre un selfie
+              {t("takeSelfie")}
             </button>
             <button className="btn btn-ghost w-full" disabled={!consent} onClick={() => library.current?.click()}>
-              Choisir une photo de moi
+              {t("choosePhoto")}
             </button>
             <button className="w-full text-xs text-muted pt-2 hover:text-ink" onClick={onCancel}>
-              Annuler
+              {t("cancel")}
             </button>
           </div>
         )}

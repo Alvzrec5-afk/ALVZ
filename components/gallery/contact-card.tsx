@@ -1,5 +1,8 @@
+"use client";
+
 import { contactLinks, type Contact } from "@/lib/contact";
 import { Wordmark } from "@/components/wordmark";
+import { useT } from "./lang";
 
 const ICONS: Record<string, React.ReactNode> = {
   whatsapp: (
@@ -29,6 +32,7 @@ const ICONS: Record<string, React.ReactNode> = {
 
 /** Carte de visite du studio, en bas de la galerie. */
 export function ContactCard({ contact }: { contact: Contact }) {
+  const t = useT();
   const links = contactLinks(contact);
   if (links.length === 0) return null;
   return (
@@ -36,7 +40,7 @@ export function ContactCard({ contact }: { contact: Contact }) {
       <Wordmark height={52} />
       {contact.name && <p className="gallery-title text-2xl sm:text-3xl mt-8">{contact.name}</p>}
       {contact.tagline && <p className="text-sm text-muted mt-3 max-w-md mx-auto leading-relaxed">{contact.tagline}</p>}
-      <p className="eyebrow text-muted mt-10 mb-6">Me contacter</p>
+      <p className="eyebrow text-muted mt-10 mb-6">{t("contactMe")}</p>
       <ContactLinks contact={contact} />
     </section>
   );
@@ -44,6 +48,7 @@ export function ContactCard({ contact }: { contact: Contact }) {
 
 /** Boutons de contact (WhatsApp, Instagram, TikTok, e-mail, site). */
 export function ContactLinks({ contact }: { contact: Contact }) {
+  const t = useT();
   return (
     <div className="flex flex-wrap justify-center gap-3 max-w-xl mx-auto">
       {contactLinks(contact).map((l) => (
@@ -58,7 +63,7 @@ export function ContactLinks({ contact }: { contact: Contact }) {
             {ICONS[l.key]}
           </svg>
           <span className="text-left">
-            <span className="block eyebrow text-[9px] text-muted">{l.label}</span>
+            <span className="block eyebrow text-[9px] text-muted">{l.key === "email" ? t("emailLabel") : l.key === "website" ? t("websiteLabel") : l.label}</span>
             <span className="block text-sm">{l.value}</span>
           </span>
         </a>
@@ -69,13 +74,14 @@ export function ContactLinks({ contact }: { contact: Contact }) {
 
 /** Fenêtre « Me contacter » ouverte depuis le bouton en haut de la galerie. */
 export function ContactSheet({ contact, onClose }: { contact: Contact; onClose: () => void }) {
+  const t = useT();
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
         className="relative w-full sm:max-w-lg bg-bg text-ink px-6 pt-10 pb-[max(env(safe-area-inset-bottom),2rem)] sm:p-12 text-center animate-[fadeUp_0.35s_ease-out_both]"
       >
-        <button onClick={onClose} className="icon-btn absolute top-3 right-3" aria-label="Fermer">
+        <button onClick={onClose} className="icon-btn absolute top-3 right-3" aria-label={t("close")}>
           <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" aria-hidden>
             <path d="M6 6l12 12M18 6 6 18" />
           </svg>
@@ -83,7 +89,7 @@ export function ContactSheet({ contact, onClose }: { contact: Contact; onClose: 
         <Wordmark height={44} />
         {contact.name && <p className="gallery-title text-2xl mt-6">{contact.name}</p>}
         {contact.tagline && <p className="text-sm text-muted mt-2 leading-relaxed">{contact.tagline}</p>}
-        <p className="eyebrow text-muted mt-8 mb-5">Me contacter</p>
+        <p className="eyebrow text-muted mt-8 mb-5">{t("contactMe")}</p>
         <ContactLinks contact={contact} />
       </div>
     </div>

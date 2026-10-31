@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PhotoView } from "@/lib/types";
 import { ChevronLeft, ChevronRight, CloseIcon, DownloadIcon, HeartIcon } from "@/components/icons";
+import { useT } from "./lang";
 
 const EASE = "cubic-bezier(0.22, 0.8, 0.2, 1)";
 
@@ -42,6 +43,7 @@ export function Lightbox({
   /** Avant chaque téléchargement (ex. demander l'e-mail du client). */
   onDownload?: (e: React.MouseEvent, href: string) => void;
 }) {
+  const t = useT();
   const photo = photos[index];
   const [loaded, setLoaded] = useState(false);
   const [chrome, setChrome] = useState(true);
@@ -189,18 +191,18 @@ export function Lightbox({
         <span className="eyebrow text-muted pl-2">{index + 1} / {photos.length}</span>
         <div className="flex items-center gap-1">
           {favoritesEnabled && (
-            <button className="icon-btn" onClick={() => onToggleFavorite(photo.id)} aria-label="Favori">
+            <button className="icon-btn" onClick={() => onToggleFavorite(photo.id)} aria-label={t("favorite")}>
               <HeartIcon className={`w-5 h-5 ${fav ? "text-heart animate-[heartPop_0.45s_ease-out]" : ""}`} filled={fav} />
             </button>
           )}
           {downloadHref && !webDownload && (
-            <a className="icon-btn" href={downloadHref(photo.id)} download aria-label="Télécharger en HD" onClick={(e) => onDownload?.(e, downloadHref(photo.id))}>
+            <a className="icon-btn" href={downloadHref(photo.id)} download aria-label={t("downloadHd")} onClick={(e) => onDownload?.(e, downloadHref(photo.id))}>
               <DownloadIcon />
             </a>
           )}
           {downloadHref && webDownload && (
             <div className="relative">
-              <button className="icon-btn" onClick={() => setSizeMenu((m) => !m)} aria-label="Télécharger">
+              <button className="icon-btn" onClick={() => setSizeMenu((m) => !m)} aria-label={t("download")}>
                 <DownloadIcon />
               </button>
               {sizeMenu && (
@@ -209,19 +211,19 @@ export function Lightbox({
                     setSizeMenu(false);
                     onDownload?.(e, downloadHref(photo.id, "hd"));
                   }}>
-                    Haute définition
+                    {t("highDefinition")}
                   </a>
                   <a className="block px-4 py-3 hover:bg-bg" href={downloadHref(photo.id, "web")} download onClick={(e) => {
                     setSizeMenu(false);
                     onDownload?.(e, downloadHref(photo.id, "web"));
                   }}>
-                    Taille web <span className="text-muted text-xs">(réseaux sociaux)</span>
+                    {t("webSize")} <span className="text-muted text-xs">{t("socialNetworks")}</span>
                   </a>
                 </div>
               )}
             </div>
           )}
-          <button className="icon-btn" onClick={close} aria-label="Fermer">
+          <button className="icon-btn" onClick={close} aria-label={t("close")}>
             <CloseIcon />
           </button>
         </div>
@@ -260,12 +262,12 @@ export function Lightbox({
       </div>
 
       {index > 0 && (
-        <button className={`hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 icon-btn w-12 h-12 transition-opacity ${chrome && !closing ? "" : "opacity-0"}`} onClick={prev} aria-label="Précédente">
+        <button className={`hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 icon-btn w-12 h-12 transition-opacity ${chrome && !closing ? "" : "opacity-0"}`} onClick={prev} aria-label={t("previous")}>
           <ChevronLeft />
         </button>
       )}
       {index < photos.length - 1 && (
-        <button className={`hidden sm:flex absolute right-4 top-1/2 -translate-y-1/2 icon-btn w-12 h-12 transition-opacity ${chrome && !closing ? "" : "opacity-0"}`} onClick={next} aria-label="Suivante">
+        <button className={`hidden sm:flex absolute right-4 top-1/2 -translate-y-1/2 icon-btn w-12 h-12 transition-opacity ${chrome && !closing ? "" : "opacity-0"}`} onClick={next} aria-label={t("next")}>
           <ChevronRight />
         </button>
       )}

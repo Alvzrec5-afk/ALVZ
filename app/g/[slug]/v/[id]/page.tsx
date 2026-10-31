@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { readDesign, themeAttr } from "@/lib/design";
 import { findGalleryBySlug, hasAccess, isExpired, visitorEmail } from "@/lib/gallery-access";
@@ -8,6 +9,7 @@ import { VIDEO_FIELDS, findPublicVideo, toVideoView } from "@/lib/videos";
 import { presignGet, videoKey } from "@/lib/storage";
 import { VideoPage } from "@/components/gallery/video-page";
 import { ExpiredScreen, LockScreen } from "@/components/gallery/screens";
+import { pickLang } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -22,9 +24,11 @@ export default async function VideoRoute({ params }: { params: Promise<{ slug: s
   const gallery = await findGalleryBySlug(slug);
   if (!gallery) notFound();
   const design = readDesign(gallery);
-  if (isExpired(gallery)) return <ExpiredScreen theme={themeAttr(design)} />;
+  // Langue réglée sur l'appareil du client (français, anglais ou portugais).
+  const lang = pickLang((await headers()).get("accept-language"));
+  if (isExpired(gallery)) return <ExpiredScreen theme={themeAttr(design)} lang={lang} />;
   if (!(await hasAccess(gallery))) {
-    return <LockScreen slug={slug} title={gallery.title} theme={themeAttr(design)} fontStyle={design.font_style} next={`/g/${slug}/v/${id}`} />;
+    return <LockScreen slug={slug} title={gallery.title} theme={themeAttr(design)} fontStyle={design.font_style} next={`/g/${slug}/v/${id}`} lang={lang} />;
   }
 
   const db = createServiceClient();
@@ -54,6 +58,7 @@ export default async function VideoRoute({ params }: { params: Promise<{ slug: s
       comments={(comments ?? []) as VideoComment[]}
       others={more}
       askEmail={gallery.download_email_required && !email}
+      lang={lang}
       paymentPending={gallery.payment_locked}
       backHref={gallery.kind === "video" && more.length === 0 ? null : `/g/${slug}`}
     />

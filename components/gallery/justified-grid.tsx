@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { GridSize, GridSpacing, GridStyle } from "@/lib/design";
 import type { PhotoView } from "@/lib/types";
 import { HeartIcon } from "@/components/icons";
+import { useT } from "./lang";
 
 type Row = { items: PhotoView[]; height: number };
 
@@ -51,6 +52,7 @@ type Props = {
 };
 
 export function PhotoGrid({ photos, style, size, spacing, favorites, favoritesEnabled, onOpen, onToggleFavorite }: Props) {
+  const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
 
@@ -98,7 +100,7 @@ export function PhotoGrid({ photos, style, size, spacing, favorites, favoritesEn
     const fav = favorites.has(p.id);
     return (
       <div key={p.id} data-photo-id={p.id} className="reveal group relative bg-bg-soft overflow-hidden" style={box}>
-        <button className="block w-full h-full cursor-zoom-in" onClick={() => onOpen(p.id)} aria-label={`Ouvrir ${p.filename}`}>
+        <button className="block w-full h-full cursor-zoom-in" onClick={() => onOpen(p.id)} aria-label={t("openPhoto", { name: p.filename })}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={p.thumb}
@@ -119,7 +121,7 @@ export function PhotoGrid({ photos, style, size, spacing, favorites, favoritesEn
           <button
             onClick={() => onToggleFavorite(p.id)}
             className={`absolute bottom-1 right-1 w-9 h-9 flex items-center justify-center text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-opacity ${fav ? "opacity-100" : "opacity-0 group-hover:opacity-90 [@media(hover:none)]:opacity-70"}`}
-            aria-label={fav ? "Retirer des favoris" : "Ajouter aux favoris"}
+            aria-label={fav ? t("removeFavorite") : t("addFavorite")}
           >
             <HeartIcon className={`w-5 h-5 ${fav ? "animate-[heartPop_0.45s_ease-out]" : ""}`} filled={fav} />
           </button>

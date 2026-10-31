@@ -2,6 +2,7 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import type { VideoComment, VideoView } from "@/lib/types";
+import { useT } from "@/components/gallery/lang";
 
 export type PlayerHandle = { seek: (t: number, play?: boolean) => void; pause: () => void; time: () => number };
 
@@ -32,6 +33,7 @@ type NetworkInfo = { downlink?: number; saveData?: boolean };
  * de l'écran (et ajustée en cours de lecture), commentaires sur la barre de lecture.
  */
 export const VideoPlayer = forwardRef<PlayerHandle, Props>(function VideoPlayer({ video, comments = [], onTime, onMarker, onPlayStart, onWatched }, ref) {
+  const t = useT();
   const box = useRef<HTMLDivElement>(null);
   const el = useRef<HTMLVideoElement>(null);
   const bar = useRef<HTMLDivElement>(null);
@@ -287,7 +289,7 @@ export const VideoPlayer = forwardRef<PlayerHandle, Props>(function VideoPlayer(
         <button
           onClick={toggle}
           className="absolute inset-0 m-auto w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-black/45 backdrop-blur-sm text-white flex items-center justify-center"
-          aria-label="Lecture"
+          aria-label={t("play")}
         >
           {waiting && started ? (
             <span className="w-7 h-7 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -330,7 +332,7 @@ export const VideoPlayer = forwardRef<PlayerHandle, Props>(function VideoPlayer(
               }}
               className="absolute -top-2.5 -translate-x-1/2 w-4 h-4 flex items-center justify-center"
               style={{ left: `${(c.time_sec / Math.max(1, duration)) * 100}%` }}
-              aria-label={`Commentaire à ${formatTime(c.time_sec)}`}
+              aria-label={t("commentAt", { time: formatTime(c.time_sec) })}
             >
               <span className="w-2 h-2 rounded-full bg-amber-400 ring-2 ring-black/40" />
             </button>
@@ -343,7 +345,7 @@ export const VideoPlayer = forwardRef<PlayerHandle, Props>(function VideoPlayer(
         </div>
 
         <div className="flex items-center gap-1 sm:gap-2 text-[13px]">
-          <button onClick={toggle} className="w-9 h-9 flex items-center justify-center" aria-label={playing ? "Pause" : "Lecture"}>
+          <button onClick={toggle} className="w-9 h-9 flex items-center justify-center" aria-label={playing ? t("pause") : t("play")}>
             {playing ? (
               <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor" aria-hidden><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /></svg>
             ) : (
@@ -355,7 +357,7 @@ export const VideoPlayer = forwardRef<PlayerHandle, Props>(function VideoPlayer(
               if (el.current) el.current.muted = !el.current.muted;
             }}
             className="w-9 h-9 flex items-center justify-center"
-            aria-label={muted ? "Activer le son" : "Couper le son"}
+            aria-label={muted ? t("unmute") : t("mute")}
           >
             <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4Z" fill="currentColor" />
@@ -367,14 +369,14 @@ export const VideoPlayer = forwardRef<PlayerHandle, Props>(function VideoPlayer(
           </span>
           <span className="flex-1" />
           <div className="relative">
-            <button onClick={() => setMenu((m) => !m)} className="h-9 px-2 flex items-center gap-1 tabular-nums" aria-label="Qualité">
+            <button onClick={() => setMenu((m) => !m)} className="h-9 px-2 flex items-center gap-1 tabular-nums" aria-label={t("quality")}>
               {mode === "auto" ? <>Auto <span className="text-white/60">{label(current)}</span></> : label(current)}
             </button>
             {menu && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setMenu(false)} />
                 <div className="absolute right-0 bottom-11 z-20 w-40 bg-black/90 backdrop-blur py-1 text-sm rounded">
-                  <p className="px-4 pt-2 pb-1 text-[11px] text-white/50 uppercase tracking-wider">Qualité</p>
+                  <p className="px-4 pt-2 pb-1 text-[11px] text-white/50 uppercase tracking-wider">{t("quality")}</p>
                   {(["auto", ...sources.map((s) => s.h)] as const).map((q) => (
                     <button
                       key={q}
@@ -388,14 +390,14 @@ export const VideoPlayer = forwardRef<PlayerHandle, Props>(function VideoPlayer(
                       className={`block w-full text-left px-4 py-2 hover:bg-white/10 ${mode === q ? "text-white" : "text-white/70"}`}
                     >
                       {mode === q ? "✓ " : ""}
-                      {q === "auto" ? "Automatique" : qualityLabel(q)}
+                      {q === "auto" ? t("automatic") : qualityLabel(q)}
                     </button>
                   ))}
                 </div>
               </>
             )}
           </div>
-          <button onClick={fullscreen} className="w-9 h-9 flex items-center justify-center" aria-label="Plein écran">
+          <button onClick={fullscreen} className="w-9 h-9 flex items-center justify-center" aria-label={t("fullscreen")}>
             <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" aria-hidden>
               <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
             </svg>
