@@ -77,12 +77,14 @@ Détail complet (fichiers, tables, choix techniques) : **`docs/carte-du-code.md`
   taille du texte, rognage, clic droit, copier-coller entre onglets, annuler, capture PNG, partage client `/t/<lien>`,
   modèle des nouveaux tableaux (7 planches, dont 5. STORYBOARD). Serveur : `lib/boards.ts` (`cleanData` filtre chaque champ de carte :
   **tout nouveau champ de `BoardData` doit y être ajouté**).
-- **Recherche par visage (selfie)** : option par galerie (Paramètres → Recherche par visage). Studio : `lib/client/faces.ts`
-  (face-api, modèles sur jsDelivr, original ramené à 4000 px + morceaux de 900 px pour les petites têtes) et
-  `lib/client/face-indexer.ts` (file d'analyse, lancée après chaque envoi ou bouton « Analyser ») → `/api/admin/faces` →
-  table `photo_faces` (pgvector 128). Client : bouton « Trouver mes photos », selfie analysé sur le téléphone,
-  `/api/g/<lien>/faces` → fonction `match_faces`, seuil **0,50** (0,6 donnait 26 photos fausses le 31 oct.). Selfie = moyenne
-  normal + miroir. Studio connecté : sous les résultats, distances des 15 photos les plus proches (mode réglage) pour affiner.
+- **Recherche par visage (selfie)** : option par galerie (Paramètres → Recherche par visage). Moteur **ArcFace**
+  (InsightFace EfficientNet-B0, licence MIT, jsDelivr figé sur un commit) depuis le 31 oct. : l'ancien moteur face-api
+  confondait des personnes à peau foncée (26 puis 6 photos fausses). Studio : `lib/client/faces.ts` (détection + repères
+  face-api, visage redressé 112 px, empreinte 512, original 4000 px + morceaux de 900 px pour les petites têtes) et
+  `lib/client/face-indexer.ts` → `/api/admin/faces` → table `face_embeddings` (`photos.faces_model = 'arcface-b0'` ; une
+  photo d'un autre moteur est à ré-analyser). Client : « Trouver mes photos » → `/api/g/<lien>/faces` → `match_faces_arcface`
+  (distance cosinus < **0,60** ; banc d'essai : même personne ≤ 0,54, inconnus ≥ 0,72). Studio connecté : distances des
+  15 photos les plus proches sous les résultats (mode réglage). Ancienne table `photo_faces` inutilisée.
 - **Médias** : photos préparées dans le navigateur (`lib/client/image.ts`), vidéos H.264 (`lib/client/video.ts`).
 - **Base** : schéma de référence `supabase/schema.sql` (à tenir à jour après chaque migration).
 
@@ -169,8 +171,10 @@ Publié le 24 oct. : **calendriers importés** (iPhone iCloud / Google, lien iCa
   Ctrl + clic sur Mac ; envoi d'un clip (H.264/4K) ; e-mail de test Gmail ; images « disparues » des tableaux
   revenues (réparation automatique `objectSize`).
 - **À vérifier en vrai par le propriétaire** : recherche par selfie (31 oct.) sur une vraie galerie : vitesse de l'analyse sur
-  son Mac, justesse avec le seuil 0,50 (lire la ligne « Studio · seuil … » sous les résultats, connecté au studio : son
-  propre visage absent → aucune photo ; une personne présente → ses photos). Table `photo_faces` + `match_faces` déjà en base US.
+  son Mac, justesse du moteur ArcFace (ZOEE à ré-analyser une fois : Paramètres → Recherche par visage → Analyser ; puis
+  ligne « Studio · seuil … » sous les résultats : son propre visage absent → aucune photo ; une personne présente → ses
+  photos). Table `face_embeddings` + `match_faces_arcface` déjà en base US. Lien jsDelivr `gh/vladmandic/insightface@c972aaf…`
+  non vérifiable depuis le conteneur (bloqué) : à confirmer au premier essai.
 - E-mails qui partent en spam : conseils donnés. Proposé, non fait : test vers n'importe quelle adresse
   (mail-tester.com), envois étalés dans le temps ; plus tard, adresse à son domaine (Brevo / Google Workspace +
   SPF/DKIM/DMARC).

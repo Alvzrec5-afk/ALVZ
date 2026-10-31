@@ -2,7 +2,10 @@ import { apiError, requireAdminApi } from "@/lib/auth";
 import { isUuid } from "@/lib/boards";
 import { originalKey, presignGet, variantKey } from "@/lib/storage";
 
-const DIM = 128;
+const DIM = 512;
+/** Moteur des empreintes (même valeur que `FACE_MODEL` côté navigateur) : les photos d'un autre moteur sont à refaire. */
+const MODEL = "arcface-b0";
+const notThisModel = `faces_model.is.null,faces_model.neq.${MODEL}`;
 
 /**
  * Recherche par visage — état d'une galerie : activée ou non, photos analysées / total.
@@ -18,7 +21,7 @@ export async function GET(req: Request) {
     const [{ data: g }, total, done] = await Promise.all([
       supabase.from("galleries").select("face_search_enabled").eq("id", galleryId).maybeSingle(),
       supabase.from("photos").select("id", { count: "exact", head: true }).eq("gallery_id", galleryId).eq("status", "ready"),
-      supabase.from("photos").select("id", { count: "exact", head: true }).eq("gallery_id", galleryId).eq("status", "ready").not("faces_indexed_at", "is", null),
+      supabase.from("photos").select("id", { count: "exact", head: true }).eq("gallery_id", galleryId).eq("status", "ready").eq("faces_model", MODEL),
     ]);
     if (!g) return Response.json({ error: "Galerie introuvable" }, { status: 404 });
     const body = { enabled: Boolean(g.face_search_enabled), total: total.count ?? 0, done: done.count ?? 0 };
@@ -29,7 +32,7 @@ export async function GET(req: Request) {
       .select("id, gallery_id, original_ext")
       .eq("gallery_id", galleryId)
       .eq("status", "ready")
-      .is("faces_indexed_at", null)
+      .or(notThisModel)
       .order("position")
       .limit(200);
     const pending = await Promise.all(
@@ -60,15 +63,19 @@ export async function POST(req: Request) {
         photo_id: photo.id,
         gallery_id: photo.gallery_id,
         box: { x: unit(f.box?.x), y: unit(f.box?.y), w: unit(f.box?.w), h: unit(f.box?.h) },
-        descriptor: `[${f.descriptor!.map((n) => Number(n).toFixed(5)).join(",")}]`,
+        embedding: `[${f.descriptor!.map((n) => Number(n).toFixed(5)).join(",")}]`,
       }));
-    const { error: delError } = await supabase.from("photo_faces").delete().eq("photo_id", photo.id);
+    // L'analyse remplace la précédente (et efface les empreintes de l'ancien moteur face-api).
+    const [{ error: delError }] = await Promise.all([
+      supabase.from("face_embeddings").delete().eq("photo_id", photo.id),
+      supabase.from("photo_faces").delete().eq("photo_id", photo.id),
+    ]);
     if (delError) throw new Error(delError.message);
     if (rows.length) {
-      const { error } = await supabase.from("photo_faces").insert(rows);
+      const { error } = await supabase.from("face_embeddings").insert(rows);
       if (error) throw new Error(error.message);
     }
-    const { error } = await supabase.from("photos").update({ faces_indexed_at: new Date().toISOString() }).eq("id", photo.id);
+    const { error } = await supabase.from("photos").update({ faces_indexed_at: new Date().toISOString(), faces_model: MODEL }).eq("id", photo.id);
     if (error) throw new Error(error.message);
     return Response.json({ faces: rows.length });
   } catch (e) {

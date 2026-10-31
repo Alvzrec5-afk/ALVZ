@@ -520,3 +520,36 @@ as $$
 $$;
 revoke execute on function public.match_faces(uuid, extensions.vector, double precision, integer) from public, anon, authenticated;
 grant execute on function public.match_faces(uuid, extensions.vector, double precision, integer) to service_role;
+
+-- Recherche par visage, moteur ArcFace (31 oct. 2026) : empreintes de 512 nombres (InsightFace EfficientNet-B0),
+-- comparées par distance cosinus. Remplace photo_faces / match_faces (face-api, gardés mais plus utilisés).
+alter table public.photos add column if not exists faces_model text;
+create table if not exists public.face_embeddings (
+  id uuid primary key default gen_random_uuid(),
+  photo_id uuid not null references public.photos(id) on delete cascade,
+  gallery_id uuid not null references public.galleries(id) on delete cascade,
+  box jsonb not null default '{}'::jsonb,
+  embedding extensions.vector(512) not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists face_embeddings_gallery_idx on public.face_embeddings (gallery_id);
+create index if not exists face_embeddings_photo_idx on public.face_embeddings (photo_id);
+alter table public.face_embeddings enable row level security;
+create policy "admin full access" on public.face_embeddings
+  for all to authenticated using ((select private.is_admin())) with check ((select private.is_admin()));
+grant select, insert, update, delete on public.face_embeddings to authenticated, service_role;
+create or replace function public.match_faces_arcface(g uuid, q extensions.vector(512), max_distance double precision, max_count integer)
+returns table (photo_id uuid, distance double precision)
+language sql stable
+set search_path = public, extensions
+as $$
+  select f.photo_id, min(f.embedding <=> q) as distance
+  from public.face_embeddings f
+  where f.gallery_id = g
+  group by f.photo_id
+  having min(f.embedding <=> q) < max_distance
+  order by distance
+  limit max_count;
+$$;
+revoke execute on function public.match_faces_arcface(uuid, extensions.vector, double precision, integer) from public, anon, authenticated;
+grant execute on function public.match_faces_arcface(uuid, extensions.vector, double precision, integer) to service_role;

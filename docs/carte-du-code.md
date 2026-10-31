@@ -375,3 +375,15 @@ Mode réglage : si `isStudioSession()`, la route cherche jusqu'à 0,75 et renvoi
 affichés sous les résultats (« Studio · seuil … »), jamais aux clients.
 Tests (photos d'exemple face-api.js) : vraie personne 0,37–0,55, inconnus ≥ 0,69 ; têtes de 45–60 px trouvées
 dans une image 6000 × 4000.
+
+**Recherche par visage — moteur ArcFace (31 oct. 2026)** — le moteur face-api (2017, 128 nombres) donnait des photos
+fausses sur la galerie ZOEE (personnes différentes à peau foncée toutes entre 0,44 et 0,53, sans écart). Banc d'essai
+(jeu deepface 300 paires + photos d'Obama contre 84 autres visages) : écart « même personne / inconnu » face-api 0,07 ;
+InsightFace EfficientNet-B0 0,23 (choisi), GhostNet 0,20, MobileNet-swish 0,20. `faces.ts` : `loadFaceApi` charge SSD +
+68 points (face-api) et `ARCFACE_URL` (jsDelivr `gh/vladmandic/insightface@c972aafe…/models/insightface-efficientnet-b0.json`,
+.bin 13 Mo à côté) ; `embed` redresse le visage sur le modèle 5 points ArcFace (yeux, nez, coins de bouche ; `similarity`
+= moindres carrés), 112 × 112, valeurs 0–1, empreinte à l'endroit + miroir, somme normalisée (512). Base : `face_embeddings`
+(vector 512), `photos.faces_model`, `match_faces_arcface` (cosinus `<=>`). `/api/admin/faces` : DIM 512, `MODEL = 'arcface-b0'`,
+photos à analyser = `faces_model` absent ou différent ; le POST efface aussi les vieilles lignes `photo_faces`.
+Route client : seuil 0,60 (mode réglage studio jusqu'à 0,85). Test bout en bout (vrai code) : même personne 0,21–0,54,
+inconnus ≥ 0,87 ; têtes de 70–90 px dans une image 6000 × 4000 reconnues (0,32).

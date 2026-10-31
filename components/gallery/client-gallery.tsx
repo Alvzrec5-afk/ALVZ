@@ -352,7 +352,7 @@ export function ClientGallery(props: Props) {
             {faceDebug && (
               <p className="text-[11px] text-muted mt-3 font-mono">
                 Studio · seuil {faceDebug.threshold} · photos les plus proches :{" "}
-                {faceDebug.distances.length ? faceDebug.distances.map((d) => d.toFixed(2)).join(" ") : "aucune sous 0,75"}
+                {faceDebug.distances.length ? faceDebug.distances.map((d) => d.toFixed(2)).join(" ") : "aucune sous 0,85"}
               </p>
             )}
           </div>
