@@ -486,3 +486,37 @@ alter table public.quotes add column if not exists pay_clicked_at timestamptz; -
 -- Remise des devis : quotes.discount_type / discount_value / discount_label (migration « quotes_discount »).
 alter table public.galleries add column if not exists zip_enabled boolean not null default true; -- migration « galleries_zip_enabled »
 alter table public.quotes add column if not exists client_phone text not null default ''; -- migration « quotes_client_phone »
+
+-- Recherche par visage (selfie) : empreintes des visages des photos (128 nombres, face-api), comparées par pgvector.
+create extension if not exists vector with schema extensions;
+alter table public.galleries add column if not exists face_search_enabled boolean not null default false;
+alter table public.photos add column if not exists faces_indexed_at timestamptz;
+create table if not exists public.photo_faces (
+  id uuid primary key default gen_random_uuid(),
+  photo_id uuid not null references public.photos(id) on delete cascade,
+  gallery_id uuid not null references public.galleries(id) on delete cascade,
+  box jsonb not null default '{}'::jsonb,
+  descriptor extensions.vector(128) not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists photo_faces_gallery_idx on public.photo_faces (gallery_id);
+create index if not exists photo_faces_photo_idx on public.photo_faces (photo_id);
+alter table public.photo_faces enable row level security;
+create policy "admin full access" on public.photo_faces
+  for all to authenticated using ((select private.is_admin())) with check ((select private.is_admin()));
+-- Photos de la galerie dont un visage est proche du selfie (appelée seulement par le site, clé « service »).
+create or replace function public.match_faces(g uuid, q extensions.vector(128), max_distance double precision, max_count integer)
+returns table (photo_id uuid, distance double precision)
+language sql stable
+set search_path = public, extensions
+as $$
+  select f.photo_id, min(f.descriptor <-> q) as distance
+  from public.photo_faces f
+  where f.gallery_id = g
+  group by f.photo_id
+  having min(f.descriptor <-> q) < max_distance
+  order by distance
+  limit max_count;
+$$;
+revoke execute on function public.match_faces(uuid, extensions.vector, double precision, integer) from public, anon, authenticated;
+grant execute on function public.match_faces(uuid, extensions.vector, double precision, integer) to service_role;

@@ -356,3 +356,19 @@ de `quote-editor.tsx` (`SendByMessage`) : texte court (devis ou relance, montant
 WhatsApp (`wa.me/<numéro>?text=`, `phoneDigits` : 06… → 336…), SMS / iMessage (`sms:+33…?&body=`), Partager (`navigator.share`,
 iPhone) et Copier. Rien ne part du serveur ; `markQuoteSent` passe le brouillon en « envoyé » (sa page devient visible) ou date la relance.
 Refusé si le devis n'est pas enregistré.
+
+**Recherche par visage (selfie)** — option `galleries.face_search_enabled` (Paramètres → « Recherche par visage »,
+photos seulement). Analyse dans le navigateur du studio (`lib/client/faces.ts`, `@vladmandic/face-api` 1.7.15, modèles
+SSD MobileNet + landmarks + reconnaissance chargés depuis jsDelivr `FACE_MODEL_URL`, WebGL sinon processeur) :
+`facesInImage` = image ramenée à 4000 px, vue d'ensemble 1200 px + morceaux de 900 px chevauchant d'un quart,
+doublons fusionnés (`dedupe`), visages < 28 px ignorés, chaque visage recadré à ≈ 220 px puis empreinte 128 nombres.
+`face-indexer.ts` : file unique (singleton), `addUploaded` appelé par `uploader.ts` après chaque photo (original encore
+en mémoire, seulement si l'option est active), `analyzeGallery` pour les photos déjà en ligne (relit l'original via URL
+pré-signée, sinon la version web). Progression : rubrique des paramètres (`FaceIndexStatus`) + pastille dans
+`BackgroundStatus` (avertit à la fermeture de l'onglet). Serveur : `/api/admin/faces` (GET état + photos à analyser,
+POST remplace les visages d'une photo et met `photos.faces_indexed_at`), table `photo_faces` (vecteur pgvector 128,
+cascade avec photo et galerie). Client : bouton « Trouver mes photos » (`FaceSearchDialog` dans `client-gallery.tsx`,
+accord obligatoire, selfie ou photo, `selfieDescriptor` ajoute une marge pour les selfies serrés), onglet « Mes photos » ;
+`/api/g/<lien>/faces` → `match_faces` (distance < 0,6, la plus proche d'abord). Le selfie n'est jamais envoyé.
+Tests (photos d'exemple face-api.js) : vraie personne 0,37–0,55, inconnus ≥ 0,69 ; têtes de 45–60 px trouvées
+dans une image 6000 × 4000.

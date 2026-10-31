@@ -19,6 +19,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
+    "@vladmandic/face-api": "1.7.15",
     "bcryptjs": "^3.0.3",
     "client-zip": "^2.5.1",
     "exifr": "^7.1.3",

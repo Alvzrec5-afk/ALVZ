@@ -28,6 +28,8 @@ type Props = {
   /** Téléchargement de toute la galerie / d'une collection en ZIP (sinon photo par photo seulement). */
   zipEnabled?: boolean;
   favoritesEnabled: boolean;
+  /** Recherche par selfie (« Trouver mes photos »). */
+  faceSearch?: boolean;
   cover: { src: string; width: number; height: number } | null;
   /** Deuxième photo (mise en page Diptyque). */
   coverAlt: string | null;
@@ -39,6 +41,7 @@ type Props = {
 };
 
 const FAVORITES_TAB = "__favorites";
+const FACES_TAB = "__faces";
 const VIDEOS_TAB = "__videos";
 
 export function ClientGallery(props: Props) {
@@ -102,13 +105,16 @@ export function ClientGallery(props: Props) {
     };
   }, [design]);
 
-  const visible = useMemo(
-    () =>
-      tab === FAVORITES_TAB
-        ? props.photos.filter((p) => favorites.has(p.id))
-        : props.photos.filter((p) => p.collectionId === tab),
-    [tab, props.photos, favorites],
-  );
+  // Photos trouvées par le selfie, de la plus ressemblante à la moins ressemblante.
+  const [faceMatches, setFaceMatches] = useState<string[] | null>(null);
+  const [faceOpen, setFaceOpen] = useState(false);
+  const visible = useMemo(() => {
+    if (tab === FACES_TAB) {
+      const byId = new Map(props.photos.map((p) => [p.id, p]));
+      return (faceMatches ?? []).map((id) => byId.get(id)).filter((p): p is PhotoView => Boolean(p));
+    }
+    return tab === FAVORITES_TAB ? props.photos.filter((p) => favorites.has(p.id)) : props.photos.filter((p) => p.collectionId === tab);
+  }, [tab, props.photos, favorites, faceMatches]);
 
   const persistFavorite = useCallback(
     async (id: string, on: boolean) => {
@@ -186,7 +192,7 @@ export function ClientGallery(props: Props) {
             <p className="gallery-title text-xl sm:text-2xl truncate">{props.title}</p>
             <p className="eyebrow text-muted text-[9px] mt-1">ALVZ.REC{props.date ? ` · ${props.date}` : ""}</p>
           </button>
-          {(props.collections.length + (props.videos.length ? 1 : 0) > 1 || tab === FAVORITES_TAB) && (
+          {(props.collections.length + (props.videos.length ? 1 : 0) > 1 || tab === FAVORITES_TAB || tab === FACES_TAB) && (
             <nav ref={navRef} className="relative order-last md:order-2 w-[calc(100%+2.5rem)] sm:w-full md:w-auto md:flex-1 min-w-0 flex md:justify-center gap-6 overflow-x-auto no-scrollbar -mx-5 px-5 sm:mx-0 sm:px-0 md:h-full md:items-center border-t border-line md:border-0">
               {indicator && (
                 <span
@@ -214,6 +220,11 @@ export function ClientGallery(props: Props) {
                   Vidéos
                 </button>
               )}
+              {tab === FACES_TAB && (
+                <button data-tab={FACES_TAB} className="eyebrow whitespace-nowrap py-3 text-ink flex items-center gap-1.5">
+                  <FaceScanIcon className="w-3.5 h-3.5" /> Mes photos
+                </button>
+              )}
               {tab === FAVORITES_TAB && (
                 <button data-tab={FAVORITES_TAB} className="eyebrow whitespace-nowrap py-3 text-ink flex items-center gap-1.5">
                   <HeartIcon className="w-3.5 h-3.5" filled /> Ma sélection
@@ -230,6 +241,16 @@ export function ClientGallery(props: Props) {
               >
                 <ChatIcon />
                 <span className="text-[10px] uppercase tracking-[0.1em]">Contacter</span>
+              </button>
+            )}
+            {props.faceSearch && (
+              <button
+                onClick={() => (faceMatches && tab !== FACES_TAB ? selectTab(FACES_TAB) : setFaceOpen(true))}
+                className={`flex items-center gap-1.5 h-10 px-2 transition-colors ${tab === FACES_TAB ? "text-ink" : "text-ink/80 hover:text-ink"}`}
+                aria-label="Trouver mes photos"
+              >
+                <FaceScanIcon className="w-[22px] h-[22px]" />
+                <span className={`eyebrow text-[10px] ml-1 ${design.nav_style === "labels" ? "" : "hidden lg:inline"}`}>Trouver mes photos</span>
               </button>
             )}
             {props.favoritesEnabled && (
@@ -313,12 +334,27 @@ export function ClientGallery(props: Props) {
             Sélection enregistrée pour {email}. Elle est automatiquement transmise à ALVZ.REC.
           </p>
         )}
+        {tab === FACES_TAB && (
+          <div className="text-center py-6 px-6">
+            <p className="text-sm">
+              {visible.length
+                ? `${visible.length} photo${visible.length > 1 ? "s" : ""} où vous apparaissez`
+                : "Aucune photo trouvée avec ce selfie."}
+            </p>
+            <p className="text-xs text-muted mt-2">
+              La recherche peut manquer une photo floue, de profil ou très sombre : n&apos;hésitez pas à parcourir toute la galerie.
+            </p>
+            <button className="text-xs underline underline-offset-4 mt-3 hover:opacity-70" onClick={() => setFaceOpen(true)}>
+              Nouvelle recherche
+            </button>
+          </div>
+        )}
         {tab === VIDEOS_TAB ? (
           <div key={tab} className="animate-[gridIn_0.6s_ease-out_both] px-3 sm:px-0 pt-4">
             <VideoCards slug={props.slug} videos={props.videos} />
           </div>
         ) : visible.length === 0 ? (
-          tab === FAVORITES_TAB ? (
+          tab === FACES_TAB ? null : tab === FAVORITES_TAB ? (
             <div className="py-28 text-center px-8">
               <HeartIcon className="w-6 h-6 mx-auto text-muted" />
               <p className="gallery-title text-2xl mt-5">Votre sélection est vide</p>
@@ -386,6 +422,18 @@ export function ClientGallery(props: Props) {
             const go = askDownload;
             setAskDownload(null);
             go();
+          }}
+        />
+      )}
+
+      {faceOpen && (
+        <FaceSearchDialog
+          slug={props.slug}
+          onCancel={() => setFaceOpen(false)}
+          onDone={(ids) => {
+            setFaceMatches(ids);
+            setFaceOpen(false);
+            selectTab(FACES_TAB);
           }}
         />
       )}
@@ -699,5 +747,94 @@ function ChatIcon() {
     <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M4.5 18.5 5.7 15A7.5 7.5 0 1 1 9 18.3l-4.5.2Z" />
     </svg>
+  );
+}
+
+function FaceScanIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3.5 8V5.5a2 2 0 0 1 2-2H8M16 3.5h2.5a2 2 0 0 1 2 2V8M20.5 16v2.5a2 2 0 0 1-2 2H16M8 20.5H5.5a2 2 0 0 1-2-2V16" />
+      <circle cx="12" cy="10.5" r="3" />
+      <path d="M7.5 17.2a5 5 0 0 1 9 0" />
+    </svg>
+  );
+}
+
+/**
+ * « Trouver mes photos » : le client accepte, prend un selfie (ou choisit une photo) ; l'empreinte du visage
+ * est calculée sur son téléphone et seule elle part au site. Le selfie n'est ni envoyé ni enregistré.
+ */
+function FaceSearchDialog({ slug, onCancel, onDone }: { slug: string; onCancel: () => void; onDone: (photoIds: string[]) => void }) {
+  const [consent, setConsent] = useState(false);
+  const [step, setStep] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const camera = useRef<HTMLInputElement>(null);
+  const library = useRef<HTMLInputElement>(null);
+
+  async function search(file: File | undefined) {
+    if (!file) return;
+    setError(null);
+    try {
+      setStep("Préparation de la reconnaissance…");
+      const { loadFaceApi, selfieDescriptor } = await import("@/lib/client/faces");
+      await loadFaceApi();
+      setStep("Analyse de votre selfie…");
+      const descriptor = await selfieDescriptor(file);
+      if (!descriptor) throw new Error("Aucun visage trouvé. Reprenez un selfie de face, bien éclairé, sans lunettes de soleil.");
+      setStep("Recherche dans la galerie…");
+      const res = await fetch(`/api/g/${slug}/faces`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ descriptor }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Recherche impossible");
+      onDone(json.photoIds ?? []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setStep(null);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm" onClick={step ? undefined : onCancel}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full sm:max-w-md bg-bg text-ink px-7 pt-10 pb-[max(env(safe-area-inset-bottom),2rem)] sm:p-12 animate-[fadeUp_0.4s_ease-out_both]"
+      >
+        <FaceScanIcon className="w-6 h-6 mx-auto" />
+        <h2 className="display text-3xl text-center mt-5">Trouver mes photos</h2>
+        <p className="text-sm text-muted text-center mt-3 leading-relaxed">
+          Prenez un selfie : nous affichons toutes les photos de la galerie où vous apparaissez.
+        </p>
+        <label className="flex items-start gap-3 mt-7 text-xs text-muted leading-relaxed cursor-pointer">
+          <input type="checkbox" className="mt-0.5 accent-current" checked={consent} onChange={(e) => setConsent(e.target.checked)} disabled={Boolean(step)} />
+          <span>
+            J&apos;accepte que mon visage soit comparé aux photos de cette galerie. Le selfie reste sur mon appareil : il n&apos;est ni envoyé
+            ni enregistré.
+          </span>
+        </label>
+        <input ref={camera} type="file" accept="image/*" capture="user" className="hidden" onChange={(e) => search(e.target.files?.[0])} />
+        <input ref={library} type="file" accept="image/*" className="hidden" onChange={(e) => search(e.target.files?.[0])} />
+        {step ? (
+          <p className="text-sm text-center mt-8 flex items-center justify-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> {step}
+          </p>
+        ) : (
+          <div className="mt-8 space-y-3">
+            <button className="btn w-full" disabled={!consent} onClick={() => camera.current?.click()}>
+              Prendre un selfie
+            </button>
+            <button className="btn btn-ghost w-full" disabled={!consent} onClick={() => library.current?.click()}>
+              Choisir une photo de moi
+            </button>
+            <button className="w-full text-xs text-muted pt-2 hover:text-ink" onClick={onCancel}>
+              Annuler
+            </button>
+          </div>
+        )}
+        {error && <p className="text-sm text-danger mt-4 text-center">{error}</p>}
+      </div>
+    </div>
   );
 }

@@ -5,6 +5,7 @@
  * la suppression se fait en arrière-plan. En cas d'échec, il réapparaît et un message s'affiche.
  */
 import { useSyncExternalStore } from "react";
+import { faceIndexer } from "@/lib/client/face-indexer";
 
 const hidden = new Set<string>();
 let pending = 0;
@@ -62,8 +63,17 @@ export function deleteInBackground(ids: string[], task: () => Promise<unknown>, 
 /** Pastille discrète tant qu'une suppression est en cours (et avertit si on ferme la page). */
 export function BackgroundStatus() {
   const n = usePendingCount();
+  const faces = useSyncExternalStore(faceIndexer.subscribe, faceIndexer.getSnapshot, faceIndexer.getServerSnapshot);
   if (typeof window !== "undefined") {
-    window.onbeforeunload = n > 0 ? (e) => e.preventDefault() : null;
+    window.onbeforeunload = n > 0 || faces.running ? (e) => e.preventDefault() : null;
+  }
+  if (!n && faces.running) {
+    return (
+      <div className="fixed z-[600000] left-1/2 -translate-x-1/2 bottom-[max(env(safe-area-inset-bottom),16px)] bg-ink text-bg text-xs px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 pointer-events-none">
+        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+        Analyse des visages… {faces.done} / {faces.total}
+      </div>
+    );
   }
   if (!n) return null;
   return (

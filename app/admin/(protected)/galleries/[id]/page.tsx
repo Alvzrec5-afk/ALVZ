@@ -21,7 +21,7 @@ export default async function GalleryPage({ params }: { params: Promise<{ id: st
     supabase
       .from("galleries")
       .select(
-        `id, deleted_at, kind, slug, title, event_date, cover_photo_id, password_hash, expires_at, watermark, downloads_enabled, download_web_enabled, download_email_required, zip_enabled, favorites_enabled, ${DESIGN_FIELDS}`,
+        `id, deleted_at, kind, slug, title, event_date, cover_photo_id, password_hash, expires_at, watermark, downloads_enabled, download_web_enabled, download_email_required, zip_enabled, face_search_enabled, favorites_enabled, ${DESIGN_FIELDS}`,
       )
       .eq("id", id)
       .maybeSingle(),
@@ -86,6 +86,7 @@ export default async function GalleryPage({ params }: { params: Promise<{ id: st
     downloadWebEnabled: g.download_web_enabled,
     downloadEmailRequired: Boolean(g.download_email_required),
     zipEnabled: g.zip_enabled !== false,
+    faceSearchEnabled: Boolean(g.face_search_enabled),
     favoritesEnabled: g.favorites_enabled,
     design: readDesign(g),
     kind: g.kind === "video" ? "video" : "photo",

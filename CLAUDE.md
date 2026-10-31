@@ -77,6 +77,11 @@ Détail complet (fichiers, tables, choix techniques) : **`docs/carte-du-code.md`
   taille du texte, rognage, clic droit, copier-coller entre onglets, annuler, capture PNG, partage client `/t/<lien>`,
   modèle des nouveaux tableaux (7 planches, dont 5. STORYBOARD). Serveur : `lib/boards.ts` (`cleanData` filtre chaque champ de carte :
   **tout nouveau champ de `BoardData` doit y être ajouté**).
+- **Recherche par visage (selfie)** : option par galerie (Paramètres → Recherche par visage). Studio : `lib/client/faces.ts`
+  (face-api, modèles sur jsDelivr, original ramené à 4000 px + morceaux de 900 px pour les petites têtes) et
+  `lib/client/face-indexer.ts` (file d'analyse, lancée après chaque envoi ou bouton « Analyser ») → `/api/admin/faces` →
+  table `photo_faces` (pgvector 128). Client : bouton « Trouver mes photos », selfie analysé sur le téléphone,
+  `/api/g/<lien>/faces` → fonction `match_faces` (seuil 0,6). Testé avec des photos d'exemple, pas encore en vrai.
 - **Médias** : photos préparées dans le navigateur (`lib/client/image.ts`), vidéos H.264 (`lib/client/video.ts`).
 - **Base** : schéma de référence `supabase/schema.sql` (à tenir à jour après chaque migration).
 
@@ -159,6 +164,10 @@ Publié le 24 oct. : **calendriers importés** (iPhone iCloud / Google, lien iCa
 - **À faire par le propriétaire** : poser une fois l'index.html (Studio → Site → Relier alvzrec.com) sur l'ancien compte Netlify, puis vérifier alvzrec.com (clips, photos, coulisses).
 - **À vérifier en vrai par le propriétaire** : nouvel Accueil (chiffres réels, objectif à régler dans Finances → Réglages) ; import calendrier iPhone / Google ; remise dans un devis ; zoom galerie (grille bloquée, photo ouverte zoomable) sur vrai iPhone ; option ZIP ; Calendrier (événement test confirmé → projets créés ; abonnement iPhone) ; Articles dans un devis ; Finances (remplir Réglages, devis test envoyé à soi-même, bon pour accord, bouton Payer, e-mails reçus, galerie bloquée puis débloquée) ; tableau modifié en mode avion puis réseau remis (iPhone et Mac), panneau « Images projet » (déplacer, agrandir, glisser une image sur le tableau), onglets des planches, Studio → Site (ajout d'un lien YouTube, envoi de photos), Accueil `/admin` (chiffres, stockage détaillé), Banque d'images (copie d'office d'une photo envoyée, onglet, corbeille), ouverture d'une planche ; menu « … » (plan Google Maps, envoi d'un PDF / MP3 vers Oracle), case photo vide (choix parmi les photos du projet) ;
   vidéo dans un tableau (envoi depuis l'iPhone, lecture, plein écran) ; capture d'un tableau **depuis l'iPhone** (nette au zoom ? photos présentes ? non testé sur vrai Safari) et avec de vraies photos Oracle (si elles sortent
+- **À vérifier en vrai par le propriétaire** : recherche par selfie (31 oct.) sur une vraie galerie : vitesse de l'analyse sur
+  son Mac, justesse (petites têtes de groupe comprises). Table `photo_faces` + `match_faces` déjà en base US.
+- 31 oct. : l'ancien projet Supabase d'Irlande (sauvegarde) a été réactivé par erreur (il était en pause) et a reçu la
+  migration `face_search` ; sans effet sur le site. Il se remettra en pause tout seul.
   grises → CORS : passer les images par une route du site ou régler le bucket) ; défilement au doigt sur une grille ;
   Ctrl + clic sur Mac ; envoi d'un clip (H.264/4K) ; e-mail de test Gmail ; images « disparues » des tableaux
   revenues (réparation automatique `objectSize`).

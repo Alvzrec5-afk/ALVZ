@@ -33,6 +33,7 @@ export type ManagedGallery = {
   downloadEmailRequired: boolean;
   /** Téléchargement de toute la galerie / d'une collection en ZIP. */
   zipEnabled: boolean;
+  faceSearchEnabled: boolean;
   favoritesEnabled: boolean;
   design: GalleryDesign;
   kind: "photo" | "video";

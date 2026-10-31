@@ -3,6 +3,7 @@
  * réseau, détection des doublons, progression en octets.
  */
 import exifr from "exifr";
+import { faceIndexer } from "./face-indexer";
 import { makeVariants } from "./image";
 import { sha256, type PickedFile } from "./files";
 
@@ -256,6 +257,8 @@ export class Uploader {
         variantsBytes: smallTotal,
       }),
     );
+    // Recherche par visage (si la galerie l'a activée) : analyse de l'original, encore sur l'ordinateur.
+    void faceIndexer.addUploaded(this.galleryId, prepared.photoId, file);
     return false;
   }
 }

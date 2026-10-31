@@ -1,14 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { regenerateLink, setGalleryExpiry, setGalleryPassword, setGallerySlug } from "@/app/admin/actions";
-import { DownloadIcon, HeartIcon, LockIcon, WrenchIcon } from "@/components/icons";
+import { DownloadIcon, HeartIcon, LockIcon, PeopleIcon, WrenchIcon } from "@/components/icons";
+import { faceIndexer } from "@/lib/client/face-indexer";
 import type { ManagedGallery } from "./gallery-manager";
 import { ListRow, SubHeader, Toggle } from "./ui";
 import { SaveStatus, useSave } from "./use-save";
 
-type View = "menu" | "general" | "privacy" | "download" | "favorites" | "contact";
+type View = "menu" | "general" | "privacy" | "download" | "favorites" | "contact" | "faces";
 
 export function SettingsPanel({ gallery, onDelete }: { gallery: ManagedGallery; onDelete: () => void }) {
   const router = useRouter();
@@ -20,6 +21,7 @@ export function SettingsPanel({ gallery, onDelete }: { gallery: ManagedGallery; 
     download_web_enabled: gallery.downloadWebEnabled,
     download_email_required: gallery.downloadEmailRequired,
     zip_enabled: gallery.zipEnabled,
+    face_search_enabled: gallery.faceSearchEnabled,
     favorites_enabled: gallery.favoritesEnabled,
     show_contact: gallery.design.show_contact,
   });
@@ -31,10 +33,11 @@ export function SettingsPanel({ gallery, onDelete }: { gallery: ManagedGallery; 
         download_web_enabled: gallery.downloadWebEnabled,
         download_email_required: gallery.downloadEmailRequired,
         zip_enabled: gallery.zipEnabled,
+        face_search_enabled: gallery.faceSearchEnabled,
         favorites_enabled: gallery.favoritesEnabled,
         show_contact: gallery.design.show_contact,
       }),
-    [gallery.watermark, gallery.downloadsEnabled, gallery.downloadWebEnabled, gallery.downloadEmailRequired, gallery.zipEnabled, gallery.favoritesEnabled, gallery.design.show_contact],
+    [gallery.watermark, gallery.downloadsEnabled, gallery.downloadWebEnabled, gallery.downloadEmailRequired, gallery.zipEnabled, gallery.faceSearchEnabled, gallery.favoritesEnabled, gallery.design.show_contact],
   );
   const toggle = (key: keyof typeof opts) => (v: boolean) => {
     setOpts((o) => ({ ...o, [key]: v }));
@@ -49,6 +52,9 @@ export function SettingsPanel({ gallery, onDelete }: { gallery: ManagedGallery; 
         <ListRow icon={<LockIcon />} label="Confidentialité" value={gallery.hasPassword ? "Mot de passe" : "Lien seul"} onClick={() => setView("privacy")} />
         <ListRow icon={<DownloadIcon />} label="Téléchargement" badge={opts.downloads_enabled} onClick={() => setView("download")} />
         <ListRow icon={<HeartIcon />} label="Favoris" badge={opts.favorites_enabled} onClick={() => setView("favorites")} />
+        {gallery.kind === "photo" && (
+          <ListRow icon={<PeopleIcon />} label="Recherche par visage" badge={opts.face_search_enabled} onClick={() => setView("faces")} />
+        )}
         <ListRow icon={<CardIcon />} label="Carte de visite" badge={opts.show_contact} onClick={() => setView("contact")} />
       </div>
     );
@@ -101,6 +107,29 @@ export function SettingsPanel({ gallery, onDelete }: { gallery: ManagedGallery; 
             hint="Le client indique son e-mail une seule fois avant de télécharger. Les adresses arrivent dans Outils → Clients & e-mails."
           />
         </div>
+        <div className="mt-6"><SaveStatus status={status} /></div>
+      </div>
+    );
+  }
+
+  if (view === "faces") {
+    return (
+      <div>
+        <SubHeader title="Recherche par visage" onBack={back} />
+        <Toggle
+          checked={opts.face_search_enabled}
+          onChange={(v) => {
+            toggle("face_search_enabled")(v);
+            faceIndexer.setEnabled(gallery.id, v);
+          }}
+          label="Le client retrouve ses photos avec un selfie"
+          hint="Bouton « Trouver mes photos » dans la galerie : le client prend un selfie et voit toutes les photos où il apparaît. Le selfie reste sur son téléphone (seule une empreinte du visage sert à la recherche, rien n'est enregistré). Le client doit accepter avant."
+        />
+        {opts.face_search_enabled && <FaceIndexStatus galleryId={gallery.id} />}
+        <p className="text-xs text-muted mt-6 leading-relaxed max-w-xl">
+          Données biométriques (RGPD) : n&apos;activez cette option que si vos clients en sont informés (contrat, mentions
+          légales). Les empreintes des visages sont effacées avec les photos et la galerie.
+        </p>
         <div className="mt-6"><SaveStatus status={status} /></div>
       </div>
     );
@@ -314,5 +343,69 @@ function CardIcon() {
       <circle cx="9" cy="11" r="2" />
       <path d="M6 15.5c.6-1.3 1.7-2 3-2s2.4.7 3 2M14.5 10h4M14.5 13h3" />
     </svg>
+  );
+}
+
+/** Avancement de l'analyse des visages d'une galerie, et bouton pour analyser les photos déjà en ligne. */
+function FaceIndexStatus({ galleryId }: { galleryId: string }) {
+  const live = useSyncExternalStore(faceIndexer.subscribe, faceIndexer.getSnapshot, faceIndexer.getServerSnapshot);
+  const [count, setCount] = useState<{ done: number; total: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let stop = false;
+    fetch(`/api/admin/faces?gallery=${galleryId}&count=1`)
+      .then((r) => r.json())
+      .then((j) => !stop && setCount({ done: j.done ?? 0, total: j.total ?? 0 }))
+      .catch(() => undefined);
+    return () => {
+      stop = true;
+    };
+    // Recompte à la fin de chaque analyse.
+  }, [galleryId, live.running, live.done]);
+
+  const remaining = count ? count.total - count.done : 0;
+  return (
+    <div className="mt-8 border border-line p-5 max-w-xl">
+      <p className="text-sm">
+        {count ? (
+          <>
+            <span className="display text-2xl mr-2">{count.done}</span>/ {count.total} photos analysées
+          </>
+        ) : (
+          "…"
+        )}
+      </p>
+      {live.running ? (
+        <>
+          <div className="h-1 bg-bg-soft mt-4 overflow-hidden">
+            <div className="h-full bg-emerald-500 transition-all" style={{ width: `${live.total ? (live.done / live.total) * 100 : 0}%` }} />
+          </div>
+          <p className="text-xs text-muted mt-3 leading-relaxed">
+            Analyse en cours : {live.done} / {live.total}. Chaque photo est examinée en pleine définition, petits visages compris
+            (quelques secondes par photo). Gardez cet onglet ouvert ; vous pouvez continuer à utiliser le studio.
+          </p>
+        </>
+      ) : remaining > 0 ? (
+        <>
+          <button
+            className="btn mt-4"
+            onClick={() => {
+              setError(null);
+              faceIndexer.analyzeGallery(galleryId).catch((e) => setError(e instanceof Error ? e.message : String(e)));
+            }}
+          >
+            Analyser {remaining} photo{remaining > 1 ? "s" : ""}
+          </button>
+          <p className="text-xs text-muted mt-3 leading-relaxed">
+            Les nouvelles photos envoyées sont analysées automatiquement. Pour celles déjà en ligne, l&apos;analyse relit chaque
+            original (quelques secondes par photo, à faire une fois).
+          </p>
+        </>
+      ) : count && count.total > 0 ? (
+        <p className="text-xs text-muted mt-3">Toutes les photos sont prêtes pour la recherche par selfie.</p>
+      ) : null}
+      {(error || live.error) && <p className="text-xs text-danger mt-3">{error || live.error}</p>}
+    </div>
   );
 }
