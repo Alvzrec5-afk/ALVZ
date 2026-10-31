@@ -14,7 +14,7 @@ Netlify sur 300 par mois). Entre-temps, les commits restent en local.
    - `git status --short` (aucun fichier `app/harness/` ni `public/hx/` qui traîne) ;
    - `npm run typecheck` puis `npm run build` : les deux doivent passer.
 2. Si `CLAUDE.md` liste une **migration à appliquer** : l'appliquer avec l'outil MCP Supabase `apply_migration`
-   (projet `ayootztgiuhpqgeckwfu`, additive uniquement), vérifier avec `list_tables`, puis retirer la ligne de
+   (projet `eioymzumjfgpsetncicl`, additive uniquement), vérifier avec `list_tables`, puis retirer la ligne de
    `CLAUDE.md` (dans le même commit que le reste).
 3. **Le dernier commit poussé ne doit jamais contenir `[skip netlify]`** quand le push contient du code :
    Netlify regarde le message du dernier commit et saute alors toute la publication.

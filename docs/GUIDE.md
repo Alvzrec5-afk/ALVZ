@@ -35,7 +35,7 @@ Cochez **Contains secret values** pour les lignes marquées 🔒.
 
 | Nom | Valeur | |
 |---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | `https://ayootztgiuhpqgeckwfu.supabase.co` | |
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://eioymzumjfgpsetncicl.supabase.co` | |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase → Project Settings → API Keys → *Publishable key* (`sb_publishable_…`) | |
 | `SUPABASE_SECRET_KEY` | Supabase → Project Settings → API Keys → *Secret keys* → (`sb_secret_…`) | 🔒 |
 | `ORACLE_NAMESPACE` | Namespace Oracle | |

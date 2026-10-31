@@ -29,7 +29,7 @@ construit et les règles de travail convenues avec le propriétaire.
 | Site | https://alvzgalleries.com (aussi alvzgalleries.netlify.app) |
 | Netlify | projet `alvzgalleries`, site id `16e80748-88fd-49c9-a6ae-b72b12bcfb17`, équipe `luis-alves-andrade`, offre gratuite (crédits), fonctions aux USA (iad) |
 | Branche de production | `claude/alvz-photo-gallery-platform-tig9or` (dépôt `Alvzrec5-afk/ALVZ`) |
-| Supabase | projet **`eioymzumjfgpsetncicl`** « ALVZ Studio (US) » (us-east-1, à côté des fonctions Netlify) depuis le 21 oct. 2026 — outils MCP Supabase disponibles. Ancien projet `ayootztgiuhpqgeckwfu` (Irlande) gardé comme sauvegarde, à supprimer plus tard |
+| Supabase | projet **`eioymzumjfgpsetncicl`** « ALVZ Studio (US) » (us-east-1, à côté des fonctions Netlify) depuis le 21 oct. 2026 — outils MCP Supabase disponibles. Ancien projet d'Irlande **supprimé le 31 oct.** : c'est le seul projet Supabase |
 | Stockage | Oracle Object Storage (API S3), région eu-paris-1, bucket privé, URL pré-signées |
 | E-mails | Gmail `alvzrec.pro@gmail.com` via SMTP (mot de passe d'application) |
 
@@ -166,8 +166,6 @@ Publié le 24 oct. : **calendriers importés** (iPhone iCloud / Google, lien iCa
   vidéo dans un tableau (envoi depuis l'iPhone, lecture, plein écran) ; capture d'un tableau **depuis l'iPhone** (nette au zoom ? photos présentes ? non testé sur vrai Safari) et avec de vraies photos Oracle (si elles sortent
 - **À vérifier en vrai par le propriétaire** : recherche par selfie (31 oct.) sur une vraie galerie : vitesse de l'analyse sur
   son Mac, justesse (petites têtes de groupe comprises). Table `photo_faces` + `match_faces` déjà en base US.
-- 31 oct. : l'ancien projet Supabase d'Irlande (sauvegarde) a été réactivé par erreur (il était en pause) et a reçu la
-  migration `face_search` ; sans effet sur le site. Il se remettra en pause tout seul.
   grises → CORS : passer les images par une route du site ou régler le bucket) ; défilement au doigt sur une grille ;
   Ctrl + clic sur Mac ; envoi d'un clip (H.264/4K) ; e-mail de test Gmail ; images « disparues » des tableaux
   revenues (réparation automatique `objectSize`).
